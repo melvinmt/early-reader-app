@@ -173,15 +173,17 @@ That's it. No dashboards, no complexity - just a protected settings screen. **Al
 
 ## Onboarding Flow
 
-### Screen 1: Parent Email (Local Storage)
+### Screen 1: Parent Email (Supabase Auth)
 
-Email is stored locally for account identification and RevenueCat association. No cloud authentication required.
+Parent authentication via Supabase Auth (email OTP). After authentication, parent email and user ID are stored locally in SQLite for account identification and RevenueCat association.
 
 **Requirements:**
 - Simple email input field with validation
-- On submit, create parent record in local SQLite database
+- On submit, initiate Supabase Auth email OTP flow
+- Show "Check your email" screen with OTP input
+- On successful authentication, create parent record in local SQLite database with Supabase user ID
 - Store parent ID in session storage for subsequent screens
-- Navigate to Add Children screen after successful save
+- Navigate to Add Children screen after successful authentication
 - Display terms and privacy policy link
 
 ### SQLite Database Schema
@@ -191,7 +193,7 @@ All data is stored locally in SQLite. The database is initialized on app startup
 **Database Tables:**
 
 1. **parents** - Parent account information
-   - id (TEXT PRIMARY KEY)
+   - id (TEXT PRIMARY KEY) - Supabase Auth user ID
    - email (TEXT NOT NULL)
    - created_at (TEXT NOT NULL)
    - subscription_status (TEXT DEFAULT 'none') - Values: 'none', 'trial', 'active', 'cancelled', 'expired'
@@ -242,9 +244,16 @@ All data is stored locally in SQLite. The database is initialized on app startup
 - idx_sessions_child on sessions(child_id)
 - idx_content_cache_type on content_cache(content_type, content_key)
 
-### Supabase Edge Functions (LLM Proxy Only)
+### Supabase Services
 
-Supabase is used ONLY for proxying LLM API calls. No user data is sent to the cloud.
+**Supabase Auth:**
+- Parent authentication via email OTP
+- User session management
+- Secure token storage
+
+**Supabase Edge Functions (LLM Proxy Only):**
+- Used ONLY for proxying LLM API calls
+- No user data is sent to Edge Functions beyond what's necessary for LLM requests
 
 **Architecture:**
 - All LLM API calls (Gemini 3 Flash, OpenAI, Nano Banana) are proxied through Supabase Edge Functions
@@ -1966,7 +1975,8 @@ assets/
 │  ├── OpenAI Realtime Voice API (Interactive voice + pronunciation)  │
 │  └── OpenAI Realtime Tool Calling (Dynamic lesson control)          │
 │                                                                      │
-│  CLOUD PROXY (No user data stored in cloud)                          │
+│  CLOUD SERVICES                                                      │
+│  ├── Supabase Auth (Parent authentication via email OTP)           │
 │  └── Supabase Edge Functions (API key protection for LLM calls)     │
 │                                                                      │
 │  LOCAL DATA STORAGE (All user data on device)                        │
@@ -2010,6 +2020,9 @@ assets/
 - react-native-mmkv 2.x (Fast key-value storage)
 - react-native-fs 2.x (File system access)
 
+**Authentication:**
+- @supabase/supabase-js (Supabase Auth client)
+
 **In-App Purchases:**
 - react-native-purchases (RevenueCat)
 
@@ -2019,7 +2032,7 @@ assets/
 
 **Client-Side (.env):**
 - SUPABASE_URL - Supabase project URL
-- SUPABASE_ANON_KEY - Supabase anonymous key (for Edge Function calls)
+- SUPABASE_ANON_KEY - Supabase anonymous key (for Supabase Auth and Edge Function calls)
 
 **Server-Side (Supabase Edge Functions):**
 - GEMINI_API_KEY - Google Gemini API key (for both Gemini 3 Flash and Nano Banana)
@@ -2177,7 +2190,7 @@ Duration: ~6-8 weeks
 │  ├── [ ] Initialize React Native project with TypeScript            │
 │  ├── [ ] Configure React Navigation                                  │
 │  ├── [ ] Set up Zustand state management                            │
-│  └── [ ] Configure Firebase (Auth, Firestore)                       │
+│  └── [ ] Configure Supabase Auth (Parent authentication)              │
 │                                                                      │
 │  CORE FEATURES                                                       │
 │  ├── [ ] Custom orthography rendering with React Native Skia        │
@@ -2269,7 +2282,7 @@ Duration: ~8-10 weeks
 │  ├── [ ] Cloud sync for progress                                    │
 │  ├── [ ] Offline mode (WatermelonDB)                                │
 │  ├── [ ] Error reporting (Sentry/Crashlytics)                       │
-│  └── [ ] Analytics events (Firebase Analytics)                      │
+│  └── [ ] Analytics events (Local tracking, optional Supabase Analytics) │
 │                                                                      │
 │  QUALITY                                                             │
 │  ├── [ ] Accessibility audit (VoiceOver/TalkBack)                   │
