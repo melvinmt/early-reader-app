@@ -103,8 +103,8 @@ All user data is stored locally in SQLite on the device. The only cloud interact
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                 SUPABASE EDGE FUNCTIONS                       │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │   │
-│  │  │ OpenAI   │ │ Gemini   │ │ Imagen   │ │ TTS      │         │   │
-│  │  │ Realtime │ │ 2.0 Flash│ │ 3        │ │ Services │         │   │
+│  │  │ OpenAI   │ │ Gemini   │ │ Nano     │ │ TTS      │         │   │
+│  │  │ Realtime │ │ 3 Flash  │ │ Banana   │ │ Services │         │   │
 │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘         │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                                                                      │
@@ -139,8 +139,8 @@ All user data is stored locally in SQLite on the device. The only cloud interact
 │  │  └───────────────────────┘  │         │  ┌───────────────┐  │    │
 │  │                             │         │  │ External APIs │  │    │
 │  │  ┌───────────────────────┐  │         │  │ • OpenAI      │  │    │
-│  │  │   File System Cache   │  │         │  │ • Gemini      │  │    │
-│  │  │  ┌─────────────────┐  │  │         │  │ • Imagen      │  │    │
+│  │  │   File System Cache   │  │         │  │ • Gemini 3    │  │    │
+│  │  │  ┌─────────────────┐  │  │         │  │ • Nano Banana │  │    │
 │  │  │  │ images/         │  │  │         │  └───────────────┘  │    │
 │  │  │  │ audio/          │  │  │         └─────────────────────┘    │
 │  │  │  └─────────────────┘  │  │                                    │
@@ -245,17 +245,17 @@ All data is stored locally in SQLite. The database is initialized on app startup
 Supabase is used ONLY for proxying LLM API calls. No user data is sent to the cloud.
 
 **Architecture:**
-- All LLM API calls (Gemini, OpenAI, Imagen) are proxied through Supabase Edge Functions
+- All LLM API calls (Gemini 3 Flash, OpenAI, Nano Banana) are proxied through Supabase Edge Functions
 - API keys are stored server-side in Edge Functions, never exposed to the client
 - Client makes HTTPS requests to Edge Function endpoints with only the necessary parameters
 
 **Required Edge Functions:**
 
-1. **generate-word** - Calls Gemini 2.0 Flash to generate appropriate words
+1. **generate-word** - Calls Gemini 3 Flash to generate appropriate words
    - Input: targetSounds, knownSounds, difficulty
    - Output: word, phonemes array, imagePrompt
 
-2. **generate-image** - Calls Imagen 3 to generate word images
+2. **generate-image** - Calls Nano Banana to generate word images
    - Input: imagePrompt
    - Output: imageBase64
 
@@ -375,8 +375,8 @@ The app uses a modified SM-2 algorithm (SuperMemo 2) to determine when to resurf
 
 2. **New Cards (Lower Priority)**
    - Generate 10 new cards appropriate for child's current level
-   - Use Supabase Edge Function to call Gemini for word generation
-   - Use Supabase Edge Function to call Imagen for image generation
+   - Use Supabase Edge Function to call Gemini 3 Flash for word generation
+   - Use Supabase Edge Function to call Nano Banana for image generation
    - Cache word data and images locally in SQLite and file system
    - Exclude words already seen by this child
    - Priority: 10+ (incremented by index)
@@ -386,8 +386,8 @@ The app uses a modified SM-2 algorithm (SuperMemo 2) to determine when to resurf
    - Review cards always shown before new cards
 
 **Card Generation:**
-- Generate words via LLM proxy (Gemini) based on level configuration
-- Generate images via LLM proxy (Imagen) using word's image prompt
+- Generate words via LLM proxy (Gemini 3 Flash) based on level configuration
+- Generate images via LLM proxy (Nano Banana) using word's image prompt
 - Store word metadata in content_cache table
 - Save images to local file system
 - Track file paths in content_cache for retrieval
@@ -707,10 +707,10 @@ The app leverages AI to dynamically generate educational content, ensuring unlim
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Google Gemini 2.0 Flash Integration
+#### Google Gemini 3 Flash Integration
 
 **Word Generation Requirements:**
-- Call Gemini 2.0 Flash via Supabase Edge Function (LLM proxy)
+- Call Gemini 3 Flash via Supabase Edge Function (LLM proxy)
 - Generate decodable words based on child's known sounds and current level
 - Input parameters: knownSounds array, targetPattern, count, difficulty, excludeWords
 - Output: Array of words with phonemes, syllables, pattern, difficulty, and imagePrompt
@@ -783,26 +783,29 @@ The app leverages AI to dynamically generate educational content, ensuring unlim
 - Add context if provided
 - Append style requirements to ensure consistency
 
-#### Google Imagen 3 Integration
+#### Google Nano Banana Integration
 
 **Image Generation Requirements:**
-- Call Imagen 3 via Supabase Edge Function (LLM proxy)
+- Call Nano Banana (via Gemini API) via Supabase Edge Function (LLM proxy)
+- Use model: `gemini-2.5-flash-image` (Nano Banana) or `gemini-3-pro-image-preview` (Nano Banana Pro) for higher quality
 - Generate images based on word and imagePrompt from word generation
 - Input parameters: word, imagePrompt (optional), style, aspectRatio
 - Apply base style prompt for consistency (friendly children's book illustration style)
-- Safety settings: block_most filter level, no person generation
-- Output: base64 encoded image data
+- Support for text-to-image generation, image editing, and multi-image blending
+- High-fidelity text rendering capabilities
+- Output: base64 encoded image data or inline image data
 - Batch generation support for pre-loading multiple images with rate limiting
 
-#### Imagen 3 Advantages for This Use Case
+#### Nano Banana Advantages for This Use Case
 
 | Feature | Benefit |
 |---------|---------|
-| **Safety Filters** | Built-in child-safe content filtering |
+| **Integrated with Gemini API** | Single API for both text and image generation |
+| **Fast Generation** | Nano Banana optimized for speed and efficiency (low latency) |
+| **High-Fidelity Text** | Can render legible text in images (useful for word cards) |
 | **Consistent Style** | Better prompt following for uniform look |
-| **Fast Generation** | Low latency for real-time needs |
-| **Google Cloud Integration** | Easy to use with Firebase backend |
 | **Cost Effective** | Competitive pricing for educational apps |
+| **Image Editing** | Can edit existing images if needed |
 
 #### Pre-Generation Strategy (Look-Ahead Caching)
 
@@ -2008,8 +2011,8 @@ assets/
 │  └── Custom audio blending engine                                    │
 │                                                                      │
 │  AI SERVICES (via Supabase Edge Functions - ONLY cloud interaction) │
-│  ├── Google Gemini 2.0 Flash (Word generation, lesson content)      │
-│  ├── Google Imagen 3 (Image generation)                              │
+│  ├── Google Gemini 3 Flash (Word generation, lesson content)        │
+│  ├── Google Nano Banana (Image generation via Gemini API)           │
 │  ├── OpenAI Realtime Voice API (Interactive voice + pronunciation)  │
 │  └── OpenAI Realtime Tool Calling (Dynamic lesson control)          │
 │                                                                      │
@@ -2069,22 +2072,20 @@ assets/
 - SUPABASE_ANON_KEY - Supabase anonymous key (for Edge Function calls)
 
 **Server-Side (Supabase Edge Functions):**
-- GEMINI_API_KEY - Google Gemini API key
+- GEMINI_API_KEY - Google Gemini API key (for both Gemini 3 Flash and Nano Banana)
 - OPENAI_API_KEY - OpenAI API key
-- GOOGLE_CLOUD_PROJECT - GCP project ID (for Imagen)
-- GOOGLE_APPLICATION_CREDENTIALS - Service account credentials (for Imagen)
 
 ### AI Service Cost Estimates
 
 | Service | Usage | Estimated Cost |
 |---------|-------|----------------|
-| **Gemini 2.0 Flash** | Word generation, stories | ~$0.001 per 1K tokens |
-| **Imagen 3** | Image generation | ~$0.02-0.04 per image |
+| **Gemini 3 Flash** | Word generation, stories | $0.50 per million input tokens, $3.00 per million output tokens |
+| **Nano Banana** | Image generation | Pricing via Gemini API (check current rates) |
 | **OpenAI Realtime** | Voice interaction | ~$0.06/min audio input, $0.24/min audio output |
 
 **Monthly estimate for active user (1 lesson/day):**
-- Gemini: ~$0.50/month
-- Imagen: ~$5-10/month (with pre-generation caching)
+- Gemini 3 Flash: ~$0.50-1.00/month (word generation)
+- Nano Banana: ~$5-10/month (with pre-generation caching)
 - OpenAI Realtime: ~$15-20/month (20 min voice/day)
 - **Total: ~$20-30/user/month** (can be optimized with caching)
 
@@ -2267,8 +2268,8 @@ Duration: ~8-10 weeks
 │  └── [ ] Parent override controls                                   │
 │                                                                      │
 │  AI CONTENT GENERATION                                               │
-│  ├── [ ] Google Gemini 2.0 Flash for word/story generation          │
-│  ├── [ ] Google Imagen 3 image generation                           │
+│  ├── [ ] Google Gemini 3 Flash for word/story generation          │
+│  ├── [ ] Google Nano Banana image generation                       │
 │  ├── [ ] OpenAI Realtime API for voice interaction                  │
 │  └── [ ] Word validation engine (decodability check)                │
 │                                                                      │
