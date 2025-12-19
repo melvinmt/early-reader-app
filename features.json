@@ -1,0 +1,184 @@
+{
+  "features": [
+    {
+      "id": "auth-001",
+      "category": "Authentication",
+      "description": "Parent can sign in with email OTP via Supabase",
+      "steps": [
+        "Enter email on login screen",
+        "Receive OTP code via email",
+        "Enter code and gain access",
+        "Store parent in local SQLite"
+      ],
+      "passes": false
+    },
+    {
+      "id": "onboard-001",
+      "category": "Onboarding",
+      "description": "Parent can add one or more children with name and age",
+      "steps": [
+        "Navigate to Add Children screen",
+        "Enter child name and select age (3-8)",
+        "Add multiple children if needed",
+        "Save to local SQLite with parent_id"
+      ],
+      "passes": false
+    },
+    {
+      "id": "onboard-002",
+      "category": "Onboarding",
+      "description": "Parent can subscribe via RevenueCat ($99/mo, 3-day trial)",
+      "steps": [
+        "View subscription screen with pricing",
+        "Initiate purchase via RevenueCat",
+        "Complete subscription",
+        "Update subscription_status in SQLite"
+      ],
+      "passes": false
+    },
+    {
+      "id": "gate-001",
+      "category": "Parental Gate",
+      "description": "Settings screen protected by math problem gate",
+      "steps": [
+        "Click gear icon to access settings",
+        "See math problem (2-digit addition)",
+        "Answer correctly to unlock",
+        "Retry on incorrect answer"
+      ],
+      "passes": false
+    },
+    {
+      "id": "card-001",
+      "category": "Card Display",
+      "description": "Display word cards with blurred image reveal",
+      "steps": [
+        "Show word with phoneme breakdown",
+        "Display blurred image initially",
+        "Reveal image after successful pronunciation",
+        "Animate blur transition smoothly"
+      ],
+      "passes": false
+    },
+    {
+      "id": "swipe-001",
+      "category": "Swipe Detection",
+      "description": "Child can swipe under words to sound them out",
+      "steps": [
+        "Display word with visual guide (balls/arrows)",
+        "Detect finger swipe under letters",
+        "Enforce left-to-right order",
+        "Trigger audio for each letter zone"
+      ],
+      "passes": false
+    },
+    {
+      "id": "orthography-001",
+      "category": "UI/UX",
+      "description": "Render DISTAR special orthography (macrons, balls, arrows)",
+      "steps": [
+        "Display macrons for long vowels",
+        "Show small letters for silent sounds",
+        "Render balls under continuous sounds",
+        "Show arrows for quick sounds"
+      ],
+      "passes": false
+    },
+    {
+      "id": "voice-001",
+      "category": "Voice Interaction",
+      "description": "OpenAI Realtime API validates child pronunciation",
+      "steps": [
+        "Connect to OpenAI Realtime via Edge Function",
+        "Stream child's voice to API",
+        "AI validates pronunciation against expected word",
+        "Return quality rating (0-5) for SM-2"
+      ],
+      "passes": false
+    },
+    {
+      "id": "voice-002",
+      "category": "Voice Interaction",
+      "description": "Retry system with max 3 attempts per word",
+      "steps": [
+        "On incorrect pronunciation, show encouraging prompt",
+        "Model correct pronunciation",
+        "Listen for retry (max 3 attempts)",
+        "After 3 failures, show help sequence"
+      ],
+      "passes": false
+    },
+    {
+      "id": "sm2-001",
+      "category": "Spaced Repetition",
+      "description": "SM-2 algorithm tracks card progress",
+      "steps": [
+        "Record quality rating (0-5) for each card",
+        "Calculate next review interval",
+        "Update ease factor based on performance",
+        "Store in card_progress table"
+      ],
+      "passes": false
+    },
+    {
+      "id": "queue-001",
+      "category": "Card Queue",
+      "description": "Card queue prioritizes review cards over new cards",
+      "steps": [
+        "Query due review cards (next_review_at <= now)",
+        "Generate new cards via Gemini when queue low",
+        "Prioritize review cards (priority 0) over new (priority 10+)",
+        "Load next card from queue"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ai-word-001",
+      "category": "AI Content Generation",
+      "description": "Gemini 3 Flash generates appropriate words for child's level",
+      "steps": [
+        "Call generate-word Edge Function",
+        "Pass knownSounds, targetPattern, difficulty",
+        "Receive word with phonemes and imagePrompt",
+        "Cache word data locally"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ai-image-001",
+      "category": "AI Content Generation",
+      "description": "Nano Banana generates child-friendly word images",
+      "steps": [
+        "Call generate-image Edge Function",
+        "Pass imagePrompt with style requirements",
+        "Receive base64 encoded image",
+        "Save to local file system and cache"
+      ],
+      "passes": false
+    },
+    {
+      "id": "level-001",
+      "category": "Level Progression",
+      "description": "Child levels up when mastery threshold met",
+      "steps": [
+        "Track mastered cards (ease_factor >= 2.5, interval >= 7 days)",
+        "Compare count to level's mastery threshold",
+        "Increment current_level when threshold met",
+        "Trigger pre-generation for next level"
+      ],
+      "passes": false
+    },
+    {
+      "id": "pregen-001",
+      "category": "Content Pre-generation",
+      "description": "Background pre-generation of next 5 cards",
+      "steps": [
+        "Queue images for next 5 cards",
+        "Generate in background during app usage",
+        "Store in local file system",
+        "Evict old images when cache limit reached"
+      ],
+      "passes": false
+    }
+  ]
+}
