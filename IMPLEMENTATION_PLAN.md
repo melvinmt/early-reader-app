@@ -102,10 +102,12 @@ All user data is stored locally in SQLite on the device. The only cloud interact
 │  CLOUD SERVICES (via Supabase Edge Functions only)                   │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                 SUPABASE EDGE FUNCTIONS                       │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │   │
-│  │  │ OpenAI   │ │ Gemini   │ │ Nano     │ │ TTS      │         │   │
-│  │  │ Realtime │ │ 3 Flash  │ │ Banana   │ │ Services │         │   │
-│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘         │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐                     │   │
+│  │  │ OpenAI   │ │ Gemini   │ │ Nano     │                     │   │
+│  │  │ Realtime │ │ 3 Flash  │ │ Banana   │                     │   │
+│  │  │ (Voice + │ │ (Text)   │ │ (Images) │                     │   │
+│  │  │  TTS)    │ │          │ │          │                     │   │
+│  │  └──────────┘ └──────────┘ └──────────┘                     │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                                                                      │
 │  LOCAL SERVICES                                                      │
@@ -132,7 +134,7 @@ All user data is stored locally in SQLite on the device. The only cloud interact
 │  │  │  ┌─────────────────┐  │  │         │  │ generate-word │  │    │
 │  │  │  │ parents         │  │  │         │  │ generate-image│  │    │
 │  │  │  │ children        │  │  │         │  │ voice-session │  │    │
-│  │  │  │ card_progress   │  │  │         │  │ text-to-speech│  │    │
+│  │  │  │ card_progress   │  │  │         │  │ (handles TTS) │  │    │
 │  │  │  │ content_cache   │  │  │         │  └───────────────┘  │    │
 │  │  │  │ sessions        │  │  │         │         │           │    │
 │  │  │  └─────────────────┘  │  │         │         ▼           │    │
@@ -259,11 +261,7 @@ Supabase is used ONLY for proxying LLM API calls. No user data is sent to the cl
    - Input: imagePrompt
    - Output: imageBase64
 
-3. **text-to-speech** - Converts text to speech audio
-   - Input: text, voice parameters
-   - Output: audioBase64 or audio URL
-
-4. **voice-session** - Manages OpenAI Realtime Voice API sessions
+3. **voice-session** - Manages OpenAI Realtime Voice API sessions
    - Input: session parameters
    - Output: WebSocket connection details or session ID
 
@@ -1239,43 +1237,9 @@ The app uses OpenAI's Realtime Voice API as the core interaction layer, enabling
 
 ### 4. AI Audio/Speech Generation
 
-#### Text-to-Speech for Instructions and Words
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    AI SPEECH GENERATION SYSTEM                       │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  Input Types:                                                        │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │
-│  │ Phoneme     │  │ Word        │  │ Instruction │                  │
-│  │ "aaa"       │  │ "cat"       │  │ "Sound it   │                  │
-│  │ (stretched) │  │ (normal)    │  │  out!"      │                  │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘                  │
-│         │                │                │                          │
-│         ▼                ▼                ▼                          │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │              TTS Engine Selection                            │    │
-│  │                                                              │    │
-│  │  Phonemes ──▶ Custom phoneme audio library (pre-recorded)   │    │
-│  │  Words ────▶ ElevenLabs / Azure TTS (natural voice)         │    │
-│  │  Scripts ──▶ ElevenLabs (consistent instructor voice)       │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                              │                                       │
-│                              ▼                                       │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │              Audio Post-Processing                           │    │
-│  │  • Normalize volume                                          │    │
-│  │  • Add appropriate pauses                                    │    │
-│  │  • Speed adjustment for "slow" vs "fast" modes              │    │
-│  │  • Cache generated audio                                     │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
 #### Voice Synthesis via OpenAI Realtime API
 
-The OpenAI Realtime API handles all voice synthesis, eliminating the need for separate TTS services:
+The OpenAI Realtime API handles all voice synthesis (text-to-speech), eliminating the need for separate TTS services:
 
 | Capability | OpenAI Realtime Implementation |
 |------------|-------------------------------|
@@ -1314,25 +1278,13 @@ PHONEME_AUDIO_SPECS = {
 }
 ```
 
-#### AI Voice Cloning for Consistent Instructor
+#### AI Voice via OpenAI Realtime API
 
-```python
-# Create a consistent "teacher" voice using ElevenLabs voice cloning
-INSTRUCTOR_VOICE_CONFIG = {
-    "voice_id": "custom_instructor_voice_id",
-    "stability": 0.75,  # Consistent but natural
-    "similarity_boost": 0.8,
-    "style": 0.4,  # Warm, encouraging tone
-    "speaking_rate": 0.9  # Slightly slower for clarity
-}
-
-async def generate_instruction_audio(text: str) -> bytes:
-    return await elevenlabs.generate(
-        text=text,
-        voice=INSTRUCTOR_VOICE_CONFIG["voice_id"],
-        model="eleven_turbo_v2"
-    )
-```
+**Voice Configuration:**
+- OpenAI Realtime API provides built-in voice selection (shimmer, alloy, echo, etc.)
+- No separate voice cloning service needed
+- Consistent instructor voice achieved through API voice selection and prompt engineering
+- Voice parameters (tone, speed, emotion) controlled via API instructions
 
 ### 4. AI-Powered Content Pipeline
 
@@ -2005,10 +1957,8 @@ assets/
 │  └── Expo SDK 52+ (Build tooling, expo-sqlite)                      │
 │                                                                      │
 │  AUDIO & SPEECH                                                      │
-│  ├── @react-native-voice/voice (Speech Recognition)                 │
-│  ├── react-native-tts (Text-to-Speech)                               │
-│  ├── expo-av (Audio Playback)                                        │
-│  └── Custom audio blending engine                                    │
+│  ├── expo-av (Audio Playback for pre-recorded phonemes)              │
+│  └── OpenAI Realtime API (Speech Recognition + Text-to-Speech)       │
 │                                                                      │
 │  AI SERVICES (via Supabase Edge Functions - ONLY cloud interaction) │
 │  ├── Google Gemini 3 Flash (Word generation, lesson content)        │
