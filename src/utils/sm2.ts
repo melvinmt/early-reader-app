@@ -95,3 +95,5 @@ export function mapPronunciationToQuality(
 
   return 2; // Minor struggle
 }
+
+

@@ -97,3 +97,5 @@ export function getLevelConfig(level: number): LevelConfig | null {
 export function getNextLevelConfig(currentLevel: number): LevelConfig | null {
   return getLevelConfig(currentLevel + 1);
 }
+
+

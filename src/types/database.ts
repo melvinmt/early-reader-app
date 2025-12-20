@@ -48,3 +48,5 @@ export interface Session {
   cards_completed: number;
   duration_seconds: number;
 }
+
+

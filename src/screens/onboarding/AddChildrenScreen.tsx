@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { createChild } from '@/services/storage';
 import { Child } from '@/types/database';
 import Button from '@/components/ui/Button';
-import { v4 as uuidv4 } from 'uuid';
+import * as Crypto from 'expo-crypto';
 
 interface ChildInput {
   id: string;
@@ -19,7 +19,7 @@ export default function AddChildrenScreen() {
   const router = useRouter();
   const { session } = useAuthStore();
   const [children, setChildren] = useState<ChildInput[]>([
-    { id: uuidv4(), name: '', age: null },
+    { id: Crypto.randomUUID(), name: '', age: null },
   ]);
 
   const updateChild = (id: string, field: 'name' | 'age', value: string | number) => {
@@ -29,7 +29,7 @@ export default function AddChildrenScreen() {
   };
 
   const addChild = () => {
-    setChildren((prev) => [...prev, { id: uuidv4(), name: '', age: null }]);
+    setChildren((prev) => [...prev, { id: Crypto.randomUUID(), name: '', age: null }]);
   };
 
   const removeChild = (id: string) => {
@@ -57,7 +57,7 @@ export default function AddChildrenScreen() {
     try {
       for (const childInput of validChildren) {
         const child: Child = {
-          id: uuidv4(),
+          id: Crypto.randomUUID(),
           parent_id: session.user.id,
           name: childInput.name.trim(),
           age: childInput.age!,
@@ -245,3 +245,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
+
+

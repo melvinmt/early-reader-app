@@ -38,9 +38,6 @@ export type AudioMode = {
      */
     playThroughEarpieceAndroid: boolean;
 };
-/**
- * @platform ios
- */
 export declare enum InterruptionModeIOS {
     /**
      * **This is the default option.** If this option is set, your experience's audio is mixed with audio playing in background apps.
@@ -55,9 +52,6 @@ export declare enum InterruptionModeIOS {
      */
     DuckOthers = 2
 }
-/**
- * @platform android
- */
 export declare enum InterruptionModeAndroid {
     /**
      * If this option is set, your experience's audio interrupts audio from other apps.

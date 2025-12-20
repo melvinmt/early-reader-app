@@ -34,3 +34,4 @@ assets.forEach((asset) => {
 
 console.log('Placeholder assets created successfully!');
 console.log('Note: Replace these with actual design assets before production.');
+

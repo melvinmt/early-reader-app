@@ -23,3 +23,5 @@ fi
 # Start Expo dev server
 echo "🎯 Starting Expo dev server..."
 npx expo start
+
+

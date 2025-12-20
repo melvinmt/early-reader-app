@@ -41,9 +41,6 @@ export type AudioMode = {
 };
 
 // @needsAudit
-/**
- * @platform ios
- */
 export enum InterruptionModeIOS {
   /**
    * **This is the default option.** If this option is set, your experience's audio is mixed with audio playing in background apps.
@@ -59,9 +56,6 @@ export enum InterruptionModeIOS {
   DuckOthers = 2,
 }
 
-/**
- * @platform android
- */
 export enum InterruptionModeAndroid {
   /**
    * If this option is set, your experience's audio interrupts audio from other apps.

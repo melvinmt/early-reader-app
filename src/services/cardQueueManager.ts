@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import * as Crypto from 'expo-crypto';
 import {
   getDueReviewCards,
   createOrUpdateCardProgress,
@@ -100,8 +100,8 @@ export class CardQueueManager {
         });
 
         // Save to cache
-        const wordId = uuidv4();
-        const imageId = uuidv4();
+        const wordId = Crypto.randomUUID();
+        const imageId = Crypto.randomUUID();
 
         // Save word data
         await createOrUpdateContentCache({
@@ -127,7 +127,7 @@ export class CardQueueManager {
         });
 
         // Create card
-        const cardId = uuidv4();
+        const cardId = Crypto.randomUUID();
         this.queue.push({
           id: cardId,
           word: wordData.word,
@@ -172,7 +172,7 @@ export class CardQueueManager {
     const result = calculateSM2(input);
 
     const progress: CardProgress = {
-      id: existing?.id || uuidv4(),
+      id: existing?.id || Crypto.randomUUID(),
       child_id: this.childId,
       word,
       ease_factor: result.nextEaseFactor,
@@ -195,3 +195,5 @@ export class CardQueueManager {
     return false;
   }
 }
+
+
