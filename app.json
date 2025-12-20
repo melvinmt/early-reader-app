@@ -31,6 +31,11 @@
     "plugins": [
       "expo-router"
     ],
-    "scheme": "instareader"
+    "scheme": "instareader",
+    "updates": {
+      "enabled": false,
+      "fallbackToCacheTimeout": 0
+    }
   }
 }
+
