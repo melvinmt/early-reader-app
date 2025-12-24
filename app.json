@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -16,20 +16,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.instareader.app",
-      "infoPlist": {
-        "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": false,
-          "NSExceptionDomains": {
-            "supabase.co": {
-              "NSExceptionAllowsInsecureHTTPLoads": false,
-              "NSIncludesSubdomains": true,
-              "NSExceptionRequiresForwardSecrecy": true,
-              "NSExceptionMinimumTLSVersion": "TLSv1.2"
-            }
-          }
-        }
-      }
+      "bundleIdentifier": "com.instareader.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -41,15 +28,10 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "scheme": "instareader",
     "plugins": [
       "expo-router"
-    ],
-    "scheme": "instareader",
-    "updates": {
-      "enabled": false,
-      "fallbackToCacheTimeout": 0
-    }
+    ]
   }
 }
-
 
