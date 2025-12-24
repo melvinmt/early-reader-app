@@ -35,9 +35,11 @@ export default function EmailInputScreen() {
         
         // Provide more specific error messages
         if (errorMessage.includes('Network request failed') || errorMessage.includes('fetch')) {
-          errorMessage = 'Network error. Please check your internet connection and try again.';
+          errorMessage = 'Cannot connect to Supabase. Please check:\n\n• Your internet connection\n• That your Supabase project is active (not paused)\n• The Supabase URL and API key in your .env file\n\nIf the project is paused, go to Supabase Dashboard → Settings → General → Resume project.';
         } else if (errorMessage.includes('not configured')) {
-          errorMessage = 'App configuration error. Please contact support.';
+          errorMessage = 'App configuration error. Please check your .env file has EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.';
+        } else if (errorMessage.includes('Invalid API key') || errorMessage.includes('401')) {
+          errorMessage = 'Invalid Supabase API key. Please verify your EXPO_PUBLIC_SUPABASE_ANON_KEY in .env matches the "anon" "public" key from Supabase Dashboard → Settings → API.';
         }
         
         Alert.alert('Error', errorMessage);

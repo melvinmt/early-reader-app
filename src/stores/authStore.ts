@@ -44,29 +44,55 @@ export const useAuthStore = create<AuthState>((set) => ({
         return { error: configError };
       }
 
+      console.log('Attempting OTP sign in for:', email);
+      console.log('Supabase URL:', supabaseUrl.substring(0, 30) + '...');
+
       const { error, data } = await supabase.auth.signInWithOtp({
         email,
         options: {
           shouldCreateUser: true,
+          emailRedirectTo: undefined, // Not needed for mobile
         },
       });
       
       set({ loading: false });
       
       if (error) {
-        console.error('Supabase OTP error:', error);
-        return { error };
+        console.error('Supabase OTP error:', {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+        });
+        
+        // Provide more specific error messages
+        let userMessage = error.message;
+        if (error.message.includes('Network request failed') || error.message.includes('fetch')) {
+          userMessage = 'Cannot connect to Supabase. Please check:\n\n1. Your internet connection\n2. That your Supabase project is active\n3. The Supabase URL in your .env file';
+        } else if (error.message.includes('Invalid API key')) {
+          userMessage = 'Invalid Supabase API key. Please check your .env file.';
+        } else if (error.message.includes('not found') || error.status === 404) {
+          userMessage = 'Supabase project not found. Please verify your project URL.';
+        }
+        
+        return { error: new Error(userMessage) };
       }
       
+      console.log('✓ OTP sent successfully');
       return { error: null };
     } catch (error) {
       console.error('Network error during OTP sign in:', error);
       set({ loading: false });
       
       // Provide more helpful error messages
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Network request failed. Please check your internet connection and try again.';
+      let errorMessage = 'Network request failed.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Network request failed')) {
+          errorMessage = 'Cannot connect to Supabase. Please check:\n\n1. Your internet connection\n2. That your Supabase project is active (not paused)\n3. The Supabase URL in your .env file matches your project';
+        } else {
+          errorMessage = error.message;
+        }
+      }
       
       return { error: new Error(errorMessage) };
     }

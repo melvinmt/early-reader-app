@@ -22,13 +22,66 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: false,
   },
+  global: {
+    fetch: (url, options = {}) => {
+      // Workaround for Expo SDK 52 + iOS 18.4 simulator network issues
+      const urlString = typeof url === 'string' ? url : url.toString();
+      
+      // Ensure we're using the native fetch with proper error handling
+      const fetchOptions: RequestInit = {
+        ...options,
+        headers: {
+          ...options.headers,
+          'apikey': supabaseAnonKey,
+          'Content-Type': 'application/json',
+        },
+      };
+
+      return fetch(urlString, fetchOptions).catch((error) => {
+        console.error('Supabase fetch error:', {
+          url: urlString.substring(0, 100),
+          error: error.message,
+          type: error.constructor.name,
+          name: error.name,
+        });
+        
+        // Re-throw with more context
+        const enhancedError = new Error(
+          `Network request failed: ${error.message}. ` +
+          `This may be an Expo SDK 52 + iOS 18.4 simulator issue. ` +
+          `Try using iOS 18.0 simulator or a physical device.`
+        );
+        enhancedError.name = error.name;
+        throw enhancedError;
+      });
+    },
+  },
 });
 
 // Test connection on initialization (in development)
 if (__DEV__ && supabaseUrl) {
-  supabase.auth.getSession().catch((error) => {
-    console.warn('Supabase connection test failed:', error.message);
-  });
+  // Test if Supabase endpoint is reachable
+  fetch(`${supabaseUrl}/rest/v1/`, {
+    method: 'HEAD',
+    headers: {
+      'apikey': supabaseAnonKey,
+    },
+  })
+    .then((response) => {
+      if (response.ok) {
+        console.log('✓ Supabase connection test: OK');
+      } else {
+        console.warn('⚠ Supabase connection test: HTTP', response.status);
+      }
+    })
+    .catch((error) => {
+      console.error('✗ Supabase connection test failed:', error.message);
+      console.error('  URL:', supabaseUrl);
+      console.error('  This might indicate:');
+      console.error('  1. The Supabase project is paused or inactive');
+      console.error('  2. Network connectivity issues');
+      console.error('  3. Incorrect Supabase URL');
+    });
 }
 
 
