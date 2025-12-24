@@ -6,16 +6,18 @@ import {
   getContentCache,
   createOrUpdateContentCache,
 } from './storage';
-import { generateWord, generateImage } from './ai/edgeFunctions';
-import { getLevelConfig } from '@/data/levels';
+import { generateContent, generateImage } from './ai/edgeFunctions';
+import { getLevelConfig, ContentType } from '@/data/levels';
 import { calculateSM2 } from '@/utils/sm2';
 import { CardProgress, ContentCache } from '@/types/database';
-import { WordGenerationResponse } from './ai/edgeFunctions';
+import { ContentGenerationResponse } from './ai/edgeFunctions';
 
 export interface Card {
   id: string;
-  word: string;
+  content: string;
+  contentType: ContentType;
   phonemes: string[];
+  wordCount: number;
   imageUri: string;
   isReview: boolean;
   progress?: CardProgress;
@@ -25,7 +27,7 @@ export class CardQueueManager {
   private childId: string;
   private currentLevel: number;
   private queue: Card[] = [];
-  private seenWords: Set<string> = new Set();
+  private seenContent: Set<string> = new Set();
 
   constructor(childId: string, currentLevel: number) {
     this.childId = childId;
@@ -41,21 +43,23 @@ export class CardQueueManager {
     // 1. Get due review cards (highest priority)
     const reviewCards = await getDueReviewCards(this.childId, 5);
     for (const progress of reviewCards) {
-      // Get cached word data
-      const wordCache = await getContentCache('word', progress.word);
+      // Get cached content data
+      const contentCache = await getContentCache('word', progress.word);
       const imageCache = await getContentCache('image', progress.word);
 
-      if (wordCache && imageCache) {
-        const wordData = JSON.parse(wordCache.content_data);
+      if (contentCache && imageCache) {
+        const contentData = JSON.parse(contentCache.content_data);
         this.queue.push({
           id: progress.id,
-          word: progress.word,
-          phonemes: wordData.phonemes || [],
+          content: progress.word,
+          contentType: contentData.contentType || 'word',
+          phonemes: contentData.phonemes || [],
+          wordCount: contentData.wordCount || 1,
           imageUri: imageCache.file_path || '',
           isReview: true,
           progress,
         });
-        this.seenWords.add(progress.word);
+        this.seenContent.add(progress.word);
       }
     }
 
@@ -76,52 +80,51 @@ export class CardQueueManager {
       return;
     }
 
-    const excludeWords = Array.from(this.seenWords);
+    const excludeContent = Array.from(this.seenContent);
 
     for (let i = 0; i < count; i++) {
       try {
-        // Generate word
-        const wordData: WordGenerationResponse = await generateWord({
+        // Generate content based on level's content type
+        const contentData: ContentGenerationResponse = await generateContent({
+          contentType: levelConfig.contentType,
           knownSounds: levelConfig.knownSounds,
           targetPattern: levelConfig.pattern,
           difficulty: levelConfig.difficulty,
-          excludeWords,
-          count: 1,
+          excludeContent,
         });
 
-        if (this.seenWords.has(wordData.word)) {
+        if (this.seenContent.has(contentData.content)) {
           continue; // Skip if already seen
         }
 
         // Generate image
         const imageData = await generateImage({
-          word: wordData.word,
-          imagePrompt: wordData.imagePrompt,
+          word: contentData.content,
+          imagePrompt: contentData.imagePrompt,
         });
 
         // Save to cache
-        const wordId = Crypto.randomUUID();
+        const contentId = Crypto.randomUUID();
         const imageId = Crypto.randomUUID();
 
-        // Save word data
+        // Save content data
         await createOrUpdateContentCache({
-          id: wordId,
-          content_type: 'word',
-          content_key: wordData.word,
-          content_data: JSON.stringify(wordData),
+          id: contentId,
+          content_type: 'word', // Using 'word' as general content type for caching
+          content_key: contentData.content,
+          content_data: JSON.stringify(contentData),
           file_path: null,
           created_at: new Date().toISOString(),
           expires_at: null,
         });
 
-        // Save image (in a real app, you'd save the base64 to file system)
-        // For now, we'll store the base64 in content_data
+        // Save image
         await createOrUpdateContentCache({
           id: imageId,
           content_type: 'image',
-          content_key: wordData.word,
+          content_key: contentData.content,
           content_data: imageData.imageBase64,
-          file_path: null, // TODO: Save to file system and set path
+          file_path: null,
           created_at: new Date().toISOString(),
           expires_at: null,
         });
@@ -130,13 +133,16 @@ export class CardQueueManager {
         const cardId = Crypto.randomUUID();
         this.queue.push({
           id: cardId,
-          word: wordData.word,
-          phonemes: wordData.phonemes,
-          imageUri: `data:image/png;base64,${imageData.imageBase64}`, // Temporary
+          content: contentData.content,
+          contentType: contentData.contentType,
+          phonemes: contentData.phonemes,
+          wordCount: contentData.wordCount,
+          imageUri: `data:image/png;base64,${imageData.imageBase64}`,
           isReview: false,
         });
 
-        this.seenWords.add(wordData.word);
+        this.seenContent.add(contentData.content);
+        excludeContent.push(contentData.content);
       } catch (error) {
         console.error('Error generating card:', error);
         // Continue with next card
@@ -152,15 +158,29 @@ export class CardQueueManager {
   }
 
   /**
+   * Peek at next card without removing it
+   */
+  peekNextCard(): Card | null {
+    return this.queue[0] || null;
+  }
+
+  /**
+   * Get queue length
+   */
+  getQueueLength(): number {
+    return this.queue.length;
+  }
+
+  /**
    * Record card attempt and update SM-2 progress
    */
   async recordAttempt(
-    word: string,
+    content: string,
     quality: number,
     attempts: number,
     neededHelp: boolean
   ): Promise<void> {
-    const existing = await getCardProgress(this.childId, word);
+    const existing = await getCardProgress(this.childId, content);
 
     const input = {
       quality,
@@ -174,7 +194,7 @@ export class CardQueueManager {
     const progress: CardProgress = {
       id: existing?.id || Crypto.randomUUID(),
       child_id: this.childId,
-      word,
+      word: content,
       ease_factor: result.nextEaseFactor,
       interval_days: result.nextInterval,
       next_review_at: result.nextReviewDate,
@@ -190,10 +210,26 @@ export class CardQueueManager {
    * Check if child should level up
    */
   async checkLevelUp(): Promise<boolean> {
-    // TODO: Implement level-up logic
-    // Check if child has mastered enough cards (ease_factor >= 2.5 AND interval_days >= 7)
+    const levelConfig = getLevelConfig(this.currentLevel);
+    if (!levelConfig) return false;
+
+    // Check mastery threshold - count cards with good ease factor and interval
+    // TODO: Query database for mastered cards count
+    // A card is mastered when ease_factor >= 2.5 AND interval_days >= 7
     return false;
   }
+
+  /**
+   * Get current level info
+   */
+  getCurrentLevelInfo(): { level: number; contentType: ContentType; description: string } | null {
+    const config = getLevelConfig(this.currentLevel);
+    if (!config) return null;
+    
+    return {
+      level: config.level,
+      contentType: config.contentType,
+      description: config.description,
+    };
+  }
 }
-
-

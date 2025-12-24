@@ -55,7 +55,7 @@ export default function LearningScreen() {
 
     if (success) {
       // Record successful attempt
-      await queueManager.recordAttempt(currentCard.word, 5, 1, false);
+      await queueManager.recordAttempt(currentCard.content, 5, 1, false);
       setIsRevealed(true);
       await incrementChildCardsCompleted(childId);
     } else {
@@ -63,7 +63,7 @@ export default function LearningScreen() {
       setAttempts((prev) => prev + 1);
       if (attempts >= 2) {
         // After 3 attempts, record as needing help
-        await queueManager.recordAttempt(currentCard.word, 1, 3, true);
+        await queueManager.recordAttempt(currentCard.content, 1, 3, true);
         setIsRevealed(true);
       }
     }
@@ -132,11 +132,11 @@ export default function LearningScreen() {
           }}
         />
 
-        <WordDisplay word={currentCard.word} phonemes={currentCard.phonemes} />
+        <WordDisplay word={currentCard.content} phonemes={currentCard.phonemes} />
 
         {!isRevealed && (
           <WordSwipeDetector
-            word={currentCard.word}
+            word={currentCard.content}
             phonemes={currentCard.phonemes}
             onLetterEnter={(index) => {
               // Play phoneme sound
