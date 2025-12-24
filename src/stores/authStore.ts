@@ -36,17 +36,39 @@ export const useAuthStore = create<AuthState>((set) => ({
   signInWithOtp: async (email: string) => {
     set({ loading: true });
     try {
-      const { error } = await supabase.auth.signInWithOtp({
+      // Check if Supabase is configured
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl) {
+        const configError = new Error('Supabase is not configured. Please check your environment variables.');
+        set({ loading: false });
+        return { error: configError };
+      }
+
+      const { error, data } = await supabase.auth.signInWithOtp({
         email,
         options: {
           shouldCreateUser: true,
         },
       });
+      
       set({ loading: false });
-      return { error };
+      
+      if (error) {
+        console.error('Supabase OTP error:', error);
+        return { error };
+      }
+      
+      return { error: null };
     } catch (error) {
+      console.error('Network error during OTP sign in:', error);
       set({ loading: false });
-      return { error: error as Error };
+      
+      // Provide more helpful error messages
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Network request failed. Please check your internet connection and try again.';
+      
+      return { error: new Error(errorMessage) };
     }
   },
 

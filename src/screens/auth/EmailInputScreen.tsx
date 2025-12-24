@@ -26,17 +26,34 @@ export default function EmailInputScreen() {
     }
 
     setIsValidating(true);
-    const { error } = await signInWithOtp(email.toLowerCase().trim());
+    try {
+      const { error } = await signInWithOtp(email.toLowerCase().trim());
 
-    if (error) {
-      Alert.alert('Error', error.message || 'Failed to send OTP. Please try again.');
+      if (error) {
+        console.error('OTP sign in error:', error);
+        let errorMessage = error.message || 'Failed to send OTP. Please try again.';
+        
+        // Provide more specific error messages
+        if (errorMessage.includes('Network request failed') || errorMessage.includes('fetch')) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
+        } else if (errorMessage.includes('not configured')) {
+          errorMessage = 'App configuration error. Please contact support.';
+        }
+        
+        Alert.alert('Error', errorMessage);
+        setIsValidating(false);
+      } else {
+        // Navigate to OTP verification screen with email
+        router.push({
+          pathname: '/auth/otp-verification',
+          params: { email: email.toLowerCase().trim() },
+        });
+        setIsValidating(false);
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
       setIsValidating(false);
-    } else {
-      // Navigate to OTP verification screen with email
-      router.push({
-        pathname: '/auth/otp-verification',
-        params: { email: email.toLowerCase().trim() },
-      });
     }
   };
 
