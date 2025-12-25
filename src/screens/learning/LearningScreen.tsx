@@ -295,9 +295,11 @@ export default function LearningScreen() {
             distarCard={currentCard.distarCard}
             onLetterEnter={() => {}}
             onSwipeComplete={handleSwipeComplete}
-            renderHint={true}
           />
         </View>
+        
+        {/* Swipe hint caption below card */}
+        <Text style={styles.swipeHint}>Swipe right to reveal the image</Text>
       </View>
 
       <ConfettiCelebration visible={showConfetti} onComplete={() => setShowConfetti(false)} />
@@ -390,5 +392,12 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#e0e0e0',
     marginVertical: 24,
+  },
+  swipeHint: {
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
   },
 });

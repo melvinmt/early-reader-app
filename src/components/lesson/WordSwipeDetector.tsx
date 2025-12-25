@@ -10,7 +10,6 @@ interface WordSwipeDetectorProps {
   distarCard?: DistarCard;
   onLetterEnter: (index: number) => void;
   onSwipeComplete: (success: boolean) => void;
-  renderHint?: boolean; // Whether to render the hint text below
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -21,7 +20,6 @@ export default function WordSwipeDetector({
   distarCard,
   onLetterEnter,
   onSwipeComplete,
-  renderHint = false,
 }: WordSwipeDetectorProps) {
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [isActive, setIsActive] = useState(false);
@@ -99,11 +97,6 @@ export default function WordSwipeDetector({
           </View>
         </View>
       </GestureDetector>
-
-      {/* Swipe hint text below */}
-      {renderHint && (
-        <Text style={styles.swipeHint}>👉 Swipe right to reveal the image ✨</Text>
-      )}
     </View>
   );
 }
@@ -131,12 +124,5 @@ const styles = StyleSheet.create({
   },
   progressFillActive: {
     backgroundColor: '#2E7D32',
-  },
-  swipeHint: {
-    textAlign: 'center',
-    marginTop: 16,
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
   },
 });
