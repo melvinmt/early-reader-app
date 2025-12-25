@@ -75,17 +75,24 @@ export default function SubscriptionScreen() {
         }
       }
 
-      // Configure RevenueCat
-      // In Browser Mode, configure may work differently
+      // Configure RevenueCat with error handling for browser API issues
       try {
         await Purchases.configure({
           apiKey: apiKey,
         });
       } catch (configureError: any) {
-        // If configure fails due to browser API issues, try alternative initialization
-        if (configureError?.message?.includes('search') || configureError?.message?.includes('undefined')) {
-          console.warn('RevenueCat Browser Mode initialization issue, using fallback');
-          // Try to continue without full initialization - Browser Mode may still work
+        // If configure fails due to browser API issues (window.location.search, etc.), skip RevenueCat
+        const errorMessage = configureError?.message || String(configureError);
+        if (
+          errorMessage.includes('search') ||
+          errorMessage.includes('undefined') ||
+          errorMessage.includes('window') ||
+          errorMessage.includes('location')
+        ) {
+          console.warn('RevenueCat Browser Mode not supported in this environment:', errorMessage);
+          setPurchasesAvailable(false);
+          setInitializing(false);
+          return;
         } else {
           throw configureError;
         }
@@ -93,16 +100,26 @@ export default function SubscriptionScreen() {
 
       // Log in user
       if (Purchases.logIn) {
-        await Purchases.logIn(session.user.id);
+        try {
+          await Purchases.logIn(session.user.id);
+        } catch (loginError: any) {
+          console.warn('RevenueCat login failed:', loginError);
+          // Continue anyway - may still work
+        }
       }
 
       // Get available packages
       if (Purchases.getOfferings) {
-        const offerings = await Purchases.getOfferings();
-        if (offerings?.current) {
-          setPackages(offerings.current.availablePackages || []);
-          setPurchasesAvailable(true);
-        } else {
+        try {
+          const offerings = await Purchases.getOfferings();
+          if (offerings?.current) {
+            setPackages(offerings.current.availablePackages || []);
+            setPurchasesAvailable(true);
+          } else {
+            setPurchasesAvailable(false);
+          }
+        } catch (offeringsError: any) {
+          console.warn('RevenueCat getOfferings failed:', offeringsError);
           setPurchasesAvailable(false);
         }
       } else {
@@ -111,7 +128,13 @@ export default function SubscriptionScreen() {
     } catch (error: any) {
       console.error('Error initializing RevenueCat:', error);
       // If it's a browser API error, mark as unavailable but don't show error to user
-      if (error?.message?.includes('search') || error?.message?.includes('undefined')) {
+      const errorMessage = error?.message || String(error);
+      if (
+        errorMessage.includes('search') ||
+        errorMessage.includes('undefined') ||
+        errorMessage.includes('window') ||
+        errorMessage.includes('location')
+      ) {
         console.warn('RevenueCat Browser Mode not fully supported in this environment');
       }
       setPurchasesAvailable(false);
