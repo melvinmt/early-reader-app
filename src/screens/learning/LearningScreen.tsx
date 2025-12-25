@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getCardQueue, recordCardCompletion, getNextCard, LearningCard } from '@/services/cardQueueManager';
-import { realtimeVoiceService } from '@/services/voice/realtimeVoiceService';
 import { validatePronunciation } from '@/utils/pronunciation';
 import { audioPlayer } from '@/services/audio/audioPlayer';
 import WordDisplay from '@/components/lesson/WordDisplay';
@@ -30,6 +29,7 @@ export default function LearningScreen() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [progress, setProgress] = useState(0);
 
+  // Voice service disabled - keeping refs for future use
   const voiceTranscriptRef = useRef<string>('');
   const voicePhonemesRef = useRef<string[]>([]);
 
@@ -63,15 +63,8 @@ export default function LearningScreen() {
         duration_seconds: 0,
       });
 
-      // Initialize voice service (optional - app works without it)
-      try {
-        await realtimeVoiceService.connect();
-        realtimeVoiceService.onResponse(handleVoiceResponse);
-        console.log('Voice service connected');
-      } catch (voiceError) {
-        console.warn('Voice service unavailable, continuing without voice:', voiceError);
-        // App continues to work without voice
-      }
+      // Voice service disabled for now - can be added later
+      // Voice is optional and not required for core functionality
     } catch (error) {
       console.error('Error initializing session:', error);
     }
@@ -98,6 +91,7 @@ export default function LearningScreen() {
   const loadNextCard = async () => {
     try {
       setState('loading');
+      console.log('Loading next card for child:', childId);
       const card = await getNextCard(childId);
       
       if (!card) {
@@ -105,6 +99,34 @@ export default function LearningScreen() {
         Alert.alert('Great job!', 'You\'ve completed all available cards for today.');
         router.back();
         return;
+      }
+
+      console.log('Card loaded:', { 
+        word: card.word, 
+        phonemes: card.phonemes, 
+        phonemesLength: card.phonemes?.length,
+        imageUrl: card.imageUrl,
+        hasImage: !!card.imageUrl 
+      });
+      
+      // Validate card has required data
+      if (!card.word) {
+        console.error('Card missing word:', card);
+        Alert.alert('Error', 'Card is missing word. Please try again.');
+        setTimeout(() => loadNextCard(), 1000);
+        return;
+      }
+      
+      // Ensure phonemes exist (fallback to word characters if missing)
+      if (!card.phonemes || card.phonemes.length === 0) {
+        console.warn('Card missing phonemes, using word characters:', card.word);
+        card.phonemes = card.word.split('');
+      }
+      
+      // Image URL is optional - can be generated later or use placeholder
+      if (!card.imageUrl) {
+        console.warn('Card missing image URL, will generate on swipe');
+        // Image will be generated when needed
       }
 
       setCurrentCard(card);
@@ -115,38 +137,15 @@ export default function LearningScreen() {
       voicePhonemesRef.current = [];
       setState('ready');
 
-      // Inject context into voice service (optional - only if connected)
-      try {
-        await realtimeVoiceService.injectContext({
-          currentWord: card.word,
-          phonemes: card.phonemes,
-          level: card.level,
-        });
-      } catch (voiceError) {
-        // Voice service not available, continue without it
-        console.warn('Could not inject context to voice service:', voiceError);
-      }
+      // Voice service disabled - skip context injection
     } catch (error) {
       console.error('Error loading card:', error);
-      Alert.alert('Error', 'Failed to load card. Please try again.');
-      router.back();
+      Alert.alert('Error', `Failed to load card: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Don't navigate back, allow retry
     }
   };
 
-  const handleVoiceResponse = (response: { transcript?: string; toolCalls?: any[]; audio?: string }) => {
-    if (response.transcript) {
-      voiceTranscriptRef.current = response.transcript;
-    }
-
-    // Handle tool calls if any
-    if (response.toolCalls) {
-      response.toolCalls.forEach((toolCall) => {
-        if (toolCall.name === 'phoneme_segmentation' && toolCall.arguments?.phonemes) {
-          voicePhonemesRef.current = toolCall.arguments.phonemes;
-        }
-      });
-    }
-  };
+  // Voice service disabled - handler removed
 
   const handleLetterEnter = async (index: number) => {
     // Play phoneme sound when letter is entered
