@@ -22,6 +22,8 @@ Configure the **Magic Link** email template in your Supabase Dashboard to includ
 
 4. **Update the Template Content**
    
+   **CRITICAL:** The template must ONLY contain `{{ .Token }}` and must NOT contain `{{ .ConfirmationURL }}`.
+   
    **Current (Magic Link - WRONG):**
    ```html
    <h2>Magic Link</h2>
@@ -35,6 +37,11 @@ Configure the **Magic Link** email template in your Supabase Dashboard to includ
    <p>Your 6-digit code is: <strong>{{ .Token }}</strong></p>
    <p>Enter this code in the app to sign in.</p>
    ```
+   
+   **⚠️ IMPORTANT:** 
+   - Remove ALL instances of `{{ .ConfirmationURL }}` from the template
+   - The template should ONLY use `{{ .Token }}`
+   - If both variables are present, Supabase will default to Magic Link
 
 5. **Save the Template**
    - Click **Save** or **Update**
@@ -42,9 +49,9 @@ Configure the **Magic Link** email template in your Supabase Dashboard to includ
 ## How It Works
 
 - When `signInWithOtp()` is called, Supabase checks the Magic Link template
-- If the template contains `{{ .Token }}`, it sends a 6-digit OTP code
-- If the template contains `{{ .ConfirmationURL }}`, it sends a Magic Link
-- The presence of `{{ .Token }}` in the template determines the behavior
+- **If the template contains `{{ .ConfirmationURL }}` (even if `{{ .Token }}` is also present), it sends a Magic Link**
+- **If the template contains ONLY `{{ .Token }}` and NO `{{ .ConfirmationURL }}`, it sends a 6-digit OTP code**
+- **You must completely remove `{{ .ConfirmationURL }}` from the template for OTP to work**
 
 ## Template Variables
 
@@ -58,10 +65,22 @@ Configure the **Magic Link** email template in your Supabase Dashboard to includ
 ## Verification
 
 After updating the template:
-1. Request a new OTP code in the app
-2. Check your email
-3. You should receive an email with a 6-digit code (e.g., "123456")
-4. The email should NOT contain a clickable "Log In" link
+1. **Double-check the template** - Make sure there is NO `{{ .ConfirmationURL }}` anywhere in the template
+2. **Save the template** in the Supabase Dashboard
+3. Request a new OTP code in the app (wait a few seconds for template changes to propagate)
+4. Check your email
+5. You should receive an email with a 6-digit code (e.g., "123456")
+6. The email should NOT contain a clickable "Log In" link
+
+## Troubleshooting
+
+**Still receiving Magic Links?**
+
+1. **Check the template again** - Search for `{{ .ConfirmationURL }}` and remove it completely
+2. **Check the subject line** - The subject should not reference "Magic Link"
+3. **Wait a few minutes** - Template changes can take a few minutes to propagate
+4. **Try a different email** - Sometimes email clients cache old templates
+5. **Check if you're editing the right template** - Make sure you're editing "Magic Link", not "Confirm signup" or another template
 
 ## References
 
