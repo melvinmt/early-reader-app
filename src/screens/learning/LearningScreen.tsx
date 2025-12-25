@@ -29,6 +29,10 @@ export default function LearningScreen() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [progress, setProgress] = useState(0);
 
+  // Pre-loaded next card (loaded in background)
+  const nextCardRef = useRef<LearningCard | null>(null);
+  const isLoadingNextRef = useRef(false);
+
   // Voice service disabled - keeping refs for future use
   const voiceTranscriptRef = useRef<string>('');
   const voicePhonemesRef = useRef<string[]>([]);
@@ -83,8 +87,63 @@ export default function LearningScreen() {
     }
   };
 
+  // Pre-load next card in background (doesn't interfere with current card)
+  const preloadNextCard = async () => {
+    if (isLoadingNextRef.current) return; // Already loading
+    
+    try {
+      isLoadingNextRef.current = true;
+      const card = await getNextCard(childId);
+      
+      if (card) {
+        // Validate and prepare the card
+        if (!card.word) {
+          console.warn('Pre-loaded card missing word, will skip');
+          nextCardRef.current = null;
+          return;
+        }
+        
+        // Ensure phonemes exist
+        if (!card.phonemes || card.phonemes.length === 0) {
+          card.phonemes = card.word.split('');
+        }
+        
+        nextCardRef.current = card;
+        console.log('Next card pre-loaded:', card.word);
+      } else {
+        nextCardRef.current = null;
+      }
+    } catch (error) {
+      console.error('Error pre-loading next card:', error);
+      nextCardRef.current = null;
+    } finally {
+      isLoadingNextRef.current = false;
+    }
+  };
+
   const loadNextCard = async () => {
     try {
+      // Check if we have a pre-loaded card ready
+      if (nextCardRef.current) {
+        console.log('Using pre-loaded card:', nextCardRef.current.word);
+        const preloadedCard = nextCardRef.current;
+        nextCardRef.current = null; // Clear it
+        
+        // Use pre-loaded card immediately (no loading state needed)
+        setCurrentCard(preloadedCard);
+        setIsImageRevealed(false);
+        setAttempts(0);
+        setNeededHelp(false);
+        voiceTranscriptRef.current = '';
+        voicePhonemesRef.current = [];
+        setState('ready');
+        
+        // Immediately start loading the next card in background
+        preloadNextCard();
+        return;
+      }
+      
+      // No pre-loaded card, load one now
       setState('loading');
       console.log('Loading next card for child:', childId);
       const card = await getNextCard(childId);
@@ -131,6 +190,9 @@ export default function LearningScreen() {
       voiceTranscriptRef.current = '';
       voicePhonemesRef.current = [];
       setState('ready');
+
+      // Start pre-loading the next card in background (non-blocking)
+      preloadNextCard();
 
       // Voice service disabled - skip context injection
     } catch (error) {
