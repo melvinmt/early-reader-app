@@ -406,11 +406,12 @@ async function generatePhonemeCards(): Promise<any[]> {
     const audioPath = path.join(cardDir, 'audio.mp3');
     
     // Generate image (mnemonic for letter)
-    const imagePrompt = phoneme.isDigraph 
-      ? `Illustration representing the sound "${phoneme.pronunciation}"`
-      : `Simple illustration of ${phoneme.exampleWord} for the letter "${phoneme.symbol}"`;
+    // Use exampleWord for the illustration, NOT pronunciation (pronunciation is phonetic like "ooo" and shouldn't appear in images)
+    const imagePrompt = phoneme.exampleWord
+      ? `Simple illustration of ${phoneme.exampleWord} for the ${phoneme.isDigraph ? 'sound' : 'letter'} "${phoneme.symbol}"`
+      : `Simple illustration representing the ${phoneme.isDigraph ? 'sound' : 'letter'} "${phoneme.symbol}"`;
     
-    // Include the phoneme symbol in the image
+    // Include the phoneme symbol in the image (the actual letter/symbol, not the pronunciation)
     await generateImage(imagePrompt, imagePath, phoneme.symbol);
     
     // Generate prompt audio - encouraging and not giving away the answer
