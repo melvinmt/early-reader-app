@@ -69,11 +69,11 @@ Deno.serve(async (req: Request) => {
     console.log('Generating image with Nano Banana (Gemini 2.5 Flash Image) API');
     console.log('Prompt:', imagePrompt);
     
-    // Use Nano Banana (Gemini 2.0 Flash Exp) API for image generation
-    // Note: responseMimeType cannot be 'image/png' - it only accepts text formats
-    // The API returns image data in parts[1].inlineData.data
+    // Use Nano Banana (Gemini 2.5 Flash Image) API for image generation
+    // Model: gemini-2.5-flash-image
+    // Can optionally set response_modalities to ['Image'] to get only image (no text)
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: {
@@ -89,6 +89,10 @@ Deno.serve(async (req: Request) => {
               ],
             },
           ],
+          // Optional: request only image response (no text)
+          generationConfig: {
+            responseModalities: ['IMAGE'],
+          },
         }),
       }
     );
