@@ -21,17 +21,8 @@ rm -rf $TMPDIR/metro-* 2>/dev/null || true
 rm -rf $TMPDIR/haste-map-* 2>/dev/null || true
 rm -rf $TMPDIR/react-* 2>/dev/null || true
 
-# Clear watchman (if installed) - with timeout to prevent hanging
-if command -v watchman &> /dev/null; then
-    echo "🗑️  Clearing Watchman cache..."
-    timeout 5 watchman watch-del-all 2>/dev/null || true
-    # If timeout command doesn't exist, try without it but in background
-    if ! command -v timeout &> /dev/null; then
-        (watchman watch-del-all 2>/dev/null &)
-        sleep 2
-        pkill -f watchman 2>/dev/null || true
-    fi
-fi
+# Skip watchman - it often hangs and is not critical for Expo reset
+echo "⏭️  Skipping Watchman (optional, can cause hangs)"
 
 # Clear npm/yarn cache (optional, uncomment if needed)
 # echo "🗑️  Clearing npm cache..."
