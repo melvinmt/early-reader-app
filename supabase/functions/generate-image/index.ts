@@ -66,62 +66,36 @@ Deno.serve(async (req: Request) => {
 
     const imagePrompt = prompt || `A simple, friendly cartoon illustration of ${word || 'a word'}, child-friendly style, white background, no text`;
 
-    console.log('Generating image with prompt:', imagePrompt);
+    console.log('Generating image with Nano Banana (Gemini 2.5 Flash Image) API');
+    console.log('Prompt:', imagePrompt);
     
-    // Try using Imagen 3 API for image generation
-    // First, try the Imagen 3 endpoint
-    let response;
-    try {
-      // Try Imagen 3 API endpoint
-      response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: imagePrompt,
-                  },
-                ],
-              },
-            ],
-          }),
-        }
-      );
-      
-      // If Imagen 3 doesn't work, fall back to gemini-2.5-flash-image
-      if (!response.ok) {
-        console.log('Imagen 3 failed, trying gemini-2.5-flash-image...');
-        response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [
+    // Use Nano Banana (Gemini 2.5 Flash Image) API
+    // According to Google's documentation, Nano Banana is accessed via gemini-2.0-flash-exp
+    // with image generation capabilities
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
                 {
-                  parts: [
-                    {
-                      text: imagePrompt,
-                    },
-                  ],
+                  text: imagePrompt,
                 },
               ],
-            }),
-          }
-        );
+            },
+          ],
+          // Request image output format
+          generationConfig: {
+            responseMimeType: 'image/png',
+          },
+        }),
       }
-    } catch (fetchError) {
-      console.error('Fetch error:', fetchError);
-      throw new Error(`Failed to call image generation API: ${fetchError.message}`);
-    }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -132,7 +106,8 @@ Deno.serve(async (req: Request) => {
     const data = await response.json();
     
     // Log the full response structure for debugging
-    console.log('Gemini API response structure:', {
+    console.log('Nano Banana API response status:', response.status);
+    console.log('Response structure:', {
       hasCandidates: !!data.candidates,
       candidatesLength: data.candidates?.length || 0,
       firstCandidate: data.candidates?.[0] ? {
@@ -144,34 +119,36 @@ Deno.serve(async (req: Request) => {
           keys: Object.keys(data.candidates[0].content.parts[0]),
           hasInlineData: !!data.candidates[0].content.parts[0].inlineData,
           hasText: !!data.candidates[0].content.parts[0].text,
+          inlineDataKeys: data.candidates[0].content.parts[0].inlineData ? Object.keys(data.candidates[0].content.parts[0].inlineData) : [],
         } : null,
       } : null,
       fullResponseKeys: Object.keys(data),
     });
     
-    // Try multiple possible response structures
+    // Extract image data from Nano Banana response
+    // The response should have: candidates[0].content.parts[0].inlineData.data
     let imageBase64 = '';
     
-    // Try: data.candidates[0].content.parts[0].inlineData.data
-    imageBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
-    
-    // If not found, try alternative structures
-    if (!imageBase64) {
-      // Try: data.candidates[0].content.parts[0].data
-      imageBase64 = data.candidates?.[0]?.content?.parts?.[0]?.data || '';
+    // Standard structure: data.candidates[0].content.parts[0].inlineData.data
+    if (data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data) {
+      imageBase64 = data.candidates[0].content.parts[0].inlineData.data;
+      console.log('Found image data in inlineData.data, length:', imageBase64.length);
+    } 
+    // Alternative: direct base64 in parts[0]
+    else if (data.candidates?.[0]?.content?.parts?.[0]?.data) {
+      imageBase64 = data.candidates[0].content.parts[0].data;
+      console.log('Found image data in parts[0].data, length:', imageBase64.length);
     }
-    
-    if (!imageBase64) {
-      // Try: data.images?.[0] or other possible structures
-      imageBase64 = data.images?.[0] || data.image || '';
+    // Check if response is already base64 encoded
+    else if (typeof data === 'string' && data.startsWith('data:image')) {
+      imageBase64 = data.split(',')[1]; // Extract base64 from data URL
+      console.log('Found image data in data URL format, length:', imageBase64.length);
     }
     
     // Log what we found
-    if (imageBase64) {
-      console.log('Found image data, length:', imageBase64.length);
-    } else {
+    if (!imageBase64) {
       console.error('No image data found in response');
-      console.error('Full response (first 1000 chars):', JSON.stringify(data).substring(0, 1000));
+      console.error('Full response (first 2000 chars):', JSON.stringify(data).substring(0, 2000));
     }
 
     if (!imageBase64) {
