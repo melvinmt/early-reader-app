@@ -29,6 +29,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
+import * as readline from 'readline';
 import axios from 'axios';
 import { DISTAR_PHONEMES } from '../src/data/distarPhonemes';
 
@@ -1200,6 +1201,24 @@ export function hasAudioAsset(assetPath: string): boolean {
  * Main execution
  */
 /**
+ * Prompt user for confirmation before proceeding with cleanup
+ */
+function promptForConfirmation(message: string): Promise<boolean> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.question(message, (answer) => {
+      rl.close();
+      const normalizedAnswer = answer.trim().toLowerCase();
+      resolve(normalizedAnswer === 'y' || normalizedAnswer === 'yes');
+    });
+  });
+}
+
+/**
  * Clean up existing card files and assets before generation
  * This ensures each run starts fresh
  */
@@ -1269,6 +1288,21 @@ async function main() {
     console.error('❌ GOOGLE_AI_API_KEY not set in environment');
     process.exit(1);
   }
+  
+  // Prompt for confirmation before cleaning up existing cards and assets
+  console.log('\n⚠️  WARNING: This will delete all existing cards and assets!');
+  console.log('   - All existing card data files');
+  console.log('   - All existing asset mapping files');
+  console.log('   - All existing card asset directories in assets/');
+  
+  const confirmed = await promptForConfirmation('\n❓ Continue with cleanup? (y/n): ');
+  
+  if (!confirmed) {
+    console.log('\n❌ Operation cancelled. No files were deleted.');
+    process.exit(0);
+  }
+  
+  console.log('');
   
   // Clean up existing cards and assets first
   cleanupExistingCards();
