@@ -34,10 +34,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   sendOtp: async (email: string) => {
     try {
       // Use signInWithOtp to send OTP code
-      // IMPORTANT: To send 6-digit codes instead of Magic Links, configure the email template:
+      // IMPORTANT: To send 6-digit codes instead of Magic Links, configure the OTP email template:
       // 1. Go to Supabase Dashboard > Authentication > Email Templates
-      // 2. Edit the "Magic Link" template
-      // 3. Replace the link with: <p>Please enter this code: {{ .Token }}</p>
+      // 2. Edit the OTP-specific email template (separate from Magic Link template)
+      // 3. Ensure it includes: <p>Please enter this code: {{ .Token }}</p>
+      // Note: signInWithOtp() will use the OTP template if {{ .Token }} is present,
+      // otherwise it defaults to Magic Link template with {{ .ConfirmationURL }}
       // See: https://supabase.com/docs/guides/auth/auth-email-passwordless#with-otp
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
