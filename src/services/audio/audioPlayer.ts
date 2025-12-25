@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { Audio, AVPlaybackStatus } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 
 class AudioPlayerService {
@@ -82,6 +82,65 @@ class AudioPlayerService {
   }
 
   /**
+   * Play sound from asset and wait for it to complete
+   * Returns a promise that resolves when the audio finishes playing
+   */
+  async playSoundFromAssetAndWait(assetPath: string): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Check cache first
+        let sound = this.soundCache.get(assetPath);
+
+        if (!sound) {
+          // Construct the full file path
+          const fullPath = assetPath.startsWith('assets/')
+            ? `${FileSystem.bundleDirectory}${assetPath}`
+            : `${FileSystem.bundleDirectory}assets/${assetPath}`;
+          
+          // Check if file exists
+          const fileInfo = await FileSystem.getInfoAsync(fullPath);
+          if (!fileInfo.exists) {
+            // Try alternative path (for development with Metro bundler)
+            const altPath = assetPath.startsWith('/') ? assetPath : `/${assetPath}`;
+            const { sound: newSound } = await Audio.Sound.createAsync(
+              { uri: altPath },
+              { shouldPlay: false }
+            );
+            sound = newSound;
+          } else {
+            // Load from bundle
+            const { sound: newSound } = await Audio.Sound.createAsync(
+              { uri: fullPath },
+              { shouldPlay: false }
+            );
+            sound = newSound;
+          }
+          
+          this.soundCache.set(assetPath, sound);
+        }
+
+        // Set up playback status listener to detect when audio finishes
+        const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+          if (status.isLoaded && status.didJustFinish) {
+            // Audio finished playing
+            sound?.setOnPlaybackStatusUpdate(null);
+            resolve();
+          }
+        };
+
+        sound.setOnPlaybackStatusUpdate(onPlaybackStatusUpdate);
+
+        // Play sound
+        await sound.replayAsync();
+      } catch (error) {
+        console.error('Error playing sound from asset:', error);
+        // Resolve anyway to not block the flow
+        resolve();
+      }
+    });
+  }
+
+  /**
    * Play phoneme sound
    */
   async playPhoneme(phoneme: string): Promise<void> {
@@ -125,11 +184,3 @@ class AudioPlayerService {
 }
 
 export const audioPlayer = new AudioPlayerService();
-
-
-
-
-
-
-
-

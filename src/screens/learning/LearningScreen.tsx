@@ -105,14 +105,28 @@ export default function LearningScreen() {
     }
   };
 
-  // Play great job audio on successful swipe
-  const playGreatJobAudio = async () => {
+  // Play the full success audio sequence: great-job.mp3 -> 1 second pause -> audio.mp3
+  // Returns a promise that resolves when the entire sequence is complete
+  const playSuccessAudioSequence = async (card: LearningCard): Promise<void> => {
     try {
-      if (currentCard?.distarCard?.greatJobPath) {
-        await audioPlayer.playSoundFromAsset(currentCard.distarCard.greatJobPath);
+      // 1. Play great-job.mp3 and wait for it to finish
+      if (card.distarCard?.greatJobPath) {
+        console.log('Playing great-job audio...');
+        await audioPlayer.playSoundFromAssetAndWait(card.distarCard.greatJobPath);
+        console.log('Great-job audio finished');
+      }
+      
+      // 2. Wait 1 second
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // 3. Play audio.mp3 (the word) and wait for it to finish
+      if (card.distarCard?.audioPath) {
+        console.log('Playing word audio...');
+        await audioPlayer.playSoundFromAssetAndWait(card.distarCard.audioPath);
+        console.log('Word audio finished');
       }
     } catch (error) {
-      console.error('Error playing great job audio:', error);
+      console.error('Error in success audio sequence:', error);
     }
   };
 
@@ -242,11 +256,35 @@ export default function LearningScreen() {
         useNativeDriver: true,
       }).start();
       
-      // Play great job audio
-      playGreatJobAudio();
-      
       // Reveal image
       setIsImageRevealed(true);
+      
+      // Play the audio sequence (great-job -> pause -> word audio)
+      // The image stays revealed until this completes
+      await playSuccessAudioSequence(currentCard);
+      
+      // Record completion after audio finishes
+      try {
+        await recordCardCompletion(childId, currentCard.word, {
+          success: true,
+          attempts: attempts + 1,
+          matchScore: 1.0,
+          neededHelp,
+        });
+        
+        setCardsCompleted(cardsCompleted + 1);
+        setProgress((cardsCompleted + 1) / 10);
+      } catch (error) {
+        console.error('Error recording completion:', error);
+      }
+      
+      // Small delay after audio finishes to let the child enjoy the image
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Move to next card
+      setShowConfetti(false);
+      setState('ready');
+      loadNextCard();
     } else {
       setAttempts(attempts + 1);
       if (attempts >= 2) {
@@ -256,32 +294,9 @@ export default function LearningScreen() {
     }
   };
 
-  const handleRevealComplete = async () => {
-    if (!currentCard) return;
-
-    try {
-      // Record completion
-      await recordCardCompletion(childId, currentCard.word, {
-        success: true,
-        attempts: attempts + 1,
-        matchScore: 1.0,
-        neededHelp,
-      });
-
-      setCardsCompleted(cardsCompleted + 1);
-      setProgress((cardsCompleted + 1) / 10);
-      
-      // Wait a moment to enjoy the revealed image, then move to next card
-      setTimeout(() => {
-        setShowConfetti(false);
-        setState('ready');
-        loadNextCard();
-      }, 2500); // Show revealed image for 2.5 seconds
-    } catch (error) {
-      console.error('Error recording completion:', error);
-      setState('ready');
-      loadNextCard();
-    }
+  const handleRevealComplete = () => {
+    // Blur animation finished - timing is now controlled by audio sequence in handleSwipeComplete
+    console.log('Image reveal animation complete');
   };
 
   const handleHelp = () => {
