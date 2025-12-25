@@ -272,7 +272,20 @@ export default function LearningScreen() {
   }
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+    <View style={styles.container}>
+      {/* Blurred background image */}
+      <BlurredImageReveal
+        imageUri={currentCard.imageUrl}
+        isRevealed={false}
+        isFullScreen={true}
+      />
+      
+      {/* Gradient overlay for readability */}
+      <LinearGradient
+        colors={['rgba(102, 126, 234, 0.85)', 'rgba(118, 75, 162, 0.85)']}
+        style={styles.gradientOverlay}
+      />
+      
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.levelText}>Level {currentCard.level}</Text>
@@ -322,13 +335,18 @@ export default function LearningScreen() {
       </View>
 
       <ConfettiCelebration visible={showConfetti} onComplete={() => setShowConfetti(false)} />
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
+  },
+  gradientOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
   revealContainer: {
     flex: 1,
@@ -352,6 +370,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 8,
+    zIndex: 2,
   },
   levelText: {
     fontSize: 16,
@@ -368,6 +387,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 16,
+    zIndex: 2,
   },
   dot: {
     width: 10,
@@ -386,12 +406,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingBottom: 40,
+    zIndex: 2,
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingBottom: 40,
+    zIndex: 2,
   },
   helpButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',

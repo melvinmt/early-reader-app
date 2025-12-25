@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Image, StyleSheet, Animated, Text, Dimensions } from 'react-native';
+import { View, Image, StyleSheet, Animated, Text, Dimensions, ImageSourcePropType } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { getImageSource, hasImageAsset } from '@/utils/assetMap';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface BlurredImageRevealProps {
   imageUri: string;
   isRevealed: boolean;
-  isFullScreen?: boolean; // When true, image fills entire screen
+  isFullScreen?: boolean;
   onRevealComplete?: () => void;
 }
 
@@ -17,17 +18,18 @@ export default function BlurredImageReveal({
   isFullScreen = false,
   onRevealComplete,
 }: BlurredImageRevealProps) {
-  const blurIntensity = useRef(new Animated.Value(50)).current; // Start with heavy blur (0-100)
-  const opacityAnimation = useRef(new Animated.Value(1)).current; // Question mark opacity
+  const blurIntensity = useRef(new Animated.Value(50)).current;
+  const opacityAnimation = useRef(new Animated.Value(1)).current;
+  const [currentBlur, setCurrentBlur] = useState(50);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     if (isRevealed) {
-      // Animate blur from 50 to 0 (real Gaussian blur)
       Animated.parallel([
         Animated.timing(blurIntensity, {
           toValue: 0,
-          duration: 1200, // Slightly longer for full reveal experience
-          useNativeDriver: false, // Blur doesn't support native driver
+          duration: 1200,
+          useNativeDriver: false,
         }),
         Animated.timing(opacityAnimation, {
           toValue: 0,
@@ -38,14 +40,10 @@ export default function BlurredImageReveal({
         onRevealComplete?.();
       });
     } else {
-      // Reset to blurred state
       blurIntensity.setValue(50);
       opacityAnimation.setValue(1);
     }
   }, [isRevealed]);
-
-  // Get current blur value for BlurView
-  const [currentBlur, setCurrentBlur] = useState(50);
 
   useEffect(() => {
     const listenerId = blurIntensity.addListener(({ value }) => {
@@ -57,12 +55,24 @@ export default function BlurredImageReveal({
     };
   }, [blurIntensity]);
 
-  // Don't render if no image URI
-  if (!imageUri) {
+  // Reset error state when imageUri changes
+  useEffect(() => {
+    setImageError(false);
+  }, [imageUri]);
+
+  // Get the image source (handles both local assets and URLs)
+  const imageSource = imageUri ? getImageSource(imageUri) : null;
+  const hasValidImage = imageUri && hasImageAsset(imageUri) && !imageError;
+
+  // Show placeholder if no valid image
+  if (!hasValidImage) {
     return (
       <View style={[styles.container, isFullScreen && styles.fullScreenContainer]}>
-        <View style={styles.placeholder}>
-          <Text style={styles.placeholderText}>Image loading...</Text>
+        <View style={[styles.placeholder, isFullScreen && styles.fullScreenPlaceholder]}>
+          <Text style={styles.placeholderEmoji}>🎨</Text>
+          <Text style={styles.placeholderText}>
+            {imageError ? 'Image not available' : 'Loading image...'}
+          </Text>
         </View>
       </View>
     );
@@ -71,13 +81,14 @@ export default function BlurredImageReveal({
   return (
     <View style={[styles.container, isFullScreen && styles.fullScreenContainer]}>
       <View style={[styles.imageContainer, isFullScreen && styles.fullScreenImageContainer]}>
-        <Image 
-          source={{ uri: imageUri }} 
-          style={[styles.image, isFullScreen && styles.fullScreenImage]} 
-          resizeMode="cover" 
+        <Image
+          source={imageSource}
+          style={[styles.image, isFullScreen && styles.fullScreenImage]}
+          resizeMode="cover"
+          onError={() => setImageError(true)}
         />
-        
-        {/* Real Gaussian blur overlay that animates */}
+
+        {/* Blur overlay that animates */}
         {currentBlur > 0 && (
           <BlurView
             intensity={currentBlur}
@@ -91,13 +102,11 @@ export default function BlurredImageReveal({
         <Animated.View
           style={[
             styles.overlay,
-            {
-              opacity: opacityAnimation,
-            },
+            { opacity: opacityAnimation },
           ]}
         >
           <Text style={styles.questionMark}>?</Text>
-          <Text style={styles.hint}>Read the word to see the picture!</Text>
+          <Text style={styles.hint}>Swipe to reveal!</Text>
         </Animated.View>
       )}
     </View>
@@ -165,10 +174,19 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#e8e8e8',
+    borderRadius: 16,
+  },
+  fullScreenPlaceholder: {
+    borderRadius: 0,
+    backgroundColor: '#2a2a2a',
+  },
+  placeholderEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
   },
   placeholderText: {
     fontSize: 16,
-    color: '#666',
+    color: '#888',
   },
 });
