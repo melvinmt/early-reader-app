@@ -1,7 +1,7 @@
-import { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { useSharedValue, runOnJS } from 'react-native-reanimated';
+import { runOnJS } from 'react-native-reanimated';
 import { DistarCard } from '@/data/distarCards';
 
 interface WordSwipeDetectorProps {
@@ -12,7 +12,9 @@ interface WordSwipeDetectorProps {
   onSwipeComplete: (success: boolean) => void;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Time to fill the progress bar (in ms)
+const FILL_DURATION = 1500; // 1.5 seconds to complete
+const UPDATE_INTERVAL = 16; // ~60fps
 
 export default function WordSwipeDetector({
   word,
@@ -25,7 +27,8 @@ export default function WordSwipeDetector({
   const [isActive, setIsActive] = useState(false);
   const isMountedRef = useRef(true);
   const onSwipeCompleteRef = useRef(onSwipeComplete);
-  const startX = useSharedValue(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const progressRef = useRef(0);
 
   useEffect(() => {
     onSwipeCompleteRef.current = onSwipeComplete;
@@ -35,59 +38,107 @@ export default function WordSwipeDetector({
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     };
   }, []);
 
-  const updateProgress = (progress: number) => {
+  // Start auto-filling progress while finger is held down
+  const startAutoFill = useCallback(() => {
     if (!isMountedRef.current) return;
-    setSwipeProgress(Math.min(1, Math.max(0, progress)));
-  };
-
-  const handleSwipeStart = () => {
-    if (!isMountedRef.current) return;
+    
     setIsActive(true);
-  };
+    progressRef.current = 0;
+    setSwipeProgress(0);
+    
+    // Clear any existing interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    
+    // Start filling progress automatically
+    const incrementPerUpdate = UPDATE_INTERVAL / FILL_DURATION;
+    
+    intervalRef.current = setInterval(() => {
+      if (!isMountedRef.current) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        return;
+      }
+      
+      progressRef.current = Math.min(1, progressRef.current + incrementPerUpdate);
+      setSwipeProgress(progressRef.current);
+      
+      // Auto-complete when reaching 100%
+      if (progressRef.current >= 1) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        handleComplete(true);
+      }
+    }, UPDATE_INTERVAL);
+  }, []);
 
-  const handleSwipeEnd = (finalProgress: number) => {
+  // Stop auto-filling when finger is lifted
+  const stopAutoFill = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
     if (!isMountedRef.current) return;
     
-    const success = finalProgress >= 0.8; // 80% swipe = success
+    const finalProgress = progressRef.current;
+    const success = finalProgress >= 0.8; // 80% = success
     
+    handleComplete(success);
+  }, []);
+
+  const handleComplete = useCallback((success: boolean) => {
     setIsActive(false);
     setSwipeProgress(0);
+    progressRef.current = 0;
     
     setTimeout(() => {
       if (isMountedRef.current && onSwipeCompleteRef.current) {
         onSwipeCompleteRef.current(success);
       }
     }, 0);
-  };
+  }, []);
 
+  // Use a combined gesture that works with touch down/up
   const panGesture = Gesture.Pan()
-    .minPointers(1) // Allow single finger
-    .maxPointers(10) // Allow up to 10 fingers (for kids with multiple fingers on screen)
-    .activeOffsetX(10) // Start after 10px horizontal movement
-    .failOffsetY(50) // Fail if vertical movement exceeds 50px
-    .onStart((event) => {
-      startX.value = event.absoluteX;
-      runOnJS(handleSwipeStart)();
-    })
-    .onUpdate((event) => {
-      const distance = event.absoluteX - startX.value;
-      const maxDistance = SCREEN_WIDTH - 80; // Account for padding
-      const progress = distance / maxDistance;
-      runOnJS(updateProgress)(progress);
+    .minPointers(1)
+    .maxPointers(10) // Allow multiple fingers
+    .minDistance(0) // Start immediately on touch
+    .onStart(() => {
+      runOnJS(startAutoFill)();
     })
     .onEnd(() => {
-      runOnJS(handleSwipeEnd)(swipeProgress);
+      runOnJS(stopAutoFill)();
+    })
+    .onFinalize(() => {
+      runOnJS(stopAutoFill)();
     });
+
+  // Also support simple tap and hold with long press
+  const longPressGesture = Gesture.LongPress()
+    .minDuration(0) // Start immediately
+    .maxDistance(100) // Allow some movement
+    .onStart(() => {
+      runOnJS(startAutoFill)();
+    })
+    .onEnd(() => {
+      runOnJS(stopAutoFill)();
+    });
+
+  // Combine both gestures - either works
+  const combinedGesture = Gesture.Race(panGesture, longPressGesture);
 
   // Calculate progress bar width
   const progressWidth = `${Math.min(100, swipeProgress * 100)}%`;
 
   return (
     <View style={styles.container}>
-      <GestureDetector gesture={panGesture}>
+      <GestureDetector gesture={combinedGesture}>
         <View style={styles.swipeArea}>
           {/* Progress track */}
           <View style={styles.progressTrack}>
