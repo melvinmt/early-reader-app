@@ -110,9 +110,9 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     }
   }
 
-  // Filter out cards without complete data
+  // Filter out cards without complete data (imageUrl is optional)
   const validCards = allCards.filter(
-    (card) => card.word && card.phonemes.length > 0 && card.imageUrl
+    (card) => card.word && card.phonemes.length > 0
   );
 
   return {
@@ -293,9 +293,61 @@ async function checkLevelProgression(childId: string): Promise<void> {
 
 /**
  * Get next card from queue
+ * Only generates one card at a time to show immediately
  */
 export async function getNextCard(childId: string): Promise<LearningCard | null> {
-  const queue = await getCardQueue(childId);
-  return queue.cards.length > 0 ? queue.cards[0] : null;
+  // Get child info first
+  const child = await getChild(childId);
+  if (!child) {
+    throw new Error('Child not found');
+  }
+  
+  const currentLevel = child.current_level;
+  const levelData = getLevel(currentLevel);
+  
+  if (!levelData) {
+    throw new Error(`Invalid level: ${currentLevel}`);
+  }
+  
+  // First, try to get a due review card
+  const dueCards = await getDueReviewCards(childId, 1);
+  
+  if (dueCards.length > 0) {
+    const progress = dueCards[0];
+    // Load full card data from cache
+    const cachedWord = await getContentCache('word', progress.word);
+    const cachedImage = await getContentCache('image', progress.word);
+    
+    let phonemes: string[] = [];
+    let imageUrl = '';
+    
+    if (cachedWord) {
+      const wordData = JSON.parse(cachedWord.content_data);
+      phonemes = wordData.phonemes || [];
+    } else {
+      // Regenerate phonemes if not cached
+      phonemes = await segmentPhonemes(progress.word);
+    }
+    
+    if (cachedImage) {
+      const imageData = JSON.parse(cachedImage.content_data);
+      imageUrl = imageData.imageUrl || '';
+    }
+    
+    // Return card even if imageUrl is missing (can generate on demand)
+    if (progress.word && phonemes.length > 0) {
+      return {
+        word: progress.word,
+        phonemes,
+        imageUrl,
+        progress,
+        level: currentLevel,
+      };
+    }
+  }
+  
+  // No due cards, generate a new one (only ONE card)
+  const card = await generateNewCard(childId, currentLevel, levelData.phonemes);
+  return card;
 }
 
