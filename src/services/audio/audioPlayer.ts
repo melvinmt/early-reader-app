@@ -80,8 +80,6 @@ class AudioPlayerService {
           uri = assetPath;
         }
 
-        console.log(`Loading audio from: ${uri}`);
-
         const { sound: newSound } = await Audio.Sound.createAsync(
           { uri },
           { shouldPlay: false }
@@ -128,8 +126,6 @@ class AudioPlayerService {
             // Fallback: try assetPath as-is
             uri = assetPath;
           }
-
-          console.log(`Loading audio from: ${uri}`);
 
           const { sound: newSound } = await Audio.Sound.createAsync(
             { uri },
