@@ -1,19 +1,40 @@
 import { Audio, AVPlaybackStatus } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import { Asset } from 'expo-asset';
+import { getAudioSource } from '@/utils/audioAssetMap';
 
 class AudioPlayerService {
   private soundCache: Map<string, Audio.Sound> = new Map();
+  private audioInitialized = false;
+
+  /**
+   * Initialize audio mode for playback
+   */
+  private async initializeAudio() {
+    if (this.audioInitialized) return;
+    
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true, // Play audio even if device is on silent
+        shouldDuckAndroid: true,
+        staysActiveInBackground: false,
+        playThroughEarpieceAndroid: false,
+      });
+      this.audioInitialized = true;
+      console.log('Audio mode initialized');
+    } catch (error) {
+      console.error('Error initializing audio mode:', error);
+    }
+  }
 
   /**
    * Play sound from URI (remote or local file)
    */
   async playSound(soundUri: string): Promise<void> {
     try {
-      // Check cache first
       let sound = this.soundCache.get(soundUri);
 
       if (!sound) {
-        // Load sound
         const { sound: newSound } = await Audio.Sound.createAsync(
           { uri: soundUri },
           { shouldPlay: false }
@@ -22,7 +43,6 @@ class AudioPlayerService {
         this.soundCache.set(soundUri, sound);
       }
 
-      // Play sound
       await sound.replayAsync();
     } catch (error) {
       console.error('Error playing sound:', error);
@@ -30,54 +50,50 @@ class AudioPlayerService {
   }
 
   /**
-   * Play sound from static asset path (e.g., "assets/sounds/phonemes/m.mp3")
-   * For Expo, we use the file system to load bundled assets
+   * Play sound from static asset path (e.g., "assets/en-US/001-l/audio.mp3")
+   * Uses expo-asset to properly load bundled audio files
    */
   async playSoundFromAsset(assetPath: string): Promise<void> {
     try {
+      // Initialize audio mode first
+      await this.initializeAudio();
+      
       // Check cache first
       let sound = this.soundCache.get(assetPath);
 
       if (!sound) {
-        // Construct the full file path
-        // In Expo, bundled assets are in the app bundle
-        // For development, we can use the local file system
-        const fullPath = assetPath.startsWith('assets/')
-          ? `${FileSystem.bundleDirectory}${assetPath}`
-          : `${FileSystem.bundleDirectory}assets/${assetPath}`;
+        // Get the audio source (require() module or URI)
+        const audioSource = getAudioSource(assetPath);
         
-        // Check if file exists
-        const fileInfo = await FileSystem.getInfoAsync(fullPath);
-        if (!fileInfo.exists) {
-          // Try alternative path (for development with Metro bundler)
-          const altPath = assetPath.startsWith('/') ? assetPath : `/${assetPath}`;
-          const { sound: newSound } = await Audio.Sound.createAsync(
-            { uri: altPath },
-            { shouldPlay: false }
-          );
-          sound = newSound;
+        let uri: string;
+        
+        // If it's a require() module (number), use Asset.fromModule to get URI
+        if (typeof audioSource === 'number') {
+          const asset = Asset.fromModule(audioSource);
+          await asset.downloadAsync(); // Ensure asset is loaded
+          uri = asset.localUri || asset.uri;
+        } else if (audioSource?.uri) {
+          // Already a URI object
+          uri = audioSource.uri;
         } else {
-          // Load from bundle
-          const { sound: newSound } = await Audio.Sound.createAsync(
-            { uri: fullPath },
-            { shouldPlay: false }
-          );
-          sound = newSound;
+          // Fallback: try assetPath as-is
+          uri = assetPath;
         }
-        
+
+        console.log(`Loading audio from: ${uri}`);
+
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri },
+          { shouldPlay: false }
+        );
+        sound = newSound;
         this.soundCache.set(assetPath, sound);
       }
 
-      // Play sound
       await sound.replayAsync();
     } catch (error) {
       console.error('Error playing sound from asset:', error);
-      // Fallback: try as direct URI (might be a remote URL)
-      try {
-        await this.playSound(assetPath);
-      } catch (fallbackError) {
-        console.error('Fallback playSound also failed:', fallbackError);
-      }
+      console.error('Asset path was:', assetPath);
     }
   }
 
@@ -86,43 +102,46 @@ class AudioPlayerService {
    * Returns a promise that resolves when the audio finishes playing
    */
   async playSoundFromAssetAndWait(assetPath: string): Promise<void> {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
       try {
+        // Initialize audio mode first
+        await this.initializeAudio();
+        
         // Check cache first
         let sound = this.soundCache.get(assetPath);
 
         if (!sound) {
-          // Construct the full file path
-          const fullPath = assetPath.startsWith('assets/')
-            ? `${FileSystem.bundleDirectory}${assetPath}`
-            : `${FileSystem.bundleDirectory}assets/${assetPath}`;
+          // Get the audio source (require() module or URI)
+          const audioSource = getAudioSource(assetPath);
           
-          // Check if file exists
-          const fileInfo = await FileSystem.getInfoAsync(fullPath);
-          if (!fileInfo.exists) {
-            // Try alternative path (for development with Metro bundler)
-            const altPath = assetPath.startsWith('/') ? assetPath : `/${assetPath}`;
-            const { sound: newSound } = await Audio.Sound.createAsync(
-              { uri: altPath },
-              { shouldPlay: false }
-            );
-            sound = newSound;
+          let uri: string;
+          
+          // If it's a require() module (number), use Asset.fromModule to get URI
+          if (typeof audioSource === 'number') {
+            const asset = Asset.fromModule(audioSource);
+            await asset.downloadAsync(); // Ensure asset is loaded
+            uri = asset.localUri || asset.uri;
+          } else if (audioSource?.uri) {
+            // Already a URI object
+            uri = audioSource.uri;
           } else {
-            // Load from bundle
-            const { sound: newSound } = await Audio.Sound.createAsync(
-              { uri: fullPath },
-              { shouldPlay: false }
-            );
-            sound = newSound;
+            // Fallback: try assetPath as-is
+            uri = assetPath;
           }
-          
+
+          console.log(`Loading audio from: ${uri}`);
+
+          const { sound: newSound } = await Audio.Sound.createAsync(
+            { uri },
+            { shouldPlay: false }
+          );
+          sound = newSound;
           this.soundCache.set(assetPath, sound);
         }
 
         // Set up playback status listener to detect when audio finishes
         const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
           if (status.isLoaded && status.didJustFinish) {
-            // Audio finished playing
             sound?.setOnPlaybackStatusUpdate(null);
             resolve();
           }
@@ -134,6 +153,7 @@ class AudioPlayerService {
         await sound.replayAsync();
       } catch (error) {
         console.error('Error playing sound from asset:', error);
+        console.error('Asset path was:', assetPath);
         // Resolve anyway to not block the flow
         resolve();
       }

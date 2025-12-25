@@ -45,3 +45,4 @@ export function hasImageAsset(assetPath: string): boolean {
          assetPath.startsWith('https://');
 }
 
+
