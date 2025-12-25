@@ -287,8 +287,6 @@ export default function LearningScreen() {
             onWordTap={handleWordTap}
           />
 
-          <View style={styles.divider} />
-
           <WordSwipeDetector
             word={currentCard.word}
             phonemes={currentCard.phonemes}
@@ -387,11 +385,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 24,
   },
   swipeHint: {
     textAlign: 'center',
