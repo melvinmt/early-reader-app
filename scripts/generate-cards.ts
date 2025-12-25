@@ -84,30 +84,28 @@ function generateCardId(name: string): string {
 
 /**
  * Get phoneme audio path by phoneme symbol
- * Falls back to a generated path if phoneme card wasn't generated (e.g., in test mode)
+ * Returns the path only if the phoneme card was actually generated
  */
-function getPhonemeAudioPath(phonemeSymbol: string): string {
+function getPhonemeAudioPath(phonemeSymbol: string): string | null {
   const cardId = phonemeToCardId.get(phonemeSymbol.toLowerCase());
   if (cardId) {
     return `assets/${LOCALE}/${cardId}/audio.mp3`;
   }
-  // Fallback: use a placeholder path (phoneme card may not have been generated in test mode)
-  const sanitized = phonemeSymbol.replace(/[^a-z0-9]/gi, '').toLowerCase();
-  return `assets/${LOCALE}/phoneme-${sanitized}/audio.mp3`;
+  // Return null if phoneme card doesn't exist (don't create invalid paths)
+  return null;
 }
 
 /**
  * Get word audio path by word
- * Falls back to a generated path if word card wasn't generated (e.g., in test mode)
+ * Returns the path only if the word card was actually generated
  */
-function getWordAudioPath(word: string): string {
+function getWordAudioPath(word: string): string | null {
   const cardId = wordToCardId.get(word.toLowerCase());
   if (cardId) {
     return `assets/${LOCALE}/${cardId}/audio.mp3`;
   }
-  // Fallback: use a placeholder path (word card may not have been generated in test mode)
-  const sanitized = word.replace(/[^a-z0-9]/gi, '').toLowerCase();
-  return `assets/${LOCALE}/word-${sanitized}/audio.mp3`;
+  // Return null if word card doesn't exist (don't create invalid paths)
+  return null;
 }
 
 // Assets organized by locale (e.g., assets/en-US/...)
@@ -650,8 +648,10 @@ async function generateWordCards(): Promise<any[]> {
       }).join('-');
       await generateAudio(soundedOut, soundedOutPath, 'neutral', cardLabel);
       
-      // Generate phoneme audio paths - reference phoneme card audio files
-      const phonemeAudioPaths = phonemes.map(p => getPhonemeAudioPath(p));
+      // Generate phoneme audio paths - only include paths for cards that actually exist
+      const phonemeAudioPaths = phonemes
+        .map(p => getPhonemeAudioPath(p))
+        .filter((p): p is string => p !== null);
       
       cards.push({
         id: cardId,
@@ -659,7 +659,7 @@ async function generateWordCards(): Promise<any[]> {
         display: word,
         plainText: word,
         phonemes,
-        phonemeAudioPaths,
+        ...(phonemeAudioPaths.length > 0 && { phonemeAudioPaths }),
         lesson,
         imagePath: `assets/${LOCALE}/${cardId}/image.png`,
         promptPath: `assets/${LOCALE}/${cardId}/prompt.mp3`,
@@ -743,8 +743,10 @@ async function generateWordCards(): Promise<any[]> {
       }).join('-');
       await generateAudio(soundedOut, soundedOutPath, 'neutral', cardLabel);
       
-      // Generate phoneme audio paths - reference phoneme card audio files
-      const phonemeAudioPaths = phonemes.map(p => getPhonemeAudioPath(p));
+      // Generate phoneme audio paths - only include paths for cards that actually exist
+      const phonemeAudioPaths = phonemes
+        .map(p => getPhonemeAudioPath(p))
+        .filter((p): p is string => p !== null);
       
       cards.push({
         id: cardId,
@@ -947,14 +949,15 @@ async function generateSentenceCards(): Promise<any[]> {
     // Generate full sentence audio - use 'happy' for encouraging sentences
     await generateAudio(sentence.text, audioPath, 'happy', cardLabel);
     
-    // Generate word audio paths - reference word card audio files
-    const wordAudioPaths = words.map(word => getWordAudioPath(word));
+    // Generate word audio paths - only include paths for cards that actually exist
+    const wordAudioPaths = words
+      .map(word => getWordAudioPath(word))
+      .filter((p): p is string => p !== null);
     
-    // Generate phoneme audio paths - reference other card IDs
-    const phonemeAudioPaths = phonemes.map(p => {
-      const phonemeCardId = p.replace(/[^a-z0-9]/gi, '_');
-      return `assets/${LOCALE}/${phonemeCardId}/audio.mp3`;
-    });
+    // Generate phoneme audio paths - only include paths for cards that actually exist
+    const phonemeAudioPaths = phonemes
+      .map(p => getPhonemeAudioPath(p))
+      .filter((p): p is string => p !== null);
     
     cards.push({
       id: cardId,
@@ -963,8 +966,8 @@ async function generateSentenceCards(): Promise<any[]> {
       plainText: sentence.text,
       phonemes,
       words,
-      phonemeAudioPaths,
-      wordAudioPaths,
+      ...(phonemeAudioPaths.length > 0 && { phonemeAudioPaths }),
+      ...(wordAudioPaths.length > 0 && { wordAudioPaths }),
       lesson: sentence.lesson,
       imagePath: `assets/${LOCALE}/${cardId}/image.png`,
       promptPath: `assets/${LOCALE}/${cardId}/prompt.mp3`,
@@ -1064,71 +1067,6 @@ export function getCardsByType(type: DistarCard['type']): DistarCard[] {
   
   // Also generate asset mapping files for React Native
   generateAssetMappings(cards);
-}
-
-/**
- * Validate and clean up card paths to only include files that actually exist
- * Removes phonemeAudioPaths and wordAudioPaths that reference non-existent files
- */
-function validateCardPaths(cards: any[]): void {
-  const assetsDir = path.join(__dirname, '..', 'assets', LOCALE);
-  
-  cards.forEach(card => {
-    // Validate direct file paths - remove if they don't exist
-    const pathsToCheck: Array<keyof typeof card> = [
-      'imagePath',
-      'audioPath',
-      'promptPath',
-      'tryAgainPath',
-      'noInputPath',
-      'greatJobPath',
-      'soundedOutPath',
-    ];
-    
-    pathsToCheck.forEach(pathKey => {
-      if (card[pathKey]) {
-        const fullPath = path.join(assetsDir, card[pathKey].replace(`assets/${LOCALE}/`, ''));
-        if (!fs.existsSync(fullPath)) {
-          console.warn(`⚠️  Removing non-existent path from card ${card.id}: ${card[pathKey]}`);
-          delete card[pathKey];
-        }
-      }
-    });
-    
-    // Filter phonemeAudioPaths to only include files that exist
-    if (card.phonemeAudioPaths && Array.isArray(card.phonemeAudioPaths)) {
-      card.phonemeAudioPaths = card.phonemeAudioPaths.filter((audioPath: string) => {
-        const fullPath = path.join(assetsDir, audioPath.replace(`assets/${LOCALE}/`, ''));
-        const exists = fs.existsSync(fullPath);
-        if (!exists) {
-          console.warn(`⚠️  Removing non-existent phonemeAudioPath from card ${card.id}: ${audioPath}`);
-        }
-        return exists;
-      });
-      
-      // Remove the array if it's empty
-      if (card.phonemeAudioPaths.length === 0) {
-        delete card.phonemeAudioPaths;
-      }
-    }
-    
-    // Filter wordAudioPaths to only include files that exist
-    if (card.wordAudioPaths && Array.isArray(card.wordAudioPaths)) {
-      card.wordAudioPaths = card.wordAudioPaths.filter((audioPath: string) => {
-        const fullPath = path.join(assetsDir, audioPath.replace(`assets/${LOCALE}/`, ''));
-        const exists = fs.existsSync(fullPath);
-        if (!exists) {
-          console.warn(`⚠️  Removing non-existent wordAudioPath from card ${card.id}: ${audioPath}`);
-        }
-        return exists;
-      });
-      
-      // Remove the array if it's empty
-      if (card.wordAudioPaths.length === 0) {
-        delete card.wordAudioPaths;
-      }
-    }
-  });
 }
 
 /**
@@ -1441,9 +1379,6 @@ async function main() {
   console.log(`✓ Generated ${sentenceCards.length} sentence cards\n`);
   
   const allCards = [...phonemeCards, ...wordCards, ...sentenceCards];
-  
-  console.log('🔍 Validating card paths against actual files...');
-  validateCardPaths(allCards);
   
   console.log('📝 Generating cards TypeScript file...');
   generateCardsFile(allCards);
