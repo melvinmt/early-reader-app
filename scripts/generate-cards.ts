@@ -439,7 +439,8 @@ async function generatePhonemeCards(): Promise<any[]> {
     await generateAudio(greatJobText, greatJobPath, 'excited');
     
     // Determine orthography
-    const display = phoneme.hasMacron ? phoneme.symbol : phoneme.symbol;
+    // phoneme.symbol already contains the macron character if hasMacron is true (e.g., "ā", "ē", "ō")
+    const display = phoneme.symbol;
     const balls = phoneme.type === 'voiced' && !phoneme.isDigraph ? [0] : [];
     const arrows = phoneme.type === 'whispered' && !phoneme.isDigraph ? [0] : [];
     

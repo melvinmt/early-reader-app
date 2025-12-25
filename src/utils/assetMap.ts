@@ -10,12 +10,12 @@
 
 // Image assets
 const IMAGE_ASSETS: Record<string, any> = {
-  'assets/en-US/001-/image.png': require('../../assets/en-US/001-/image.png'),
-  'assets/en-US/002-er/image.png': require('../../assets/en-US/002-er/image.png'),
-  'assets/en-US/003-but/image.png': require('../../assets/en-US/003-but/image.png'),
-  'assets/en-US/004-those/image.png': require('../../assets/en-US/004-those/image.png'),
-  'assets/en-US/005-reading-is-fun-for-everyone/image.png': require('../../assets/en-US/005-reading-is-fun-for-everyone/image.png'),
-  'assets/en-US/006-he-thought-about-his-friend/image.png': require('../../assets/en-US/006-he-thought-about-his-friend/image.png'),
+  'assets/en-US/001-o/image.png': require('../../assets/en-US/001-o/image.png'),
+  'assets/en-US/002-ing/image.png': require('../../assets/en-US/002-ing/image.png'),
+  'assets/en-US/003-zip/image.png': require('../../assets/en-US/003-zip/image.png'),
+  'assets/en-US/004-ground/image.png': require('../../assets/en-US/004-ground/image.png'),
+  'assets/en-US/005-i-am-bringing-the-ball/image.png': require('../../assets/en-US/005-i-am-bringing-the-ball/image.png'),
+  'assets/en-US/006-the-room-is-cool/image.png': require('../../assets/en-US/006-the-room-is-cool/image.png'),
 };
 
 /**
