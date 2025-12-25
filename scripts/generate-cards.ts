@@ -1069,72 +1069,55 @@ export function getCardsByType(type: DistarCard['type']): DistarCard[] {
 /**
  * Generate React Native asset mapping files (assetMap.ts and audioAssetMap.ts)
  * These are required because React Native/Metro bundler needs static require() calls
+ * 
+ * Scans the actual assets directory to find all existing files,
+ * rather than relying on card data which may have stale references
  */
 function generateAssetMappings(cards: any[]): void {
   const utilsDir = path.join(__dirname, '..', 'src', 'utils');
+  const assetsDir = path.join(__dirname, '..', 'assets', LOCALE);
   
-  // Collect all unique image paths
+  // Collect all unique paths by scanning the actual directory
   const imagePaths = new Set<string>();
   const audioPaths = new Set<string>();
   
-  // Get the assets directory to verify files exist
-  const assetsDir = path.join(__dirname, '..', 'assets', LOCALE);
+  if (!fs.existsSync(assetsDir)) {
+    console.warn(`⚠️  Assets directory does not exist: ${assetsDir}`);
+    return;
+  }
   
-  cards.forEach(card => {
-    // Only add paths that actually exist as files
-    if (card.imagePath) {
-      const fullPath = path.join(assetsDir, card.imagePath.replace(`assets/${LOCALE}/`, ''));
-      if (fs.existsSync(fullPath)) {
-        imagePaths.add(card.imagePath);
+  // Scan the assets directory recursively
+  function scanDirectory(dir: string, relativePath: string = ''): void {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      // Skip hidden files
+      if (entry.name.startsWith('.')) continue;
+      
+      const fullPath = path.join(dir, entry.name);
+      const assetRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+      const assetPath = `assets/${LOCALE}/${assetRelativePath}`;
+      
+      if (entry.isDirectory()) {
+        // Recursively scan subdirectories
+        scanDirectory(fullPath, assetRelativePath);
+      } else if (entry.isFile()) {
+        // Check file extension to determine if it's an image or audio file
+        const ext = path.extname(entry.name).toLowerCase();
+        if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) {
+          imagePaths.add(assetPath);
+        } else if (['.mp3', '.wav', '.m4a', '.aac'].includes(ext)) {
+          audioPaths.add(assetPath);
+        }
       }
     }
-    
-    if (card.audioPath) {
-      const fullPath = path.join(assetsDir, card.audioPath.replace(`assets/${LOCALE}/`, ''));
-      if (fs.existsSync(fullPath)) {
-        audioPaths.add(card.audioPath);
-      }
-    }
-    
-    if (card.promptPath) {
-      const fullPath = path.join(assetsDir, card.promptPath.replace(`assets/${LOCALE}/`, ''));
-      if (fs.existsSync(fullPath)) {
-        audioPaths.add(card.promptPath);
-      }
-    }
-    
-    if (card.greatJobPath) {
-      const fullPath = path.join(assetsDir, card.greatJobPath.replace(`assets/${LOCALE}/`, ''));
-      if (fs.existsSync(fullPath)) {
-        audioPaths.add(card.greatJobPath);
-      }
-    }
-    
-    if (card.tryAgainPath) {
-      const fullPath = path.join(assetsDir, card.tryAgainPath.replace(`assets/${LOCALE}/`, ''));
-      if (fs.existsSync(fullPath)) {
-        audioPaths.add(card.tryAgainPath);
-      }
-    }
-    
-    if (card.noInputPath) {
-      const fullPath = path.join(assetsDir, card.noInputPath.replace(`assets/${LOCALE}/`, ''));
-      if (fs.existsSync(fullPath)) {
-        audioPaths.add(card.noInputPath);
-      }
-    }
-    
-    if (card.soundedOutPath) {
-      const fullPath = path.join(assetsDir, card.soundedOutPath.replace(`assets/${LOCALE}/`, ''));
-      if (fs.existsSync(fullPath)) {
-        audioPaths.add(card.soundedOutPath);
-      }
-    }
-    
-    // Skip phonemeAudioPaths and wordAudioPaths - these are references to other cards
-    // that may not exist as separate directories (e.g., individual phonemes like "I", "a")
-    // Only include paths that are direct properties of the card itself
-  });
+  }
+  
+  // Scan the assets directory
+  scanDirectory(assetsDir);
+  
+  console.log(`  Found ${imagePaths.size} image files`);
+  console.log(`  Found ${audioPaths.size} audio files`);
   
   // Generate image asset map
   const imageMapFile = path.join(utilsDir, 'assetMap.ts');
