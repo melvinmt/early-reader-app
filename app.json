@@ -31,8 +31,10 @@
     "scheme": "instareader",
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "newArchEnabled": true
   }
 }
+
 
 

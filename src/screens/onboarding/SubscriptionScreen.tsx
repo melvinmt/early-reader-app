@@ -26,26 +26,15 @@ export default function SubscriptionScreen() {
   const [purchasesAvailable, setPurchasesAvailable] = useState(false);
 
   useEffect(() => {
+    // RevenueCat works in Browser Mode in Expo Go, so we can initialize it
     if (Purchases) {
       initializeRevenueCat();
     } else {
-      // Automatically skip subscription screen in Expo Go / dev mode
+      // If Purchases is not available, still show the screen but mark as unavailable
       setInitializing(false);
       setPurchasesAvailable(false);
-      // Auto-skip to children screen
-      const autoSkip = async () => {
-        if (session?.user) {
-          try {
-            await updateParentSubscriptionStatus(session.user.id, 'active');
-          } catch (error) {
-            console.error('Error updating subscription status:', error);
-          }
-        }
-        router.replace('/children');
-      };
-      autoSkip();
     }
-  }, [session, router]);
+  }, [session]);
 
   const initializeRevenueCat = async () => {
     try {

@@ -126,3 +126,4 @@ For InstaReader, implement these patterns:
 6. **UI/UX** - Swipe detection, blur reveal, orthography rendering
 
 Each feature should have clear acceptance criteria and be testable via device automation.
+i
