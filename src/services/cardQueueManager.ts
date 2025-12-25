@@ -130,77 +130,98 @@ async function generateNewCard(
   level: number,
   phonemes: string[]
 ): Promise<LearningCard | null> {
-  try {
-    // Generate word via AI
-    const generated = await generateWord({
-      level,
-      phonemes,
-      childId,
-    });
+  // Retry up to 5 times to get a unique word
+  const maxRetries = 5;
+  let attempts = 0;
+  
+  while (attempts < maxRetries) {
+    try {
+      // Generate word via AI
+      const generated = await generateWord({
+        level,
+        phonemes,
+        childId,
+      });
 
-    // Check if we already have progress for this word
-    const existingProgress = await getCardProgress(childId, generated.word);
+      // Check if we already have progress for this word
+      const existingProgress = await getCardProgress(childId, generated.word);
 
-    if (existingProgress) {
-      // Word already exists, skip
-      return null;
-    }
+      if (existingProgress) {
+        // Word already exists, try again
+        attempts++;
+        console.log(`Word "${generated.word}" already exists, retrying (${attempts}/${maxRetries})...`);
+        continue;
+      }
 
-    // Cache the word and image
-    await createOrUpdateContentCache({
-      id: `${childId}-word-${generated.word}`,
-      content_type: 'word',
-      content_key: generated.word,
-      content_data: JSON.stringify({
+      // Cache the word and image
+      await createOrUpdateContentCache({
+        id: `${childId}-word-${generated.word}`,
+        content_type: 'word',
+        content_key: generated.word,
+        content_data: JSON.stringify({
+          word: generated.word,
+          phonemes: generated.phonemes,
+          level,
+        }),
+        file_path: null,
+        created_at: new Date().toISOString(),
+        expires_at: null,
+      });
+
+      await createOrUpdateContentCache({
+        id: `${childId}-image-${generated.word}`,
+        content_type: 'image',
+        content_key: generated.word,
+        content_data: JSON.stringify({
+          imageUrl: generated.imageUrl,
+        }),
+        file_path: null,
+        created_at: new Date().toISOString(),
+        expires_at: null,
+      });
+
+      // Create initial progress entry
+      const progressId = `${childId}-${generated.word}-${Date.now()}`;
+      const now = new Date().toISOString();
+      const progress: CardProgress = {
+        id: progressId,
+        child_id: childId,
+        word: generated.word,
+        ease_factor: 2.5, // Default SM-2 ease factor
+        interval_days: 0, // Show immediately
+        next_review_at: now,
+        attempts: 0,
+        successes: 0,
+        last_seen_at: null,
+      };
+
+      await createOrUpdateCardProgress(progress);
+
+      return {
         word: generated.word,
         phonemes: generated.phonemes,
-        level,
-      }),
-      file_path: null,
-      created_at: new Date().toISOString(),
-      expires_at: null,
-    });
-
-    await createOrUpdateContentCache({
-      id: `${childId}-image-${generated.word}`,
-      content_type: 'image',
-      content_key: generated.word,
-      content_data: JSON.stringify({
         imageUrl: generated.imageUrl,
-      }),
-      file_path: null,
-      created_at: new Date().toISOString(),
-      expires_at: null,
-    });
-
-    // Create initial progress entry
-    const progressId = `${childId}-${generated.word}-${Date.now()}`;
-    const now = new Date().toISOString();
-    const progress: CardProgress = {
-      id: progressId,
-      child_id: childId,
-      word: generated.word,
-      ease_factor: 2.5, // Default SM-2 ease factor
-      interval_days: 0, // Show immediately
-      next_review_at: now,
-      attempts: 0,
-      successes: 0,
-      last_seen_at: null,
-    };
-
-    await createOrUpdateCardProgress(progress);
-
-    return {
-      word: generated.word,
-      phonemes: generated.phonemes,
-      imageUrl: generated.imageUrl,
-      progress,
-      level,
-    };
-  } catch (error) {
-    console.error('Error generating new card:', error);
-    return null;
+        progress,
+        level,
+      };
+    } catch (error) {
+      console.error(`Error generating new card (attempt ${attempts + 1}/${maxRetries}):`, error);
+      attempts++;
+      
+      // If we've exhausted retries, return null
+      if (attempts >= maxRetries) {
+        console.error('Failed to generate unique card after', maxRetries, 'attempts');
+        return null;
+      }
+      
+      // Wait a bit before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 100 * attempts));
+    }
   }
+  
+  // If we get here, we've exhausted all retries
+  console.error('Failed to generate unique card after', maxRetries, 'attempts');
+  return null;
 }
 
 /**
