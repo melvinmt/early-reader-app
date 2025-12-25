@@ -1,20 +1,38 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import Purchases, { PurchasesPackage } from 'react-native-purchases';
 import { useAuthStore } from '@/stores/authStore';
 import { updateParentSubscriptionStatus } from '@/services/storage';
 import Button from '@/components/ui/Button';
 
+// Conditionally import Purchases (only available in native builds)
+let Purchases: any = null;
+let PurchasesPackage: any = null;
+try {
+  const purchasesModule = require('react-native-purchases');
+  Purchases = purchasesModule.default;
+  PurchasesPackage = purchasesModule.PurchasesPackage;
+} catch (e) {
+  // Purchases not available (Expo Go)
+  console.log('react-native-purchases not available, running in Expo Go mode');
+}
+
 export default function SubscriptionScreen() {
   const router = useRouter();
   const { session } = useAuthStore();
-  const [packages, setPackages] = useState<PurchasesPackage[]>([]);
+  const [packages, setPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [purchasesAvailable, setPurchasesAvailable] = useState(false);
 
   useEffect(() => {
-    initializeRevenueCat();
+    if (Purchases) {
+      initializeRevenueCat();
+    } else {
+      // Skip initialization in Expo Go
+      setInitializing(false);
+      setPurchasesAvailable(false);
+    }
   }, []);
 
   const initializeRevenueCat = async () => {
@@ -35,15 +53,22 @@ export default function SubscriptionScreen() {
       const offerings = await Purchases.getOfferings();
       if (offerings.current) {
         setPackages(offerings.current.availablePackages);
+        setPurchasesAvailable(true);
       }
     } catch (error) {
       console.error('Error initializing RevenueCat:', error);
+      setPurchasesAvailable(false);
     } finally {
       setInitializing(false);
     }
   };
 
-  const handlePurchase = async (pkg: PurchasesPackage) => {
+  const handlePurchase = async (pkg: any) => {
+    if (!Purchases) {
+      Alert.alert('Info', 'Purchases are only available in production builds. Use "Start Free Trial" to continue.');
+      return;
+    }
+
     if (!session?.user) {
       Alert.alert('Error', 'Please sign in first');
       return;
@@ -73,8 +98,16 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
     // Allow skipping for now (trial mode)
+    // In Expo Go, we'll just mark as active for development
+    if (session?.user && !purchasesAvailable) {
+      try {
+        await updateParentSubscriptionStatus(session.user.id, 'active');
+      } catch (error) {
+        console.error('Error updating subscription status:', error);
+      }
+    }
     router.replace('/(tabs)/children');
   };
 
@@ -101,7 +134,15 @@ export default function SubscriptionScreen() {
         <FeatureItem text="Multiple child profiles" />
       </View>
 
-      {packages.length > 0 && (
+      {!purchasesAvailable && (
+        <View style={styles.devModeNotice}>
+          <Text style={styles.devModeText}>
+            Development Mode: Purchases are disabled in Expo Go. Use "Start Free Trial" to continue.
+          </Text>
+        </View>
+      )}
+
+      {packages.length > 0 && purchasesAvailable && (
         <View style={styles.packagesContainer}>
           {packages.map((pkg) => (
             <View key={pkg.identifier} style={styles.packageCard}>
@@ -216,7 +257,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
+  devModeNotice: {
+    backgroundColor: '#FFF3CD',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#FFC107',
+  },
+  devModeText: {
+    fontSize: 14,
+    color: '#856404',
+    textAlign: 'center',
+  },
 });
+
 
 
 
