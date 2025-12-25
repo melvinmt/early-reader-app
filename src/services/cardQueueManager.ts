@@ -118,43 +118,34 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     ...newCards,
   ];
 
-  // Load full card data for due cards (from static cards or cache)
+  // Load full card data for due cards (from static cards only - no cache fallback for stale cards)
   const staticCards = getAllStaticCards();
+  const validCards: LearningCard[] = [];
+  
   for (let i = 0; i < allCards.length; i++) {
     const card = allCards[i];
-    if (card.progress && (!card.phonemes.length || !card.imageUrl)) {
-      // First try to find matching static card
+    
+    // For cards with progress (due review cards), only include them if they exist in static cards
+    if (card.progress) {
       const matchingStatic = staticCards.find(c => c.plainText === card.word);
       
       if (matchingStatic) {
+        // Card exists in current static cards - use it
         card.phonemes = matchingStatic.phonemes;
         card.imageUrl = matchingStatic.imagePath;
         card.distarCard = matchingStatic;
+        validCards.push(card);
       } else {
-        // Fallback to cache for legacy cards
-        const cachedWord = await getContentCache('word', card.word);
-        const cachedImage = await getContentCache('image', card.word);
-
-        if (cachedWord) {
-          const wordData = JSON.parse(cachedWord.content_data);
-          card.phonemes = wordData.phonemes || [];
-        } else {
-          // Use characters as phonemes
-          card.phonemes = card.word.split('');
-        }
-
-        if (cachedImage) {
-          const imageData = JSON.parse(cachedImage.content_data);
-          card.imageUrl = imageData.imageUrl || '';
-        }
+        // Card no longer exists in static cards - skip it (stale reference)
+        console.warn(`Skipping stale card: "${card.word}" (no longer in static cards)`);
+      }
+    } else {
+      // New cards always have complete data from static cards
+      if (card.word && card.phonemes.length > 0) {
+        validCards.push(card);
       }
     }
   }
-
-  // Filter out cards without complete data (imageUrl is optional)
-  const validCards = allCards.filter(
-    (card) => card.word && card.phonemes.length > 0
-  );
 
   return {
     cards: validCards.slice(0, CARDS_PER_SESSION),
