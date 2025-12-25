@@ -28,6 +28,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import axios from 'axios';
 import { DISTAR_PHONEMES } from '../src/data/distarPhonemes';
 
@@ -46,7 +47,7 @@ const LOCALE = process.env.LOCALE || DEFAULT_LOCALE; // Can be overridden via en
 // Check for full mode (test mode is default)
 const FULL_MODE = process.argv.includes('--full') || process.argv.includes('--all') || process.argv.includes('-f');
 const TEST_MODE = !FULL_MODE; // Test mode is default
-const TEST_CARDS_PER_CATEGORY = 2;
+const TEST_CARDS_PER_CATEGORY = 4; // 4 per category = 12 total test cards (4 phonemes + 4 words + 4 sentences)
 
 /**
  * Randomly select n items from an array (Fisher-Yates shuffle)
@@ -1253,7 +1254,7 @@ async function main() {
   console.log(`🌍 Locale: ${LOCALE}\n`);
   
   if (TEST_MODE) {
-    console.log('🧪 TEST MODE: Generating 6 random cards (2 per category) for testing...\n');
+    console.log(`🧪 TEST MODE: Generating ${TEST_CARDS_PER_CATEGORY * 3} random cards (${TEST_CARDS_PER_CATEGORY} per category) for testing...\n`);
   } else {
     console.log('🚀 Starting DISTAR card generation (full mode)...\n');
   }
@@ -1320,6 +1321,44 @@ async function main() {
     console.log(`   - ${phonemeCards.length} phoneme/letter cards`);
     console.log(`   - ${wordCards.length} word cards`);
     console.log(`   - ${sentenceCards.length} sentence cards`);
+  }
+  
+  // Clear Metro cache and Watchman to ensure new assets are detected
+  console.log('\n🧹 Clearing Metro cache and Watchman...');
+  try {
+    // Clear Watchman watches
+    try {
+      execSync('watchman shutdown-server 2>/dev/null', { stdio: 'pipe' });
+      execSync('watchman watch-del-all 2>/dev/null', { stdio: 'pipe' });
+      console.log('   ✓ Cleared Watchman');
+    } catch (e) {
+      // Watchman might not be installed or running, that's okay
+    }
+    
+    // Clear Metro cache directories
+    const projectRoot = path.resolve(__dirname, '..');
+    const metroCacheDirs = [
+      path.join(projectRoot, 'node_modules', '.cache'),
+      path.join(projectRoot, '.metro'),
+    ];
+    
+    let clearedCount = 0;
+    for (const cacheDir of metroCacheDirs) {
+      if (fs.existsSync(cacheDir)) {
+        fs.rmSync(cacheDir, { recursive: true, force: true });
+        clearedCount++;
+      }
+    }
+    
+    if (clearedCount > 0) {
+      console.log(`   ✓ Cleared ${clearedCount} Metro cache directory/directories`);
+    } else {
+      console.log('   ✓ Metro cache directories not found (already clean)');
+    }
+    
+    console.log('\n💡 Restart your Metro bundler with: npm run start:clear');
+  } catch (error) {
+    console.warn('   ⚠️  Cache clearing encountered an issue (you may need to manually clear cache)');
   }
 }
 
