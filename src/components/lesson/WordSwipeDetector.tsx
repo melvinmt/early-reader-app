@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  runOnJS,
 } from 'react-native-reanimated';
 
 interface WordSwipeDetectorProps {
@@ -26,8 +27,35 @@ export default function WordSwipeDetector({
   const [currentLetterIndex, setCurrentLetterIndex] = useState<number>(-1);
   const translateX = useSharedValue(0);
   const startX = useSharedValue(0);
+  const isMountedRef = useRef(true);
+  const onSwipeCompleteRef = useRef(onSwipeComplete);
+
+  // Update ref when callback changes
+  useEffect(() => {
+    onSwipeCompleteRef.current = onSwipeComplete;
+  }, [onSwipeComplete]);
+
+  // Track mount state
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const letterWidth = SCREEN_WIDTH / (word.length + 2); // Add padding
+
+  // Deferred callback to avoid crashing during gesture handling
+  const handleSwipeComplete = (success: boolean) => {
+    if (isMountedRef.current && onSwipeCompleteRef.current) {
+      // Defer to next tick to avoid gesture system conflicts
+      setTimeout(() => {
+        if (isMountedRef.current && onSwipeCompleteRef.current) {
+          onSwipeCompleteRef.current(success);
+        }
+      }, 0);
+    }
+  };
 
   const panGesture = Gesture.Pan()
     .onStart((event) => {
@@ -40,28 +68,35 @@ export default function WordSwipeDetector({
       // Determine which letter zone we're in
       const letterIndex = Math.floor((event.x - letterWidth) / letterWidth);
       if (letterIndex >= 0 && letterIndex < word.length) {
-        // Check if we're moving left-to-right
-        if (letterIndex >= currentLetterIndex) {
-          setCurrentLetterIndex(letterIndex);
-          if (!visitedLetters.has(letterIndex)) {
-            setVisitedLetters((prev) => new Set([...prev, letterIndex]));
-            onLetterEnter(letterIndex);
+        // Use runOnJS to safely update React state during gesture
+        runOnJS((index: number) => {
+          if (index >= currentLetterIndex) {
+            setCurrentLetterIndex(index);
+            if (!visitedLetters.has(index)) {
+              setVisitedLetters((prev) => new Set([...prev, index]));
+              onLetterEnter(index);
+            }
           }
-        }
+        })(letterIndex);
       }
     })
     .onEnd(() => {
-      // Check if all letters were visited in order
-      const allVisited = visitedLetters.size === word.length;
-      const visitedArray = Array.from(visitedLetters).sort((a, b) => a - b);
-      const inOrder = visitedArray.every((val, idx) => val === idx);
-
-      onSwipeComplete(allVisited && inOrder);
-
-      // Reset
-      setVisitedLetters(new Set());
-      setCurrentLetterIndex(-1);
+      // Reset animation first
       translateX.value = withSpring(0);
+      
+      // Defer state updates and callback to avoid gesture system conflicts
+      // Capture values before async call
+      const visitedSet = new Set(visitedLetters);
+      const allVisited = visitedSet.size === word.length;
+      const visitedArray = Array.from(visitedSet).sort((a, b) => a - b);
+      const inOrder = visitedArray.every((val, idx) => val === idx);
+      
+      // Use runOnJS to safely call the callback
+      runOnJS(() => {
+        setVisitedLetters(new Set());
+        setCurrentLetterIndex(-1);
+        handleSwipeComplete(allVisited && inOrder);
+      })();
     });
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -162,6 +197,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 });
+
 
 
 
