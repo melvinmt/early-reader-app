@@ -64,6 +64,10 @@ export default function WordSwipeDetector({
   };
 
   const panGesture = Gesture.Pan()
+    .minPointers(1) // Allow single finger
+    .maxPointers(10) // Allow up to 10 fingers (for kids with multiple fingers on screen)
+    .activeOffsetX(10) // Start after 10px horizontal movement
+    .failOffsetY(50) // Fail if vertical movement exceeds 50px
     .onStart((event) => {
       startX.value = event.absoluteX;
       runOnJS(handleSwipeStart)();

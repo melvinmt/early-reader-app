@@ -31,7 +31,12 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding/add-children" />
         <Stack.Screen name="onboarding/subscription" />
         <Stack.Screen name="children" />
-        <Stack.Screen name="learning" />
+        <Stack.Screen 
+          name="learning" 
+          options={{ 
+            gestureEnabled: false, // Disable iOS back swipe for learning screen
+          }} 
+        />
         <Stack.Screen name="settings" />
       </Stack>
     </GestureHandlerRootView>
