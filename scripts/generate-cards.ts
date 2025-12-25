@@ -1067,6 +1067,71 @@ export function getCardsByType(type: DistarCard['type']): DistarCard[] {
 }
 
 /**
+ * Validate and clean up card paths to only include files that actually exist
+ * Removes phonemeAudioPaths and wordAudioPaths that reference non-existent files
+ */
+function validateCardPaths(cards: any[]): void {
+  const assetsDir = path.join(__dirname, '..', 'assets', LOCALE);
+  
+  cards.forEach(card => {
+    // Validate direct file paths - remove if they don't exist
+    const pathsToCheck: Array<keyof typeof card> = [
+      'imagePath',
+      'audioPath',
+      'promptPath',
+      'tryAgainPath',
+      'noInputPath',
+      'greatJobPath',
+      'soundedOutPath',
+    ];
+    
+    pathsToCheck.forEach(pathKey => {
+      if (card[pathKey]) {
+        const fullPath = path.join(assetsDir, card[pathKey].replace(`assets/${LOCALE}/`, ''));
+        if (!fs.existsSync(fullPath)) {
+          console.warn(`⚠️  Removing non-existent path from card ${card.id}: ${card[pathKey]}`);
+          delete card[pathKey];
+        }
+      }
+    });
+    
+    // Filter phonemeAudioPaths to only include files that exist
+    if (card.phonemeAudioPaths && Array.isArray(card.phonemeAudioPaths)) {
+      card.phonemeAudioPaths = card.phonemeAudioPaths.filter((audioPath: string) => {
+        const fullPath = path.join(assetsDir, audioPath.replace(`assets/${LOCALE}/`, ''));
+        const exists = fs.existsSync(fullPath);
+        if (!exists) {
+          console.warn(`⚠️  Removing non-existent phonemeAudioPath from card ${card.id}: ${audioPath}`);
+        }
+        return exists;
+      });
+      
+      // Remove the array if it's empty
+      if (card.phonemeAudioPaths.length === 0) {
+        delete card.phonemeAudioPaths;
+      }
+    }
+    
+    // Filter wordAudioPaths to only include files that exist
+    if (card.wordAudioPaths && Array.isArray(card.wordAudioPaths)) {
+      card.wordAudioPaths = card.wordAudioPaths.filter((audioPath: string) => {
+        const fullPath = path.join(assetsDir, audioPath.replace(`assets/${LOCALE}/`, ''));
+        const exists = fs.existsSync(fullPath);
+        if (!exists) {
+          console.warn(`⚠️  Removing non-existent wordAudioPath from card ${card.id}: ${audioPath}`);
+        }
+        return exists;
+      });
+      
+      // Remove the array if it's empty
+      if (card.wordAudioPaths.length === 0) {
+        delete card.wordAudioPaths;
+      }
+    }
+  });
+}
+
+/**
  * Generate React Native asset mapping files (assetMap.ts and audioAssetMap.ts)
  * These are required because React Native/Metro bundler needs static require() calls
  * 
@@ -1376,6 +1441,9 @@ async function main() {
   console.log(`✓ Generated ${sentenceCards.length} sentence cards\n`);
   
   const allCards = [...phonemeCards, ...wordCards, ...sentenceCards];
+  
+  console.log('🔍 Validating card paths against actual files...');
+  validateCardPaths(allCards);
   
   console.log('📝 Generating cards TypeScript file...');
   generateCardsFile(allCards);
