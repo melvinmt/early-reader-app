@@ -46,6 +46,7 @@
     "@types/node": "^20.0.0",
     "@types/react": "~19.1.10",
     "axios": "^1.6.0",
+    "babel-preset-expo": "^54.0.9",
     "dotenv": "^16.4.0",
     "ts-node": "^10.9.0",
     "typescript": "^5.3.0"
