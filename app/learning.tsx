@@ -1,5 +1,5 @@
-import LearningScreen from '@/screens/learning/LearningScreen';
-export default LearningScreen;
+export { default } from '@/screens/learning/LearningScreen';
+
 
 
 
