@@ -158,7 +158,7 @@ Deno.serve(async (req: Request) => {
           if (parts[i]?.inlineData?.data) {
             const imageBase64 = parts[i].inlineData.data;
             imageUrl = `data:image/png;base64,${imageBase64}`;
-            console.log(`Image generated successfully for word: ${word}, size: ${imageBase64.length}`);
+            console.log(`Image generated successfully for word: ${word}`);
             break;
           }
         }

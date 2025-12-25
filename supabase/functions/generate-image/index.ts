@@ -105,7 +105,7 @@ Deno.serve(async (req: Request) => {
 
     const data = await response.json();
     
-    // Log the full response structure for debugging
+    // Log response structure for debugging (without base64 data)
     console.log('Nano Banana API response status:', response.status);
     console.log('Response structure:', {
       hasCandidates: !!data.candidates,
@@ -120,6 +120,7 @@ Deno.serve(async (req: Request) => {
           hasInlineData: !!data.candidates[0].content.parts[0].inlineData,
           hasText: !!data.candidates[0].content.parts[0].text,
           inlineDataKeys: data.candidates[0].content.parts[0].inlineData ? Object.keys(data.candidates[0].content.parts[0].inlineData) : [],
+          // Don't log inlineData.data as it contains base64
         } : null,
       } : null,
       fullResponseKeys: Object.keys(data),
@@ -135,7 +136,7 @@ Deno.serve(async (req: Request) => {
     for (let i = 0; i < parts.length; i++) {
       if (parts[i]?.inlineData?.data) {
         imageBase64 = parts[i].inlineData.data;
-        console.log(`Found image data in parts[${i}].inlineData.data, length:`, imageBase64.length);
+        console.log(`Found image data in parts[${i}]`);
         break;
       }
     }
@@ -143,13 +144,13 @@ Deno.serve(async (req: Request) => {
     // Fallback: try parts[0] if not found in loop
     if (!imageBase64 && data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data) {
       imageBase64 = data.candidates[0].content.parts[0].inlineData.data;
-      console.log('Found image data in parts[0].inlineData.data (fallback), length:', imageBase64.length);
+      console.log('Found image data in parts[0] (fallback)');
     }
     
-    // Log what we found
+    // Log what we found (without base64 data)
     if (!imageBase64) {
       console.error('No image data found in response');
-      console.error('Full response (first 2000 chars):', JSON.stringify(data).substring(0, 2000));
+      // Don't log full response as it may contain base64 data
     }
 
     if (!imageBase64) {
