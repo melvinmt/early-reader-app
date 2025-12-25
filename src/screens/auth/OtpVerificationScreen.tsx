@@ -77,8 +77,9 @@ export default function OtpVerificationScreen() {
         // Auto-verify if all 6 digits are pasted - pass the token directly to avoid state race condition
         if (digits.length === 6) {
           // Use the digits directly instead of waiting for state update
+          // Note: digits is already a string, not an array
           setTimeout(() => {
-            handleVerifyWithToken(digits.join(''));
+            handleVerifyWithToken(digits);
           }, 50);
         }
         return;
