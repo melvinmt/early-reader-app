@@ -117,12 +117,66 @@ Deno.serve(async (req: Request) => {
       throw new Error('No word generated from Gemini');
     }
 
-    // Note: Image generation is handled separately by the generate-image Edge Function
-    // This keeps concerns separated and makes debugging easier
-    // The client will call generate-image if imageUrl is missing
-    const imageUrl = '';
+    // Generate image using Nano Banana (Gemini 2.5 Flash Image) API
+    // This happens in the same request as word generation for efficiency
+    let imageUrl = '';
+    try {
+      const imagePrompt = `A simple, friendly cartoon illustration of "${word}", child-friendly style, white background, no text`;
+      
+      console.log('Generating image for word:', word);
+      
+      const imageResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: imagePrompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              responseModalities: ['IMAGE'],
+            },
+          }),
+        }
+      );
 
-    // Return the generated word with phonemes (image will be generated separately)
+      if (imageResponse.ok) {
+        const imageData = await imageResponse.json();
+        
+        // Extract image from any part that has inlineData
+        const parts = imageData.candidates?.[0]?.content?.parts || [];
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i]?.inlineData?.data) {
+            const imageBase64 = parts[i].inlineData.data;
+            imageUrl = `data:image/png;base64,${imageBase64}`;
+            console.log(`Image generated successfully for word: ${word}, size: ${imageBase64.length}`);
+            break;
+          }
+        }
+        
+        if (!imageUrl) {
+          console.warn('Image response OK but no image data found for word:', word);
+        }
+      } else {
+        const errorText = await imageResponse.text();
+        console.error('Image generation failed for word:', word, 'Status:', imageResponse.status, 'Error:', errorText.substring(0, 200));
+        // Continue without image - client can generate separately if needed
+      }
+    } catch (imageError) {
+      console.error('Exception during image generation for word:', word, 'Error:', imageError);
+      // Continue without image - client can generate separately if needed
+    }
+
+    // Return the generated word with phonemes and image
     return new Response(
       JSON.stringify({
         word,

@@ -171,16 +171,16 @@ async function generateNewCard(
         continue;
       }
 
-      // If image URL is missing, generate it separately
+      // Image should be generated together with word, but if missing, generate separately as fallback
       let finalImageUrl = generated.imageUrl;
       if (!finalImageUrl || finalImageUrl.trim() === '') {
-        console.log('Image URL missing from word generation, generating image separately...');
+        console.warn('Image URL missing from word generation (should not happen), generating separately as fallback...');
         try {
           const imagePrompt = `A simple, friendly cartoon illustration of "${generated.word}", child-friendly style, white background, no text`;
           finalImageUrl = await generateImage(imagePrompt);
-          console.log('Image generated successfully:', !!finalImageUrl);
+          console.log('Fallback image generated successfully:', !!finalImageUrl);
         } catch (imageError) {
-          console.error('Failed to generate image:', imageError);
+          console.error('Failed to generate fallback image:', imageError);
           // Continue without image - it's optional
         }
       }
