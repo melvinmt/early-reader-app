@@ -135,7 +135,7 @@ function ensureCardDirectory(cardId: string): string {
  * Generates portrait 9:16 aspect ratio images with colorful backgrounds
  * The text (phoneme/word/sentence) will be prominently displayed in the image
  */
-async function generateImage(prompt: string, outputPath: string, displayText?: string): Promise<void> {
+async function generateImage(prompt: string, outputPath: string, displayText?: string, label?: string): Promise<void> {
   try {
     // Enhanced prompt with 9:16 portrait aspect ratio and colorful background
     // Include the text prominently in the image if provided
@@ -177,7 +177,8 @@ async function generateImage(prompt: string, outputPath: string, displayText?: s
           if (part.inlineData?.data) {
             const imageBuffer = Buffer.from(part.inlineData.data, 'base64');
             fs.writeFileSync(outputPath, imageBuffer);
-            console.log(`✓ Generated image: ${path.basename(outputPath)}`);
+            const labelText = label ? `[${label}] ` : '';
+            console.log(`✓ ${labelText}Generated image: ${path.basename(outputPath)}`);
             return;
           }
         }
@@ -205,7 +206,7 @@ async function generateImage(prompt: string, outputPath: string, displayText?: s
  * Uses emotion keywords for child-friendly, encouraging speech
  * Speed: 0.7 = 70% speed (slowed down for children learning to read)
  */
-async function generateAudio(text: string, outputPath: string, emotion: 'happy' | 'excited' | 'neutral' = 'happy'): Promise<void> {
+async function generateAudio(text: string, outputPath: string, emotion: 'happy' | 'excited' | 'neutral' = 'happy', label?: string): Promise<void> {
   try {
     // Add emotion keyword based on context
     // Eleven v3 supports emotion tags: [happy], [sad], [angry], [neutral]
@@ -238,7 +239,8 @@ async function generateAudio(text: string, outputPath: string, emotion: 'happy' 
 
     // Write the audio buffer to file
     fs.writeFileSync(outputPath, Buffer.from(response.data));
-    console.log(`✓ Generated audio (0.7x speed, ${emotion}): ${path.basename(outputPath)}`);
+    const labelText = label ? `[${label}] ` : '';
+    console.log(`✓ ${labelText}Generated audio (0.7x speed, ${emotion}): ${path.basename(outputPath)}`);
   } catch (error: any) {
     console.error(`✗ Failed to generate audio for "${text}":`, error.message);
     if (error.response) {
@@ -400,6 +402,9 @@ async function generatePhonemeCards(): Promise<any[]> {
     // Store mapping for cross-references from word/sentence cards
     phonemeToCardId.set(phoneme.symbol.toLowerCase(), cardId);
     
+    const cardLabel = `phoneme:${phoneme.symbol}`;
+    console.log(`  Generating ${cardLabel} (${cardId})...`);
+    
     const cardDir = ensureCardDirectory(cardId);
     const imagePath = path.join(cardDir, 'image.png');
     const promptPath = path.join(cardDir, 'prompt.mp3');
@@ -413,33 +418,33 @@ async function generatePhonemeCards(): Promise<any[]> {
       : `Simple illustration representing the ${phoneme.isDigraph ? 'sound' : 'letter'} "${phoneme.symbol}"`;
     
     // Include the phoneme symbol in the image (the actual letter/symbol, not the pronunciation)
-    await generateImage(imagePrompt, imagePath, phoneme.symbol);
+    await generateImage(imagePrompt, imagePath, phoneme.symbol, cardLabel);
     
     // Generate prompt audio - encouraging and not giving away the answer
     const cardType = phoneme.isDigraph ? 'digraph' : 'letter';
     const promptText = getCardPrompt(cardType);
-    await generateAudio(promptText, promptPath, 'happy');
+    await generateAudio(promptText, promptPath, 'happy', cardLabel);
     
     // Generate try again prompt - repeats the phoneme
     const tryAgainText = getTryAgainPrompt(phoneme.pronunciation, cardType);
-    await generateAudio(tryAgainText, tryAgainPath, 'happy');
+    await generateAudio(tryAgainText, tryAgainPath, 'happy', cardLabel);
     
     // Generate one varied "I didn't hear anything" prompt (different variation per card)
     const noInputPrompts = getNoInputPrompts();
     const noInputIndex = cards.length % noInputPrompts.length; // Cycle through variations
     const noInputText = noInputPrompts[noInputIndex];
     const noInputPath = path.join(cardDir, 'no-input.mp3');
-    await generateAudio(noInputText, noInputPath, 'neutral');
+    await generateAudio(noInputText, noInputPath, 'neutral', cardLabel);
     
     // Generate audio (phonetic pronunciation) - use 'neutral' for clear phoneme pronunciation
-    await generateAudio(phoneme.pronunciation, audioPath, 'neutral');
+    await generateAudio(phoneme.pronunciation, audioPath, 'neutral', cardLabel);
     
     // Generate one varied "great job" prompt with the phoneme repeated (different variation per card)
     const greatJobPrompts = getGreatJobPrompts(phoneme.pronunciation, cardType);
     const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
     const greatJobText = greatJobPrompts[greatJobIndex];
     const greatJobPath = path.join(cardDir, 'great-job.mp3');
-    await generateAudio(greatJobText, greatJobPath, 'excited');
+    await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
     
     // Determine orthography
     // phoneme.symbol already contains the macron character if hasMacron is true (e.g., "ā", "ē", "ō")
@@ -599,6 +604,9 @@ async function generateWordCards(): Promise<any[]> {
       // Store mapping for cross-references from sentence cards
       wordToCardId.set(word.toLowerCase(), cardId);
       
+      const cardLabel = `word:${word}`;
+      console.log(`  Generating ${cardLabel} (${cardId})...`);
+      
       const cardDir = ensureCardDirectory(cardId);
       
       const imagePath = path.join(cardDir, 'image.png');
@@ -608,39 +616,39 @@ async function generateWordCards(): Promise<any[]> {
       const soundedOutPath = path.join(cardDir, 'audio-sounded.mp3');
       
       // Generate image with the word text displayed
-      await generateImage(`Illustration of ${word}`, imagePath, word);
+      await generateImage(`Illustration of ${word}`, imagePath, word, cardLabel);
       
       // Generate prompt audio - encouraging and not giving away the answer
       const promptText = getCardPrompt('word');
-      await generateAudio(promptText, promptPath, 'happy');
+      await generateAudio(promptText, promptPath, 'happy', cardLabel);
       
       // Generate try again prompt - repeats the word
       const tryAgainText = getTryAgainPrompt(word, 'word');
-      await generateAudio(tryAgainText, tryAgainPath, 'happy');
+      await generateAudio(tryAgainText, tryAgainPath, 'happy', cardLabel);
       
       // Generate one varied "I didn't hear anything" prompt (different variation per card)
       const noInputPrompts = getNoInputPrompts();
       const noInputIndex = cards.length % noInputPrompts.length; // Cycle through variations
       const noInputText = noInputPrompts[noInputIndex];
       const noInputPath = path.join(cardDir, 'no-input.mp3');
-      await generateAudio(noInputText, noInputPath, 'neutral');
+      await generateAudio(noInputText, noInputPath, 'neutral', cardLabel);
       
       // Generate one varied "great job" prompt with the word repeated (different variation per card)
       const greatJobPrompts = getGreatJobPrompts(word, 'word');
       const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
       const greatJobText = greatJobPrompts[greatJobIndex];
       const greatJobPath = path.join(cardDir, 'great-job.mp3');
-      await generateAudio(greatJobText, greatJobPath, 'excited');
+      await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
       
       // Generate full word audio - use 'happy' for encouraging learning
-      await generateAudio(word, audioPath, 'happy');
+      await generateAudio(word, audioPath, 'happy', cardLabel);
       
       // Generate sounded-out audio - use 'neutral' for clear pronunciation
       const soundedOut = phonemes.map(p => {
         const phoneme = DISTAR_PHONEMES.find(ph => ph.symbol === p);
         return phoneme?.pronunciation || p;
       }).join('-');
-      await generateAudio(soundedOut, soundedOutPath, 'neutral');
+      await generateAudio(soundedOut, soundedOutPath, 'neutral', cardLabel);
       
       // Generate phoneme audio paths - reference phoneme card audio files
       const phonemeAudioPaths = phonemes.map(p => getPhonemeAudioPath(p));
@@ -689,6 +697,9 @@ async function generateWordCards(): Promise<any[]> {
       // Store mapping for cross-references from sentence cards
       wordToCardId.set(word.toLowerCase(), cardId);
       
+      const cardLabel = `word:${word}`;
+      console.log(`  Generating ${cardLabel} (${cardId})...`);
+      
       const cardDir = ensureCardDirectory(cardId);
       
       const imagePath = path.join(cardDir, 'image.png');
@@ -698,39 +709,39 @@ async function generateWordCards(): Promise<any[]> {
       const soundedOutPath = path.join(cardDir, 'audio-sounded.mp3');
       
       // Generate image with the word text displayed
-      await generateImage(`Illustration of ${word}`, imagePath, word);
+      await generateImage(`Illustration of ${word}`, imagePath, word, cardLabel);
       
       // Generate prompt audio - encouraging and not giving away the answer
       const promptText = getCardPrompt('word');
-      await generateAudio(promptText, promptPath, 'happy');
+      await generateAudio(promptText, promptPath, 'happy', cardLabel);
       
       // Generate try again prompt - repeats the word
       const tryAgainText = getTryAgainPrompt(word, 'word');
-      await generateAudio(tryAgainText, tryAgainPath, 'happy');
+      await generateAudio(tryAgainText, tryAgainPath, 'happy', cardLabel);
       
       // Generate one varied "I didn't hear anything" prompt (different variation per card)
       const noInputPrompts = getNoInputPrompts();
       const noInputIndex = cards.length % noInputPrompts.length; // Cycle through variations
       const noInputText = noInputPrompts[noInputIndex];
       const noInputPath = path.join(cardDir, 'no-input.mp3');
-      await generateAudio(noInputText, noInputPath, 'neutral');
+      await generateAudio(noInputText, noInputPath, 'neutral', cardLabel);
       
       // Generate one varied "great job" prompt with the word repeated (different variation per card)
       const greatJobPrompts = getGreatJobPrompts(word, 'word');
       const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
       const greatJobText = greatJobPrompts[greatJobIndex];
       const greatJobPath = path.join(cardDir, 'great-job.mp3');
-      await generateAudio(greatJobText, greatJobPath, 'excited');
+      await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
       
       // Generate full word audio - use 'happy' for encouraging learning
-      await generateAudio(word, audioPath, 'happy');
+      await generateAudio(word, audioPath, 'happy', cardLabel);
       
       // Generate sounded-out audio - use 'neutral' for clear pronunciation
       const soundedOut = phonemes.map(p => {
         const phoneme = DISTAR_PHONEMES.find(ph => ph.symbol === p);
         return phoneme?.pronunciation || p;
       }).join('-');
-      await generateAudio(soundedOut, soundedOutPath, 'neutral');
+      await generateAudio(soundedOut, soundedOutPath, 'neutral', cardLabel);
       
       // Generate phoneme audio paths - reference phoneme card audio files
       const phonemeAudioPaths = phonemes.map(p => getPhonemeAudioPath(p));
@@ -897,6 +908,10 @@ async function generateSentenceCards(): Promise<any[]> {
     const phonemes = sentence.text.split('').filter(c => c !== ' ');
     // Generate card ID with sequential number prefix
     const cardId = generateCardId(sentence.text);
+    
+    const cardLabel = `sentence:"${sentence.text}"`;
+    console.log(`  Generating ${cardLabel} (${cardId})...`);
+    
     const cardDir = ensureCardDirectory(cardId);
     
     const imagePath = path.join(cardDir, 'image.png');
@@ -905,32 +920,32 @@ async function generateSentenceCards(): Promise<any[]> {
     const audioPath = path.join(cardDir, 'audio.mp3');
     
     // Generate scene image with the sentence text displayed
-    await generateImage(`Scene illustration: ${sentence.text}`, imagePath, sentence.text);
+    await generateImage(`Scene illustration: ${sentence.text}`, imagePath, sentence.text, cardLabel);
     
     // Generate prompt audio - encouraging and not giving away the answer
     const promptText = getCardPrompt('sentence');
-    await generateAudio(promptText, promptPath, 'happy');
+    await generateAudio(promptText, promptPath, 'happy', cardLabel);
     
     // Generate try again prompt - repeats the sentence
     const tryAgainText = getTryAgainPrompt(sentence.text, 'sentence');
-    await generateAudio(tryAgainText, tryAgainPath, 'happy');
+    await generateAudio(tryAgainText, tryAgainPath, 'happy', cardLabel);
     
     // Generate one varied "I didn't hear anything" prompt (different variation per card)
     const noInputPrompts = getNoInputPrompts();
     const noInputIndex = cards.length % noInputPrompts.length; // Cycle through variations
     const noInputText = noInputPrompts[noInputIndex];
     const noInputPath = path.join(cardDir, 'no-input.mp3');
-    await generateAudio(noInputText, noInputPath, 'neutral');
+    await generateAudio(noInputText, noInputPath, 'neutral', cardLabel);
     
     // Generate one varied "great job" prompt with the sentence repeated (different variation per card)
     const greatJobPrompts = getGreatJobPrompts(sentence.text, 'sentence');
     const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
     const greatJobText = greatJobPrompts[greatJobIndex];
     const greatJobPath = path.join(cardDir, 'great-job.mp3');
-    await generateAudio(greatJobText, greatJobPath, 'excited');
+    await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
     
     // Generate full sentence audio - use 'happy' for encouraging sentences
-    await generateAudio(sentence.text, audioPath, 'happy');
+    await generateAudio(sentence.text, audioPath, 'happy', cardLabel);
     
     // Generate word audio paths - reference word card audio files
     const wordAudioPaths = words.map(word => getWordAudioPath(word));
