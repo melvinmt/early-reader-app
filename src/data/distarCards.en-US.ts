@@ -34,23 +34,23 @@ export interface DistarCard {
 
 export const DISTAR_CARDS: DistarCard[] = [
   {
-    "id": "001-b",
+    "id": "001-i",
     "type": "letter",
-    "display": "b",
-    "plainText": "b",
+    "display": "i",
+    "plainText": "i",
     "phonemes": [
-      "b"
+      "i"
     ],
     "phonemeAudioPaths": [
-      "assets/en-US/001-b/audio.mp3"
+      "assets/en-US/001-i/audio.mp3"
     ],
-    "lesson": 55,
-    "imagePath": "assets/en-US/001-b/image.png",
-    "promptPath": "assets/en-US/001-b/prompt.mp3",
-    "tryAgainPath": "assets/en-US/001-b/try-again.mp3",
-    "noInputPath": "assets/en-US/001-b/no-input.mp3",
-    "greatJobPath": "assets/en-US/001-b/great-job.mp3",
-    "audioPath": "assets/en-US/001-b/audio.mp3",
+    "lesson": 14,
+    "imagePath": "assets/en-US/001-i/image.png",
+    "promptPath": "assets/en-US/001-i/prompt.mp3",
+    "tryAgainPath": "assets/en-US/001-i/try-again.mp3",
+    "noInputPath": "assets/en-US/001-i/no-input.mp3",
+    "greatJobPath": "assets/en-US/001-i/great-job.mp3",
+    "audioPath": "assets/en-US/001-i/audio.mp3",
     "orthography": {
       "macrons": [],
       "small": [],
@@ -61,50 +61,23 @@ export const DISTAR_CARDS: DistarCard[] = [
     }
   },
   {
-    "id": "002-y",
-    "type": "letter",
-    "display": "y",
-    "plainText": "y",
-    "phonemes": [
-      "y"
-    ],
-    "phonemeAudioPaths": [
-      "assets/en-US/002-y/audio.mp3"
-    ],
-    "lesson": 61,
-    "imagePath": "assets/en-US/002-y/image.png",
-    "promptPath": "assets/en-US/002-y/prompt.mp3",
-    "tryAgainPath": "assets/en-US/002-y/try-again.mp3",
-    "noInputPath": "assets/en-US/002-y/no-input.mp3",
-    "greatJobPath": "assets/en-US/002-y/great-job.mp3",
-    "audioPath": "assets/en-US/002-y/audio.mp3",
-    "orthography": {
-      "macrons": [],
-      "small": [],
-      "balls": [
-        0
-      ],
-      "arrows": []
-    }
-  },
-  {
-    "id": "003-qu",
+    "id": "002-ar",
     "type": "digraph",
-    "display": "qu",
-    "plainText": "qu",
+    "display": "ar",
+    "plainText": "ar",
     "phonemes": [
-      "qu"
+      "ar"
     ],
     "phonemeAudioPaths": [
-      "assets/en-US/003-qu/audio.mp3"
+      "assets/en-US/002-ar/audio.mp3"
     ],
-    "lesson": 75,
-    "imagePath": "assets/en-US/003-qu/image.png",
-    "promptPath": "assets/en-US/003-qu/prompt.mp3",
-    "tryAgainPath": "assets/en-US/003-qu/try-again.mp3",
-    "noInputPath": "assets/en-US/003-qu/no-input.mp3",
-    "greatJobPath": "assets/en-US/003-qu/great-job.mp3",
-    "audioPath": "assets/en-US/003-qu/audio.mp3",
+    "lesson": 49,
+    "imagePath": "assets/en-US/002-ar/image.png",
+    "promptPath": "assets/en-US/002-ar/prompt.mp3",
+    "tryAgainPath": "assets/en-US/002-ar/try-again.mp3",
+    "noInputPath": "assets/en-US/002-ar/no-input.mp3",
+    "greatJobPath": "assets/en-US/002-ar/great-job.mp3",
+    "audioPath": "assets/en-US/002-ar/audio.mp3",
     "orthography": {
       "macrons": [],
       "small": [],
@@ -113,53 +86,50 @@ export const DISTAR_CARDS: DistarCard[] = [
     }
   },
   {
-    "id": "004-j",
+    "id": "003-h",
     "type": "letter",
-    "display": "j",
-    "plainText": "j",
+    "display": "h",
+    "plainText": "h",
     "phonemes": [
-      "j"
+      "h"
     ],
     "phonemeAudioPaths": [
-      "assets/en-US/004-j/audio.mp3"
+      "assets/en-US/003-h/audio.mp3"
     ],
-    "lesson": 67,
-    "imagePath": "assets/en-US/004-j/image.png",
-    "promptPath": "assets/en-US/004-j/prompt.mp3",
-    "tryAgainPath": "assets/en-US/004-j/try-again.mp3",
-    "noInputPath": "assets/en-US/004-j/no-input.mp3",
-    "greatJobPath": "assets/en-US/004-j/great-job.mp3",
-    "audioPath": "assets/en-US/004-j/audio.mp3",
+    "lesson": 39,
+    "imagePath": "assets/en-US/003-h/image.png",
+    "promptPath": "assets/en-US/003-h/prompt.mp3",
+    "tryAgainPath": "assets/en-US/003-h/try-again.mp3",
+    "noInputPath": "assets/en-US/003-h/no-input.mp3",
+    "greatJobPath": "assets/en-US/003-h/great-job.mp3",
+    "audioPath": "assets/en-US/003-h/audio.mp3",
     "orthography": {
       "macrons": [],
       "small": [],
-      "balls": [
+      "balls": [],
+      "arrows": [
         0
-      ],
-      "arrows": []
+      ]
     }
   },
   {
-    "id": "005-arm",
-    "type": "word",
-    "display": "arm",
-    "plainText": "arm",
+    "id": "004-ai",
+    "type": "digraph",
+    "display": "ai",
+    "plainText": "ai",
     "phonemes": [
-      "ar",
-      "m"
+      "ai"
     ],
     "phonemeAudioPaths": [
-      "assets/en-US/phoneme-ar/audio.mp3",
-      "assets/en-US/phoneme-m/audio.mp3"
+      "assets/en-US/004-ai/audio.mp3"
     ],
-    "lesson": 45,
-    "imagePath": "assets/en-US/005-arm/image.png",
-    "promptPath": "assets/en-US/005-arm/prompt.mp3",
-    "tryAgainPath": "assets/en-US/005-arm/try-again.mp3",
-    "noInputPath": "assets/en-US/005-arm/no-input.mp3",
-    "greatJobPath": "assets/en-US/005-arm/great-job.mp3",
-    "audioPath": "assets/en-US/005-arm/audio.mp3",
-    "soundedOutPath": "assets/en-US/005-arm/audio-sounded.mp3",
+    "lesson": 83,
+    "imagePath": "assets/en-US/004-ai/image.png",
+    "promptPath": "assets/en-US/004-ai/prompt.mp3",
+    "tryAgainPath": "assets/en-US/004-ai/try-again.mp3",
+    "noInputPath": "assets/en-US/004-ai/no-input.mp3",
+    "greatJobPath": "assets/en-US/004-ai/great-job.mp3",
+    "audioPath": "assets/en-US/004-ai/audio.mp3",
     "orthography": {
       "macrons": [],
       "small": [],
@@ -168,30 +138,49 @@ export const DISTAR_CARDS: DistarCard[] = [
     }
   },
   {
-    "id": "006-apex",
+    "id": "005-school",
     "type": "word",
-    "display": "apex",
-    "plainText": "apex",
+    "display": "school",
+    "plainText": "school",
     "phonemes": [
-      "a",
-      "p",
-      "e",
-      "x"
+      "s",
+      "ch",
+      "oo",
+      "l"
     ],
-    "phonemeAudioPaths": [
-      "assets/en-US/phoneme-a/audio.mp3",
-      "assets/en-US/phoneme-p/audio.mp3",
-      "assets/en-US/phoneme-e/audio.mp3",
-      "assets/en-US/phoneme-x/audio.mp3"
+    "lesson": 65,
+    "imagePath": "assets/en-US/005-school/image.png",
+    "promptPath": "assets/en-US/005-school/prompt.mp3",
+    "tryAgainPath": "assets/en-US/005-school/try-again.mp3",
+    "noInputPath": "assets/en-US/005-school/no-input.mp3",
+    "greatJobPath": "assets/en-US/005-school/great-job.mp3",
+    "audioPath": "assets/en-US/005-school/audio.mp3",
+    "soundedOutPath": "assets/en-US/005-school/audio-sounded.mp3",
+    "orthography": {
+      "macrons": [],
+      "small": [],
+      "balls": [],
+      "arrows": []
+    }
+  },
+  {
+    "id": "006-route",
+    "type": "word",
+    "display": "route",
+    "plainText": "route",
+    "phonemes": [
+      "r",
+      "ou",
+      "t"
     ],
     "lesson": 75,
-    "imagePath": "assets/en-US/006-apex/image.png",
-    "promptPath": "assets/en-US/006-apex/prompt.mp3",
-    "tryAgainPath": "assets/en-US/006-apex/try-again.mp3",
-    "noInputPath": "assets/en-US/006-apex/no-input.mp3",
-    "greatJobPath": "assets/en-US/006-apex/great-job.mp3",
-    "audioPath": "assets/en-US/006-apex/audio.mp3",
-    "soundedOutPath": "assets/en-US/006-apex/audio-sounded.mp3",
+    "imagePath": "assets/en-US/006-route/image.png",
+    "promptPath": "assets/en-US/006-route/prompt.mp3",
+    "tryAgainPath": "assets/en-US/006-route/try-again.mp3",
+    "noInputPath": "assets/en-US/006-route/no-input.mp3",
+    "greatJobPath": "assets/en-US/006-route/great-job.mp3",
+    "audioPath": "assets/en-US/006-route/audio.mp3",
+    "soundedOutPath": "assets/en-US/006-route/audio-sounded.mp3",
     "orthography": {
       "macrons": [],
       "small": [],
@@ -200,28 +189,54 @@ export const DISTAR_CARDS: DistarCard[] = [
     }
   },
   {
-    "id": "007-your",
+    "id": "007-mood",
     "type": "word",
-    "display": "your",
-    "plainText": "your",
+    "display": "mood",
+    "plainText": "mood",
     "phonemes": [
-      "y",
-      "ou",
-      "r"
+      "m",
+      "oo",
+      "d"
+    ],
+    "lesson": 65,
+    "imagePath": "assets/en-US/007-mood/image.png",
+    "promptPath": "assets/en-US/007-mood/prompt.mp3",
+    "tryAgainPath": "assets/en-US/007-mood/try-again.mp3",
+    "noInputPath": "assets/en-US/007-mood/no-input.mp3",
+    "greatJobPath": "assets/en-US/007-mood/great-job.mp3",
+    "audioPath": "assets/en-US/007-mood/audio.mp3",
+    "soundedOutPath": "assets/en-US/007-mood/audio-sounded.mp3",
+    "orthography": {
+      "macrons": [],
+      "small": [],
+      "balls": [],
+      "arrows": []
+    }
+  },
+  {
+    "id": "008-might",
+    "type": "word",
+    "display": "might",
+    "plainText": "might",
+    "phonemes": [
+      "m",
+      "i",
+      "g",
+      "h",
+      "t"
     ],
     "phonemeAudioPaths": [
-      "assets/en-US/002-y/audio.mp3",
-      "assets/en-US/phoneme-ou/audio.mp3",
-      "assets/en-US/phoneme-r/audio.mp3"
+      "assets/en-US/001-i/audio.mp3",
+      "assets/en-US/003-h/audio.mp3"
     ],
     "lesson": 95,
-    "imagePath": "assets/en-US/007-your/image.png",
-    "promptPath": "assets/en-US/007-your/prompt.mp3",
-    "tryAgainPath": "assets/en-US/007-your/try-again.mp3",
-    "noInputPath": "assets/en-US/007-your/no-input.mp3",
-    "greatJobPath": "assets/en-US/007-your/great-job.mp3",
-    "audioPath": "assets/en-US/007-your/audio.mp3",
-    "soundedOutPath": "assets/en-US/007-your/audio-sounded.mp3",
+    "imagePath": "assets/en-US/008-might/image.png",
+    "promptPath": "assets/en-US/008-might/prompt.mp3",
+    "tryAgainPath": "assets/en-US/008-might/try-again.mp3",
+    "noInputPath": "assets/en-US/008-might/no-input.mp3",
+    "greatJobPath": "assets/en-US/008-might/great-job.mp3",
+    "audioPath": "assets/en-US/008-might/audio.mp3",
+    "soundedOutPath": "assets/en-US/008-might/audio-sounded.mp3",
     "orthography": {
       "macrons": [],
       "small": [],
@@ -230,223 +245,43 @@ export const DISTAR_CARDS: DistarCard[] = [
     }
   },
   {
-    "id": "008-win",
-    "type": "word",
-    "display": "win",
-    "plainText": "win",
-    "phonemes": [
-      "w",
-      "i",
-      "n"
-    ],
-    "phonemeAudioPaths": [
-      "assets/en-US/phoneme-w/audio.mp3",
-      "assets/en-US/phoneme-i/audio.mp3",
-      "assets/en-US/phoneme-n/audio.mp3"
-    ],
-    "lesson": 35,
-    "imagePath": "assets/en-US/008-win/image.png",
-    "promptPath": "assets/en-US/008-win/prompt.mp3",
-    "tryAgainPath": "assets/en-US/008-win/try-again.mp3",
-    "noInputPath": "assets/en-US/008-win/no-input.mp3",
-    "greatJobPath": "assets/en-US/008-win/great-job.mp3",
-    "audioPath": "assets/en-US/008-win/audio.mp3",
-    "soundedOutPath": "assets/en-US/008-win/audio-sounded.mp3",
-    "orthography": {
-      "macrons": [],
-      "small": [],
-      "balls": [],
-      "arrows": []
-    }
-  },
-  {
-    "id": "009-i-love-to-learn-new-things",
+    "id": "009-the-kid-can-kick",
     "type": "sentence",
-    "display": "I love to learn new things",
-    "plainText": "I love to learn new things",
+    "display": "the kid can kick",
+    "plainText": "the kid can kick",
     "phonemes": [
-      "I",
-      "l",
-      "o",
-      "v",
-      "e",
       "t",
-      "o",
-      "l",
+      "h",
       "e",
+      "k",
+      "i",
+      "d",
+      "c",
       "a",
-      "r",
       "n",
-      "n",
-      "e",
-      "w",
-      "t",
-      "h",
+      "k",
       "i",
-      "n",
-      "g",
-      "s"
-    ],
-    "words": [
-      "I",
-      "love",
-      "to",
-      "learn",
-      "new",
-      "things"
-    ],
-    "phonemeAudioPaths": [
-      "assets/en-US/I/audio.mp3",
-      "assets/en-US/l/audio.mp3",
-      "assets/en-US/o/audio.mp3",
-      "assets/en-US/v/audio.mp3",
-      "assets/en-US/e/audio.mp3",
-      "assets/en-US/t/audio.mp3",
-      "assets/en-US/o/audio.mp3",
-      "assets/en-US/l/audio.mp3",
-      "assets/en-US/e/audio.mp3",
-      "assets/en-US/a/audio.mp3",
-      "assets/en-US/r/audio.mp3",
-      "assets/en-US/n/audio.mp3",
-      "assets/en-US/n/audio.mp3",
-      "assets/en-US/e/audio.mp3",
-      "assets/en-US/w/audio.mp3",
-      "assets/en-US/t/audio.mp3",
-      "assets/en-US/h/audio.mp3",
-      "assets/en-US/i/audio.mp3",
-      "assets/en-US/n/audio.mp3",
-      "assets/en-US/g/audio.mp3",
-      "assets/en-US/s/audio.mp3"
-    ],
-    "wordAudioPaths": [
-      "assets/en-US/word-i/audio.mp3",
-      "assets/en-US/word-love/audio.mp3",
-      "assets/en-US/word-to/audio.mp3",
-      "assets/en-US/word-learn/audio.mp3",
-      "assets/en-US/word-new/audio.mp3",
-      "assets/en-US/word-things/audio.mp3"
-    ],
-    "lesson": 100,
-    "imagePath": "assets/en-US/009-i-love-to-learn-new-things/image.png",
-    "promptPath": "assets/en-US/009-i-love-to-learn-new-things/prompt.mp3",
-    "tryAgainPath": "assets/en-US/009-i-love-to-learn-new-things/try-again.mp3",
-    "noInputPath": "assets/en-US/009-i-love-to-learn-new-things/no-input.mp3",
-    "greatJobPath": "assets/en-US/009-i-love-to-learn-new-things/great-job.mp3",
-    "audioPath": "assets/en-US/009-i-love-to-learn-new-things/audio.mp3",
-    "orthography": {
-      "macrons": [],
-      "small": [],
-      "balls": [],
-      "arrows": []
-    }
-  },
-  {
-    "id": "010-i-will-win",
-    "type": "sentence",
-    "display": "I will win",
-    "plainText": "I will win",
-    "phonemes": [
-      "I",
-      "w",
-      "i",
-      "l",
-      "l",
-      "w",
-      "i",
-      "n"
-    ],
-    "words": [
-      "I",
-      "will",
-      "win"
-    ],
-    "phonemeAudioPaths": [
-      "assets/en-US/I/audio.mp3",
-      "assets/en-US/w/audio.mp3",
-      "assets/en-US/i/audio.mp3",
-      "assets/en-US/l/audio.mp3",
-      "assets/en-US/l/audio.mp3",
-      "assets/en-US/w/audio.mp3",
-      "assets/en-US/i/audio.mp3",
-      "assets/en-US/n/audio.mp3"
-    ],
-    "wordAudioPaths": [
-      "assets/en-US/word-i/audio.mp3",
-      "assets/en-US/word-will/audio.mp3",
-      "assets/en-US/008-win/audio.mp3"
-    ],
-    "lesson": 32,
-    "imagePath": "assets/en-US/010-i-will-win/image.png",
-    "promptPath": "assets/en-US/010-i-will-win/prompt.mp3",
-    "tryAgainPath": "assets/en-US/010-i-will-win/try-again.mp3",
-    "noInputPath": "assets/en-US/010-i-will-win/no-input.mp3",
-    "greatJobPath": "assets/en-US/010-i-will-win/great-job.mp3",
-    "audioPath": "assets/en-US/010-i-will-win/audio.mp3",
-    "orthography": {
-      "macrons": [],
-      "small": [],
-      "balls": [],
-      "arrows": []
-    }
-  },
-  {
-    "id": "011-the-big-bug-is-red",
-    "type": "sentence",
-    "display": "the big bug is red",
-    "plainText": "the big bug is red",
-    "phonemes": [
-      "t",
-      "h",
-      "e",
-      "b",
-      "i",
-      "g",
-      "b",
-      "u",
-      "g",
-      "i",
-      "s",
-      "r",
-      "e",
-      "d"
+      "c",
+      "k"
     ],
     "words": [
       "the",
-      "big",
-      "bug",
-      "is",
-      "red"
+      "kid",
+      "can",
+      "kick"
     ],
     "phonemeAudioPaths": [
-      "assets/en-US/t/audio.mp3",
-      "assets/en-US/h/audio.mp3",
-      "assets/en-US/e/audio.mp3",
-      "assets/en-US/b/audio.mp3",
-      "assets/en-US/i/audio.mp3",
-      "assets/en-US/g/audio.mp3",
-      "assets/en-US/b/audio.mp3",
-      "assets/en-US/u/audio.mp3",
-      "assets/en-US/g/audio.mp3",
-      "assets/en-US/i/audio.mp3",
-      "assets/en-US/s/audio.mp3",
-      "assets/en-US/r/audio.mp3",
-      "assets/en-US/e/audio.mp3",
-      "assets/en-US/d/audio.mp3"
+      "assets/en-US/003-h/audio.mp3",
+      "assets/en-US/001-i/audio.mp3",
+      "assets/en-US/001-i/audio.mp3"
     ],
-    "wordAudioPaths": [
-      "assets/en-US/word-the/audio.mp3",
-      "assets/en-US/word-big/audio.mp3",
-      "assets/en-US/word-bug/audio.mp3",
-      "assets/en-US/word-is/audio.mp3",
-      "assets/en-US/word-red/audio.mp3"
-    ],
-    "lesson": 58,
-    "imagePath": "assets/en-US/011-the-big-bug-is-red/image.png",
-    "promptPath": "assets/en-US/011-the-big-bug-is-red/prompt.mp3",
-    "tryAgainPath": "assets/en-US/011-the-big-bug-is-red/try-again.mp3",
-    "noInputPath": "assets/en-US/011-the-big-bug-is-red/no-input.mp3",
-    "greatJobPath": "assets/en-US/011-the-big-bug-is-red/great-job.mp3",
-    "audioPath": "assets/en-US/011-the-big-bug-is-red/audio.mp3",
+    "lesson": 42,
+    "imagePath": "assets/en-US/009-the-kid-can-kick/image.png",
+    "promptPath": "assets/en-US/009-the-kid-can-kick/prompt.mp3",
+    "tryAgainPath": "assets/en-US/009-the-kid-can-kick/try-again.mp3",
+    "noInputPath": "assets/en-US/009-the-kid-can-kick/no-input.mp3",
+    "greatJobPath": "assets/en-US/009-the-kid-can-kick/great-job.mp3",
+    "audioPath": "assets/en-US/009-the-kid-can-kick/audio.mp3",
     "orthography": {
       "macrons": [],
       "small": [],
@@ -455,57 +290,132 @@ export const DISTAR_CARDS: DistarCard[] = [
     }
   },
   {
-    "id": "012-the-mat-is-flat",
+    "id": "010-the-sun-is-hot",
     "type": "sentence",
-    "display": "the mat is flat",
-    "plainText": "the mat is flat",
+    "display": "the sun is hot",
+    "plainText": "the sun is hot",
     "phonemes": [
       "t",
       "h",
       "e",
-      "m",
-      "a",
-      "t",
+      "s",
+      "u",
+      "n",
       "i",
       "s",
-      "f",
-      "l",
-      "a",
+      "h",
+      "o",
       "t"
     ],
     "words": [
       "the",
-      "mat",
+      "sun",
       "is",
-      "flat"
+      "hot"
     ],
     "phonemeAudioPaths": [
-      "assets/en-US/t/audio.mp3",
-      "assets/en-US/h/audio.mp3",
-      "assets/en-US/e/audio.mp3",
-      "assets/en-US/m/audio.mp3",
-      "assets/en-US/a/audio.mp3",
-      "assets/en-US/t/audio.mp3",
-      "assets/en-US/i/audio.mp3",
-      "assets/en-US/s/audio.mp3",
-      "assets/en-US/f/audio.mp3",
-      "assets/en-US/l/audio.mp3",
-      "assets/en-US/a/audio.mp3",
-      "assets/en-US/t/audio.mp3"
+      "assets/en-US/003-h/audio.mp3",
+      "assets/en-US/001-i/audio.mp3",
+      "assets/en-US/003-h/audio.mp3"
     ],
-    "wordAudioPaths": [
-      "assets/en-US/word-the/audio.mp3",
-      "assets/en-US/word-mat/audio.mp3",
-      "assets/en-US/word-is/audio.mp3",
-      "assets/en-US/word-flat/audio.mp3"
+    "lesson": 28,
+    "imagePath": "assets/en-US/010-the-sun-is-hot/image.png",
+    "promptPath": "assets/en-US/010-the-sun-is-hot/prompt.mp3",
+    "tryAgainPath": "assets/en-US/010-the-sun-is-hot/try-again.mp3",
+    "noInputPath": "assets/en-US/010-the-sun-is-hot/no-input.mp3",
+    "greatJobPath": "assets/en-US/010-the-sun-is-hot/great-job.mp3",
+    "audioPath": "assets/en-US/010-the-sun-is-hot/audio.mp3",
+    "orthography": {
+      "macrons": [],
+      "small": [],
+      "balls": [],
+      "arrows": []
+    }
+  },
+  {
+    "id": "011-we-had-a-great-day",
+    "type": "sentence",
+    "display": "we had a great day",
+    "plainText": "we had a great day",
+    "phonemes": [
+      "w",
+      "e",
+      "h",
+      "a",
+      "d",
+      "a",
+      "g",
+      "r",
+      "e",
+      "a",
+      "t",
+      "d",
+      "a",
+      "y"
     ],
-    "lesson": 20,
-    "imagePath": "assets/en-US/012-the-mat-is-flat/image.png",
-    "promptPath": "assets/en-US/012-the-mat-is-flat/prompt.mp3",
-    "tryAgainPath": "assets/en-US/012-the-mat-is-flat/try-again.mp3",
-    "noInputPath": "assets/en-US/012-the-mat-is-flat/no-input.mp3",
-    "greatJobPath": "assets/en-US/012-the-mat-is-flat/great-job.mp3",
-    "audioPath": "assets/en-US/012-the-mat-is-flat/audio.mp3",
+    "words": [
+      "we",
+      "had",
+      "a",
+      "great",
+      "day"
+    ],
+    "phonemeAudioPaths": [
+      "assets/en-US/003-h/audio.mp3"
+    ],
+    "lesson": 85,
+    "imagePath": "assets/en-US/011-we-had-a-great-day/image.png",
+    "promptPath": "assets/en-US/011-we-had-a-great-day/prompt.mp3",
+    "tryAgainPath": "assets/en-US/011-we-had-a-great-day/try-again.mp3",
+    "noInputPath": "assets/en-US/011-we-had-a-great-day/no-input.mp3",
+    "greatJobPath": "assets/en-US/011-we-had-a-great-day/great-job.mp3",
+    "audioPath": "assets/en-US/011-we-had-a-great-day/audio.mp3",
+    "orthography": {
+      "macrons": [],
+      "small": [],
+      "balls": [],
+      "arrows": []
+    }
+  },
+  {
+    "id": "012-we-went-to-the-park",
+    "type": "sentence",
+    "display": "we went to the park",
+    "plainText": "we went to the park",
+    "phonemes": [
+      "w",
+      "e",
+      "w",
+      "e",
+      "n",
+      "t",
+      "t",
+      "o",
+      "t",
+      "h",
+      "e",
+      "p",
+      "a",
+      "r",
+      "k"
+    ],
+    "words": [
+      "we",
+      "went",
+      "to",
+      "the",
+      "park"
+    ],
+    "phonemeAudioPaths": [
+      "assets/en-US/003-h/audio.mp3"
+    ],
+    "lesson": 65,
+    "imagePath": "assets/en-US/012-we-went-to-the-park/image.png",
+    "promptPath": "assets/en-US/012-we-went-to-the-park/prompt.mp3",
+    "tryAgainPath": "assets/en-US/012-we-went-to-the-park/try-again.mp3",
+    "noInputPath": "assets/en-US/012-we-went-to-the-park/no-input.mp3",
+    "greatJobPath": "assets/en-US/012-we-went-to-the-park/great-job.mp3",
+    "audioPath": "assets/en-US/012-we-went-to-the-park/audio.mp3",
     "orthography": {
       "macrons": [],
       "small": [],
