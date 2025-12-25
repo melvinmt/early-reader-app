@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Image, StyleSheet, Animated, Text } from 'react-native';
+import { BlurView } from 'expo-blur';
 
 interface BlurredImageRevealProps {
   imageUri: string;
@@ -12,14 +13,14 @@ export default function BlurredImageReveal({
   isRevealed,
   onRevealComplete,
 }: BlurredImageRevealProps) {
-  const blurAnimation = useRef(new Animated.Value(20)).current; // Start with heavy blur
+  const blurIntensity = useRef(new Animated.Value(50)).current; // Start with heavy blur (0-100)
   const opacityAnimation = useRef(new Animated.Value(1)).current; // Question mark opacity
 
   useEffect(() => {
     if (isRevealed) {
-      // Animate blur from 20 to 0
+      // Animate blur from 50 to 0 (real Gaussian blur)
       Animated.parallel([
-        Animated.timing(blurAnimation, {
+        Animated.timing(blurIntensity, {
           toValue: 0,
           duration: 800,
           useNativeDriver: false, // Blur doesn't support native driver
@@ -34,27 +35,49 @@ export default function BlurredImageReveal({
       });
     } else {
       // Reset to blurred state
-      blurAnimation.setValue(20);
+      blurIntensity.setValue(50);
       opacityAnimation.setValue(1);
     }
   }, [isRevealed]);
 
+  // Get current blur value for BlurView
+  const [currentBlur, setCurrentBlur] = useState(50);
+
+  useEffect(() => {
+    const listenerId = blurIntensity.addListener(({ value }) => {
+      setCurrentBlur(value);
+    });
+
+    return () => {
+      blurIntensity.removeListener(listenerId);
+    };
+  }, [blurIntensity]);
+
+  // Don't render if no image URI
+  if (!imageUri) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.placeholder}>
+          <Text style={styles.placeholderText}>Image loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Animated.View
-        style={[
-          styles.imageContainer,
-          {
-            // Note: expo-blur would be better for actual blur, but for now we'll use opacity
-            opacity: blurAnimation.interpolate({
-              inputRange: [0, 20],
-              outputRange: [1, 0.3],
-            }),
-          },
-        ]}
-      >
+      <View style={styles.imageContainer}>
         <Image source={{ uri: imageUri }} style={styles.image} resizeMode="contain" />
-      </Animated.View>
+        
+        {/* Real Gaussian blur overlay that animates */}
+        {currentBlur > 0 && (
+          <BlurView
+            intensity={currentBlur}
+            tint="light"
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+      </View>
 
       {!isRevealed && (
         <Animated.View
@@ -111,7 +134,19 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
+  placeholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: '#666',
+  },
 });
+
 
 
 
