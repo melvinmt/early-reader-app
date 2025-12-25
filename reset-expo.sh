@@ -13,7 +13,6 @@ pkill -f "node.*expo" || true
 
 # Clear Expo cache
 echo "🗑️  Clearing Expo cache..."
-npx expo start --clear 2>&1 | head -1 || true
 rm -rf ~/.expo 2>/dev/null || true
 
 # Clear Metro bundler cache
@@ -22,10 +21,16 @@ rm -rf $TMPDIR/metro-* 2>/dev/null || true
 rm -rf $TMPDIR/haste-map-* 2>/dev/null || true
 rm -rf $TMPDIR/react-* 2>/dev/null || true
 
-# Clear watchman (if installed)
+# Clear watchman (if installed) - with timeout to prevent hanging
 if command -v watchman &> /dev/null; then
     echo "🗑️  Clearing Watchman cache..."
-    watchman watch-del-all 2>/dev/null || true
+    timeout 5 watchman watch-del-all 2>/dev/null || true
+    # If timeout command doesn't exist, try without it but in background
+    if ! command -v timeout &> /dev/null; then
+        (watchman watch-del-all 2>/dev/null &)
+        sleep 2
+        pkill -f watchman 2>/dev/null || true
+    fi
 fi
 
 # Clear npm/yarn cache (optional, uncomment if needed)
