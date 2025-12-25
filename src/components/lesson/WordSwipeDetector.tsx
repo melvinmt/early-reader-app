@@ -29,11 +29,26 @@ export default function WordSwipeDetector({
   const startX = useSharedValue(0);
   const isMountedRef = useRef(true);
   const onSwipeCompleteRef = useRef(onSwipeComplete);
+  const onLetterEnterRef = useRef(onLetterEnter);
+  
+  // Use refs to track state that needs to be accessed in gesture handlers
+  const currentLetterIndexRef = useRef(-1);
+  const visitedLettersRef = useRef<Set<number>>(new Set());
 
-  // Update ref when callback changes
+  // Update refs when callbacks change
   useEffect(() => {
     onSwipeCompleteRef.current = onSwipeComplete;
-  }, [onSwipeComplete]);
+    onLetterEnterRef.current = onLetterEnter;
+  }, [onSwipeComplete, onLetterEnter]);
+
+  // Sync refs with state
+  useEffect(() => {
+    currentLetterIndexRef.current = currentLetterIndex;
+  }, [currentLetterIndex]);
+
+  useEffect(() => {
+    visitedLettersRef.current = visitedLetters;
+  }, [visitedLetters]);
 
   // Track mount state
   useEffect(() => {
@@ -44,6 +59,23 @@ export default function WordSwipeDetector({
   }, []);
 
   const letterWidth = SCREEN_WIDTH / (word.length + 2); // Add padding
+
+  // Helper to update letter state (called from gesture handler via runOnJS)
+  const updateLetterState = (index: number) => {
+    if (!isMountedRef.current) return;
+    
+    if (index >= currentLetterIndexRef.current) {
+      setCurrentLetterIndex(index);
+      if (!visitedLettersRef.current.has(index)) {
+        setVisitedLetters((prev) => {
+          const newSet = new Set([...prev, index]);
+          visitedLettersRef.current = newSet;
+          return newSet;
+        });
+        onLetterEnterRef.current?.(index);
+      }
+    }
+  };
 
   // Deferred callback to avoid crashing during gesture handling
   const handleSwipeComplete = (success: boolean) => {
@@ -68,13 +100,10 @@ export default function WordSwipeDetector({
       // Determine which letter zone we're in
       const letterIndex = Math.floor((event.x - letterWidth) / letterWidth);
       if (letterIndex >= 0 && letterIndex < word.length) {
-        // Check if we're moving left-to-right
-        if (letterIndex >= currentLetterIndex) {
-          setCurrentLetterIndex(letterIndex);
-          if (!visitedLetters.has(letterIndex)) {
-            setVisitedLetters((prev) => new Set([...prev, letterIndex]));
-            onLetterEnter(letterIndex);
-          }
+        // Use runOnJS to safely update React state from gesture handler
+        // Check against ref value (not React state) to avoid crashes
+        if (letterIndex >= currentLetterIndexRef.current) {
+          runOnJS(updateLetterState)(letterIndex);
         }
       }
     })
@@ -82,17 +111,21 @@ export default function WordSwipeDetector({
       // Reset animation first
       translateX.value = withSpring(0);
       
-      // Defer state updates and callback to avoid gesture system conflicts
-      // Capture values before async call
-      const visitedSet = new Set(visitedLetters);
-      const allVisited = visitedSet.size === word.length;
-      const visitedArray = Array.from(visitedSet).sort((a, b) => a - b);
-      const inOrder = visitedArray.every((val, idx) => val === idx);
-      
-      // Use runOnJS to safely call the callback
+      // Use runOnJS to safely access refs and call callbacks
       runOnJS(() => {
+        // Capture values from refs (safe to access in JS context)
+        const visitedSet = new Set(visitedLettersRef.current);
+        const allVisited = visitedSet.size === word.length;
+        const visitedArray = Array.from(visitedSet).sort((a, b) => a - b);
+        const inOrder = visitedArray.every((val, idx) => val === idx);
+        
+        // Reset state
         setVisitedLetters(new Set());
         setCurrentLetterIndex(-1);
+        currentLetterIndexRef.current = -1;
+        visitedLettersRef.current = new Set();
+        
+        // Call completion handler
         handleSwipeComplete(allVisited && inOrder);
       })();
     });
