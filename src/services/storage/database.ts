@@ -222,6 +222,24 @@ export async function getDueReviewCards(childId: string, limit: number = 5): Pro
   return result;
 }
 
+/**
+ * Get all cards for a child (for testing - shows all cards regardless of review date)
+ */
+export async function getAllCardsForChild(childId: string): Promise<CardProgress[]> {
+  const database = await initDatabase();
+  const result = await database.getAllAsync<CardProgress>(
+    `SELECT * FROM card_progress 
+     WHERE child_id = ?
+     ORDER BY 
+       CASE WHEN last_seen_at IS NULL THEN 0 ELSE 1 END ASC,
+       last_seen_at ASC,
+       attempts ASC
+     LIMIT 100`,
+    [childId]
+  );
+  return result;
+}
+
 export async function getCardProgress(childId: string, word: string): Promise<CardProgress | null> {
   const database = await initDatabase();
   const result = await database.getFirstAsync<CardProgress>(

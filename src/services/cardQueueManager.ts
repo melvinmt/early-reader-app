@@ -5,6 +5,7 @@
 
 import {
   getDueReviewCards,
+  getAllCardsForChild,
   getCardProgress,
   createOrUpdateCardProgress,
   getChild,
@@ -340,7 +341,7 @@ async function checkLevelProgression(childId: string): Promise<void> {
 
 /**
  * Get next card from queue
- * Only generates one card at a time to show immediately
+ * Simplified for testing: shows all existing cards first, then generates new ones
  */
 export async function getNextCard(childId: string): Promise<LearningCard | null> {
   // Get child info first
@@ -356,11 +357,22 @@ export async function getNextCard(childId: string): Promise<LearningCard | null>
     throw new Error(`Invalid level: ${currentLevel}`);
   }
   
-  // First, try to get a due review card
-  const dueCards = await getDueReviewCards(childId, 1);
+  // Simplified: Get ALL existing cards (not just "due" ones) for testing
+  const allCards = await getAllCardsForChild(childId);
   
-  if (dueCards.length > 0) {
-    const progress = dueCards[0];
+  // Try to find a card we haven't shown yet in this session
+  // For simplicity, just get the first card that hasn't been seen recently
+  // or the one with the oldest last_seen_at
+  if (allCards.length > 0) {
+    // Sort by last_seen_at (null first, then oldest)
+    const sortedCards = allCards.sort((a, b) => {
+      if (!a.last_seen_at && !b.last_seen_at) return 0;
+      if (!a.last_seen_at) return -1;
+      if (!b.last_seen_at) return 1;
+      return new Date(a.last_seen_at).getTime() - new Date(b.last_seen_at).getTime();
+    });
+    
+    const progress = sortedCards[0];
     // Load full card data from cache
     const cachedWord = await getContentCache('word', progress.word);
     const cachedImage = await getContentCache('image', progress.word);
@@ -393,7 +405,7 @@ export async function getNextCard(childId: string): Promise<LearningCard | null>
     }
   }
   
-  // No due cards, generate a new one (only ONE card)
+  // No existing cards, generate a new one (only ONE card)
   const card = await generateNewCard(childId, currentLevel, levelData.phonemes);
   return card;
 }
