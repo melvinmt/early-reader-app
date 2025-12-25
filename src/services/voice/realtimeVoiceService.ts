@@ -174,12 +174,18 @@ export class RealtimeVoiceService {
 
   /**
    * Inject context (current word, phonemes, level) into the AI session
+   * Returns false if voice service is not connected (non-blocking)
    */
   async injectContext(context: {
     currentWord: string;
     phonemes: string[];
     level: number;
   }): Promise<void> {
+    if (!this.isConnected) {
+      // Voice service not connected, silently return (non-blocking)
+      return;
+    }
+    
     if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
       console.warn('Data channel not ready, cannot inject context');
       return;

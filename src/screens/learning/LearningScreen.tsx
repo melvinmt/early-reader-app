@@ -12,7 +12,7 @@ import ConfettiCelebration from '@/components/ui/ConfettiCelebration';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { createSession, updateSession } from '@/services/storage/database';
 
-type LearningState = 'loading' | 'ready' | 'listening' | 'processing' | 'complete';
+type LearningState = 'loading' | 'ready' | 'processing' | 'complete';
 
 export default function LearningScreen() {
   const params = useLocalSearchParams();
@@ -63,9 +63,15 @@ export default function LearningScreen() {
         duration_seconds: 0,
       });
 
-      // Initialize voice service
-      await realtimeVoiceService.connect();
-      realtimeVoiceService.onResponse(handleVoiceResponse);
+      // Initialize voice service (optional - app works without it)
+      try {
+        await realtimeVoiceService.connect();
+        realtimeVoiceService.onResponse(handleVoiceResponse);
+        console.log('Voice service connected');
+      } catch (voiceError) {
+        console.warn('Voice service unavailable, continuing without voice:', voiceError);
+        // App continues to work without voice
+      }
     } catch (error) {
       console.error('Error initializing session:', error);
     }
@@ -73,7 +79,12 @@ export default function LearningScreen() {
 
   const cleanup = async () => {
     try {
-      await realtimeVoiceService.disconnect();
+      // Disconnect voice service if connected (optional)
+      try {
+        await realtimeVoiceService.disconnect();
+      } catch (voiceError) {
+        // Voice service may not be connected, ignore
+      }
       
       if (sessionId && sessionStartTime) {
         const duration = Math.floor((Date.now() - sessionStartTime.getTime()) / 1000);
@@ -104,12 +115,17 @@ export default function LearningScreen() {
       voicePhonemesRef.current = [];
       setState('ready');
 
-      // Inject context into voice service
-      await realtimeVoiceService.injectContext({
-        currentWord: card.word,
-        phonemes: card.phonemes,
-        level: card.level,
-      });
+      // Inject context into voice service (optional - only if connected)
+      try {
+        await realtimeVoiceService.injectContext({
+          currentWord: card.word,
+          phonemes: card.phonemes,
+          level: card.level,
+        });
+      } catch (voiceError) {
+        // Voice service not available, continue without it
+        console.warn('Could not inject context to voice service:', voiceError);
+      }
     } catch (error) {
       console.error('Error loading card:', error);
       Alert.alert('Error', 'Failed to load card. Please try again.');
@@ -143,16 +159,12 @@ export default function LearningScreen() {
     if (!currentCard) return;
 
     if (success) {
-      // Swipe was successful, now listen for pronunciation
+      // Swipe was successful - reveal image immediately
       setIsImageRevealed(true);
-      setState('listening');
       
-      // Start listening for voice
-      // In production, this would start recording audio
-      // For now, we'll simulate with a timeout
-      setTimeout(() => {
-        processCardResult(true);
-      }, 2000);
+      // Process card as successful (voice is optional enhancement)
+      // The core flow is: swipe → image revealed → card complete
+      await processCardResult(true);
     } else {
       // Swipe failed, try again
       setAttempts(attempts + 1);
@@ -168,15 +180,21 @@ export default function LearningScreen() {
 
     setState('processing');
 
-    // Validate pronunciation
-    const pronunciationResult = validatePronunciation(
-      currentCard.word,
-      currentCard.phonemes,
-      voiceTranscriptRef.current || currentCard.word, // Fallback to word if no transcript
-      voicePhonemesRef.current.length > 0 ? voicePhonemesRef.current : undefined
-    );
+    // Validate pronunciation (voice is optional - if no voice, use swipe success)
+    // Core flow: swipe success = card success
+    const hasVoiceTranscript = voiceTranscriptRef.current && voiceTranscriptRef.current !== '';
+    const pronunciationResult = hasVoiceTranscript
+      ? validatePronunciation(
+          currentCard.word,
+          currentCard.phonemes,
+          voiceTranscriptRef.current,
+          voicePhonemesRef.current.length > 0 ? voicePhonemesRef.current : undefined
+        )
+      : { isCorrect: true, matchScore: 1.0 }; // If no voice, swipe success = correct
 
-    const overallSuccess = swipeSuccess && pronunciationResult.isCorrect;
+    // Overall success: swipe must succeed, and if voice is available, pronunciation must be correct
+    // If voice is not available, swipe success is sufficient
+    const overallSuccess = swipeSuccess && (hasVoiceTranscript ? pronunciationResult.isCorrect : true);
 
     try {
       // Record completion
@@ -188,18 +206,20 @@ export default function LearningScreen() {
       });
 
       if (overallSuccess) {
-        // Success!
+        // Success! Show confetti and move to next card
         await audioPlayer.playSuccess();
         setShowConfetti(true);
         setCardsCompleted(cardsCompleted + 1);
         setProgress((cardsCompleted + 1) / 10); // Assuming 10 cards per session
         
+        // Brief delay to show success, then move to next card
         setTimeout(() => {
           setShowConfetti(false);
+          setState('ready');
           loadNextCard();
         }, 2000);
       } else {
-        // Try again
+        // Try again (shouldn't happen with swipe-only flow, but keep for safety)
         await audioPlayer.playTryAgain();
         setAttempts(attempts + 1);
         setIsImageRevealed(false);
@@ -290,18 +310,10 @@ export default function LearningScreen() {
           />
         )}
 
-        {state === 'listening' && (
-          <View style={styles.listeningContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
-            <Text style={styles.listeningText}>Listening...</Text>
-            <Text style={styles.hintText}>Say the word out loud</Text>
-          </View>
-        )}
-
         {state === 'processing' && (
           <View style={styles.processingContainer}>
             <ActivityIndicator size="large" color="#34C759" />
-            <Text style={styles.processingText}>Checking your answer...</Text>
+            <Text style={styles.processingText}>Great job!</Text>
           </View>
         )}
       </View>
