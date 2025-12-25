@@ -34,22 +34,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   sendOtp: async (email: string) => {
     try {
       // Use signInWithOtp to send OTP code
-      // IMPORTANT: To send 6-digit OTP codes that look like signup confirmation emails,
-      // you MUST configure the email template in Supabase Dashboard:
       // 
+      // IMPORTANT: signInWithOtp() sends Magic Links by default.
+      // To send 6-digit OTP codes instead, you MUST configure the email template in Supabase Dashboard.
+      // There is NO API option to force OTP mode - it's determined by the template content.
+      // 
+      // Steps to configure:
       // 1. Go to Supabase Dashboard > Authentication > Email Templates
-      // 2. Find and edit the template used by signInWithOtp()
+      // 2. Find the template used by signInWithOtp() (usually named "Magic Link")
       // 3. COMPLETELY REMOVE {{ .ConfirmationURL }} from the template
       // 4. Replace with ONLY {{ .Token }} - do NOT include both variables
       // 
-      // Example template (CORRECT - looks like signup confirmation):
+      // Example template (CORRECT):
       // <h2>Confirm Your Signup</h2>
       // <p>Your 6-digit verification code is:</p>
       // <p style="font-size: 24px; font-weight: bold;">{{ .Token }}</p>
       // <p>Enter this code in the app to complete your signup.</p>
       // 
-      // CRITICAL: If {{ .ConfirmationURL }} is present (even with {{ .Token }}),
-      // Supabase will send a confirmation link. You must remove it completely.
+      // CRITICAL: If {{ .ConfirmationURL }} exists anywhere in the template,
+      // Supabase will send a Magic Link regardless of other content.
       // See: https://supabase.com/docs/guides/auth/auth-email-passwordless#with-otp
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
