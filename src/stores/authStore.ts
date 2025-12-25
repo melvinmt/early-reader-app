@@ -6,6 +6,7 @@ interface AuthState {
   session: Session | null;
   initialized: boolean;
   initialize: () => Promise<void>;
+  sendOtp: (email: string) => Promise<{ error: AuthError | null }>;
   verifyOtp: (email: string, token: string) => Promise<{ error: AuthError | null; session: Session | null }>;
   signOut: () => Promise<void>;
 }
@@ -27,6 +28,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('Error initializing auth:', error);
       set({ initialized: true });
+    }
+  },
+
+  sendOtp: async (email: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: true,
+        },
+      });
+
+      return { error };
+    } catch (error) {
+      return {
+        error: error as AuthError,
+      };
     }
   },
 
