@@ -117,53 +117,12 @@ Deno.serve(async (req: Request) => {
       throw new Error('No word generated from Gemini');
     }
 
-    // Generate image for the word (using same endpoint as generate-image function)
-    const imagePrompt = `A simple, friendly cartoon illustration of "${word}", child-friendly style, white background, no text`;
-    
-    let imageUrl = '';
-    try {
-      const imageResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: imagePrompt,
-                  },
-                ],
-              },
-            ],
-          }),
-        }
-      );
+    // Note: Image generation is handled separately by the generate-image Edge Function
+    // This keeps concerns separated and makes debugging easier
+    // The client will call generate-image if imageUrl is missing
+    const imageUrl = '';
 
-      if (imageResponse.ok) {
-        const imageData = await imageResponse.json();
-        const imageBase64 = imageData.candidates[0]?.content?.parts[0]?.inlineData?.data || '';
-        if (imageBase64) {
-          // Return base64 data URL (client will handle storage)
-          imageUrl = `data:image/png;base64,${imageBase64}`;
-          console.log('Image generated successfully for word:', word, 'Size:', imageBase64.length);
-        } else {
-          console.warn('Image response OK but no base64 data found for word:', word, 'Response:', JSON.stringify(imageData).substring(0, 200));
-        }
-      } else {
-        const errorText = await imageResponse.text();
-        console.error('Image generation failed for word:', word, 'Status:', imageResponse.status, 'Error:', errorText);
-        // Continue without image - client will generate it separately if needed
-      }
-    } catch (imageError) {
-      console.error('Exception during image generation for word:', word, 'Error:', imageError);
-      // Continue without image - client will generate it separately if needed
-    }
-
-    // Return the generated word with phonemes and image
+    // Return the generated word with phonemes (image will be generated separately)
     return new Response(
       JSON.stringify({
         word,
