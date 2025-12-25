@@ -90,3 +90,4 @@ echo ""
 # Start Expo with tunnel mode to avoid localhost issues
 npx expo start --clear --tunnel
 
+
