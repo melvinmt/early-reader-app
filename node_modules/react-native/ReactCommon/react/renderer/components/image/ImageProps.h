@@ -32,12 +32,24 @@ class ImageProps final : public ViewProps {
 #pragma mark - Props
 
   ImageSources sources{};
-  ImageSources defaultSources{};
+  ImageSource defaultSource{};
+  ImageSource loadingIndicatorSource{};
   ImageResizeMode resizeMode{ImageResizeMode::Stretch};
   Float blurRadius{};
   EdgeInsets capInsets{};
   SharedColor tintColor{};
   std::string internal_analyticTag{};
+  std::string resizeMethod{};
+  Float resizeMultiplier{};
+  bool shouldNotifyLoadEvents{};
+  SharedColor overlayColor{};
+  Float fadeDuration{};
+  bool progressiveRenderingEnabled{};
+
+#ifdef RN_SERIALIZABLE_STATE
+  ComponentName getDiffPropsImplementationTarget() const override;
+  folly::dynamic getDiffProps(const Props* prevProps) const override;
+#endif
 };
 
 } // namespace facebook::react

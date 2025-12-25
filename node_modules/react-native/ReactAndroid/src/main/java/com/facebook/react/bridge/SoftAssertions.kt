@@ -7,13 +7,15 @@
 
 package com.facebook.react.bridge
 
+import com.facebook.react.bridge.ReactSoftExceptionLogger.Categories.SOFT_ASSERTIONS
+
 /**
  * Utility class to make assertions that should not hard-crash the app but instead be handled by the
  * Catalyst app [JSExceptionHandler]. See the javadoc on that class for more information about our
  * opinion on when these assertions should be used as opposed to assertions that might throw
  * AssertionError Throwables that will cause the app to hard crash.
  */
-public object SoftAssertions {
+internal object SoftAssertions {
 
   /**
    * Throw [AssertionException] with a given message. Use this method surrounded with `if` block
@@ -22,8 +24,8 @@ public object SoftAssertions {
    * throw.
    */
   @JvmStatic
-  public fun assertUnreachable(message: String): Unit {
-    ReactSoftExceptionLogger.logSoftException("SoftAssertions", AssertionException(message))
+  fun assertUnreachable(message: String): Unit {
+    ReactSoftExceptionLogger.logSoftException(SOFT_ASSERTIONS, AssertionException(message))
   }
 
   /**
@@ -32,9 +34,9 @@ public object SoftAssertions {
    * throw.
    */
   @JvmStatic
-  public fun assertCondition(condition: Boolean, message: String): Unit {
+  fun assertCondition(condition: Boolean, message: String): Unit {
     if (!condition) {
-      ReactSoftExceptionLogger.logSoftException("SoftAssertions", AssertionException(message))
+      ReactSoftExceptionLogger.logSoftException(SOFT_ASSERTIONS, AssertionException(message))
     }
   }
 
@@ -43,10 +45,10 @@ public object SoftAssertions {
    * an assertion with ReactSoftExceptionLogger, which decides whether or not to actually throw.
    */
   @JvmStatic
-  public fun <T> assertNotNull(instance: T?): T? {
+  fun <T> assertNotNull(instance: T?): T? {
     if (instance == null) {
       ReactSoftExceptionLogger.logSoftException(
-          "SoftAssertions", AssertionException("Expected object to not be null!"))
+          SOFT_ASSERTIONS, AssertionException("Expected object to not be null!"))
     }
     return instance
   }

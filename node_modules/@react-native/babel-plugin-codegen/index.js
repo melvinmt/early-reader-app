@@ -4,6 +4,7 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
+ * @noflow
  * @format
  */
 
@@ -11,6 +12,7 @@
 
 let FlowParser, TypeScriptParser, RNCodegen;
 
+const {cheap: traverseCheap} = require('@babel/traverse').default;
 const {basename} = require('path');
 
 try {
@@ -22,16 +24,19 @@ try {
 } catch (e) {
   // Fallback to lib when source doesn't exit (e.g. when installed as a dev dependency)
   FlowParser =
+    // $FlowIgnore[cannot-resolve-module]
     require('@react-native/codegen/lib/parsers/flow/parser').FlowParser;
   TypeScriptParser =
+    // $FlowIgnore[cannot-resolve-module]
     require('@react-native/codegen/lib/parsers/typescript/parser').TypeScriptParser;
+  // $FlowIgnore[cannot-resolve-module]
   RNCodegen = require('@react-native/codegen/lib/generators/RNCodegen');
 }
 
 const flowParser = new FlowParser();
 const typeScriptParser = new TypeScriptParser();
 
-function parseFile(filename, code) {
+function parseFile(filename /*: string */, code /*: string */) {
   if (filename.endsWith('js')) {
     return flowParser.parseString(code);
   }
@@ -45,7 +50,7 @@ function parseFile(filename, code) {
   );
 }
 
-function generateViewConfig(filename, code) {
+function generateViewConfig(filename /*: string */, code /*: string */) {
   const schema = parseFile(filename, code);
 
   const libraryName = basename(filename).replace(
@@ -53,8 +58,8 @@ function generateViewConfig(filename, code) {
     '',
   );
   return RNCodegen.generateViewConfig({
-    schema,
     libraryName,
+    schema,
   });
 }
 
@@ -168,16 +173,32 @@ module.exports = function ({parse, types: t}) {
         exit(path) {
           if (this.defaultExport) {
             const viewConfig = generateViewConfig(this.filename, this.code);
-            this.defaultExport.replaceWithMultiple(
-              parse(viewConfig, {
-                babelrc: false,
-                browserslistConfigFile: false,
-                configFile: false,
-              }).program.body,
-            );
+
+            const ast = parse(viewConfig, {
+              babelrc: false,
+              browserslistConfigFile: false,
+              configFile: false,
+            });
+
+            // Almost the whole file is replaced with the viewConfig generated code that doesn't
+            // have a clear equivalent code on the source file when the user debugs, so we point
+            // it to the location of the default export that in that file, which is the closest
+            // to representing the code that is being generated.
+            // This is mostly useful when that generated code throws an error.
+            traverseCheap(ast, node => {
+              if (node?.loc) {
+                node.loc = this.defaultExport.node.loc;
+                node.start = this.defaultExport.node.start;
+                node.end = this.defaultExport.node.end;
+              }
+            });
+
+            this.defaultExport.replaceWithMultiple(ast.program.body);
+
             if (this.commandsExport != null) {
               this.commandsExport.remove();
             }
+
             this.codeInserted = true;
           }
         },

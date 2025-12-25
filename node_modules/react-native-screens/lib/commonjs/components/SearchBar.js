@@ -15,9 +15,9 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); } // Native components
 const NativeSearchBar = _SearchBarNativeComponent.default;
 const NativeSearchBarCommands = _SearchBarNativeComponent.Commands;
-function SearchBar(props, ref) {
+function SearchBar(props, forwardedRef) {
   const searchBarRef = _react.default.useRef(null);
-  _react.default.useImperativeHandle(ref, () => ({
+  _react.default.useImperativeHandle(forwardedRef, () => ({
     blur: () => {
       _callMethodWithRef(ref => NativeSearchBarCommands.blur(ref));
     },

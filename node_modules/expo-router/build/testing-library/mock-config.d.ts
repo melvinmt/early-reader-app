@@ -4,8 +4,31 @@ export type MockContextConfig = string | string[] | MemoryContext | {
     overrides: MemoryContext;
 };
 export declare function getMockConfig(context: MockContextConfig, metaOnly?: boolean): {
-    initialRouteName: undefined;
-    screens: Record<string, import("../getReactNavigationConfig").Screen>;
+    screens: {
+        __root: {
+            initialRouteName: undefined;
+            screens: Record<string, import("../getReactNavigationConfig").Screen>;
+            path: string;
+        };
+    } | {
+        __root: {
+            initialRouteName: undefined;
+            screens: Record<string, import("../getReactNavigationConfig").Screen>;
+            path: string;
+        };
+    } | {
+        __root: {
+            initialRouteName: undefined;
+            screens: Record<string, import("../getReactNavigationConfig").Screen>;
+            path: string;
+        };
+    } | {
+        __root: {
+            initialRouteName: undefined;
+            screens: Record<string, import("../getReactNavigationConfig").Screen>;
+            path: string;
+        };
+    };
 };
 export declare function getMockContext(context: MockContextConfig): ((id: string) => any) & {
     keys: () => string[];

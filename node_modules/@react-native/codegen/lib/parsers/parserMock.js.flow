@@ -15,7 +15,7 @@ import type {
   NamedShape,
   NativeModuleAliasMap,
   NativeModuleEnumMap,
-  NativeModuleEnumMembers,
+  NativeModuleEnumMember,
   NativeModuleEnumMemberType,
   NativeModuleParamTypeAnnotation,
   Nullable,
@@ -109,15 +109,27 @@ export class MockedParser implements Parser {
     return [];
   }
 
+  getStringLiteralUnionTypeAnnotationStringLiterals(
+    membersTypes: $FlowFixMe[],
+  ): string[] {
+    return [];
+  }
+
   parseFile(filename: string): SchemaType {
+    /* $FlowFixMe[incompatible-return] Natural Inference rollout. See
+     * https://fburl.com/workplace/6291gfvu */
     return schemaMock;
   }
 
   parseString(contents: string, filename: ?string): SchemaType {
+    /* $FlowFixMe[incompatible-return] Natural Inference rollout. See
+     * https://fburl.com/workplace/6291gfvu */
     return schemaMock;
   }
 
   parseModuleFixture(filename: string): SchemaType {
+    /* $FlowFixMe[incompatible-return] Natural Inference rollout. See
+     * https://fburl.com/workplace/6291gfvu */
     return schemaMock;
   }
 
@@ -162,26 +174,40 @@ export class MockedParser implements Parser {
     return;
   }
 
-  parseEnumMembers(typeAnnotation: $FlowFixMe): NativeModuleEnumMembers {
+  parseEnumMembers(
+    typeAnnotation: $FlowFixMe,
+  ): $ReadOnlyArray<NativeModuleEnumMember> {
     return typeAnnotation.type === 'StringTypeAnnotation'
       ? [
           {
             name: 'Hello',
-            value: 'hello',
+            value: {
+              type: 'StringLiteralTypeAnnotation',
+              value: 'hello',
+            },
           },
           {
             name: 'Goodbye',
-            value: 'goodbye',
+            value: {
+              type: 'StringLiteralTypeAnnotation',
+              value: 'goodbye',
+            },
           },
         ]
       : [
           {
             name: 'On',
-            value: '1',
+            value: {
+              type: 'NumberLiteralTypeAnnotation',
+              value: 1,
+            },
           },
           {
             name: 'Off',
-            value: '0',
+            value: {
+              type: 'NumberLiteralTypeAnnotation',
+              value: 0,
+            },
           },
         ];
   }

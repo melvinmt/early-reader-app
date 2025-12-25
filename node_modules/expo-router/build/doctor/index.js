@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.doctor = void 0;
+exports.doctor = doctor;
 const debug_1 = __importDefault(require("debug"));
 const subset_1 = __importDefault(require("semver/ranges/subset"));
 const debug = (0, debug_1.default)('expo:router:doctor');
@@ -30,7 +30,10 @@ function doctor(pkg, appReactNavigationPath,
      * when the versions must not have matched and the package manager installed a nested node_module folder with a different
      * version of @react-navigation/native.
      */
-    if (userExcluded.has('@react-navigation/native') &&
+    if (
+    // NOTE(@kitten): This looks inverted. However, this check will soon be redundant
+    userExcluded.has('@react-navigation/native') &&
+        appReactNavigationPath &&
         appReactNavigationPath !== libReactNavigationPath) {
         console.warn(`Detected multiple versions of ${bold('@react-navigation/native')} in your ${bold('node_modules')}. This may lead to unexpected navigation behavior and errors. ${learnMore('https://expo.fyi/router-navigation-deps')}.`);
     }
@@ -62,5 +65,4 @@ function doctor(pkg, appReactNavigationPath,
     }
     return incorrectDependencies;
 }
-exports.doctor = doctor;
 //# sourceMappingURL=index.js.map

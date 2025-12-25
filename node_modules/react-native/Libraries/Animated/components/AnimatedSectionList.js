@@ -8,13 +8,19 @@
  * @format
  */
 
-import type {AnimatedComponentType} from '../createAnimatedComponent';
+import type {AnimatedProps} from '../createAnimatedComponent';
 
-import SectionList from '../../Lists/SectionList';
+import SectionList, {type SectionListProps} from '../../Lists/SectionList';
 import createAnimatedComponent from '../createAnimatedComponent';
 import * as React from 'react';
 
-export default (createAnimatedComponent(SectionList): AnimatedComponentType<
-  React.ElementConfig<typeof SectionList>,
-  React.ElementRef<typeof SectionList>,
->);
+// $FlowFixMe
+export default (createAnimatedComponent(SectionList): component<
+  // $FlowExpectedError[unclear-type]
+  ItemT = any,
+  // $FlowExpectedError[unclear-type]
+  SectionT = any,
+>(
+  ref?: React.RefSetter<SectionList<ItemT, SectionT>>,
+  ...props: AnimatedProps<SectionListProps<ItemT, SectionT>>
+));

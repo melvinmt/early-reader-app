@@ -9,14 +9,17 @@
  */
 
 import * as React from 'react';
+import {createContext} from 'react';
 
 type Value = {horizontal: boolean} | null;
 
-const ScrollViewContext: React.Context<Value> = React.createContext(null);
+const ScrollViewContext: React.Context<Value> = createContext(null);
 if (__DEV__) {
   ScrollViewContext.displayName = 'ScrollViewContext';
 }
 export default ScrollViewContext;
 
+// $FlowFixMe[incompatible-type] frozen objects are readonly
 export const HORIZONTAL: Value = Object.freeze({horizontal: true});
+// $FlowFixMe[incompatible-type] frozen objects are readonly
 export const VERTICAL: Value = Object.freeze({horizontal: false});

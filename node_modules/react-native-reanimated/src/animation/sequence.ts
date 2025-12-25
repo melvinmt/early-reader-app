@@ -1,14 +1,14 @@
 'use strict';
-import { defineAnimation, getReduceMotionForAnimation } from './util';
-import type { NextAnimation, SequenceAnimation } from './commonTypes';
+import { logger } from '../common';
 import type {
-  Animation,
   AnimatableValue,
+  Animation,
   AnimationObject,
   ReduceMotion,
   Timestamp,
 } from '../commonTypes';
-import { logger } from '../logger';
+import type { NextAnimation, SequenceAnimation } from './commonTypes';
+import { defineAnimation, getReduceMotionForAnimation } from './util';
 
 /**
  * Lets you run animations in a sequence.
@@ -40,7 +40,7 @@ export function withSequence(
   // this is done to allow the reduce motion config prop to be optional
   if (_reduceMotionOrFirstAnimation) {
     if (typeof _reduceMotionOrFirstAnimation === 'string') {
-      reduceMotion = _reduceMotionOrFirstAnimation as ReduceMotion;
+      reduceMotion = _reduceMotionOrFirstAnimation;
     } else {
       _animations.unshift(
         _reduceMotionOrFirstAnimation as NextAnimation<AnimationObject>
@@ -81,6 +81,9 @@ export function withSequence(
           index < animations.length - 1 &&
           animations[index].reduceMotion
         ) {
+          if (typeof animations[index].callback === 'function') {
+            animations[index].callback?.(true);
+          }
           index++;
         }
 

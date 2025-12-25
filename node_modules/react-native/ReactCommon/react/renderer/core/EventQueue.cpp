@@ -7,7 +7,7 @@
 
 #include "EventQueue.h"
 
-#include <react/renderer/runtimescheduler/RuntimeScheduler.h>
+#include <react/featureflags/ReactNativeFeatureFlags.h>
 #include "EventEmitter.h"
 #include "ShadowNodeFamily.h"
 
@@ -15,52 +15,54 @@ namespace facebook::react {
 
 EventQueue::EventQueue(
     EventQueueProcessor eventProcessor,
-    std::unique_ptr<EventBeat> eventBeat,
-    RuntimeScheduler& runtimeScheduler)
+    std::unique_ptr<EventBeat> eventBeat)
     : eventProcessor_(std::move(eventProcessor)),
-      eventBeat_(std::move(eventBeat)),
-      runtimeScheduler_(&runtimeScheduler) {
+      eventBeat_(std::move(eventBeat)) {
   eventBeat_->setBeatCallback(
       [this](jsi::Runtime& runtime) { onBeat(runtime); });
+
+  if (ReactNativeFeatureFlags::enableSynchronousStateUpdates()) {
+    eventBeat_->unstable_setInduceCallback([this]() { flushStateUpdates(); });
+  }
 }
 
 void EventQueue::enqueueEvent(RawEvent&& rawEvent) const {
   {
     std::scoped_lock lock(queueMutex_);
-    eventQueue_.push_back(std::move(rawEvent));
+
+    if (rawEvent.isUnique) {
+      auto repeatedEvent = eventQueue_.rend();
+
+      for (auto it = eventQueue_.rbegin(); it != eventQueue_.rend(); ++it) {
+        if (it->eventTarget == rawEvent.eventTarget) {
+          // It is necessary to maintain order of different event types
+          // for the same target. If the same target has event types A1, B1
+          // in the event queue and event A2 occurs. A1 has to stay in the
+          // queue.
+          if (it->isUnique && it->type == rawEvent.type) {
+            repeatedEvent = it;
+          }
+
+          break;
+        }
+      }
+
+      if (repeatedEvent == eventQueue_.rend()) {
+        eventQueue_.push_back(std::move(rawEvent));
+      } else {
+        *repeatedEvent = std::move(rawEvent);
+      }
+    } else {
+      eventQueue_.push_back(std::move(rawEvent));
+    }
   }
 
   onEnqueue();
 }
 
 void EventQueue::enqueueUniqueEvent(RawEvent&& rawEvent) const {
-  {
-    std::scoped_lock lock(queueMutex_);
-
-    auto repeatedEvent = eventQueue_.rend();
-
-    for (auto it = eventQueue_.rbegin(); it != eventQueue_.rend(); ++it) {
-      if (it->type == rawEvent.type &&
-          it->eventTarget == rawEvent.eventTarget) {
-        repeatedEvent = it;
-        break;
-      } else if (it->eventTarget == rawEvent.eventTarget) {
-        // It is necessary to maintain order of different event types
-        // for the same target. If the same target has event types A1, B1
-        // in the event queue and event A2 occurs. A1 has to stay in the
-        // queue.
-        break;
-      }
-    }
-
-    if (repeatedEvent == eventQueue_.rend()) {
-      eventQueue_.push_back(std::move(rawEvent));
-    } else {
-      *repeatedEvent = std::move(rawEvent);
-    }
-  }
-
-  onEnqueue();
+  rawEvent.isUnique = true;
+  enqueueEvent(std::move(rawEvent));
 }
 
 void EventQueue::enqueueStateUpdate(StateUpdate&& stateUpdate) const {
@@ -79,27 +81,17 @@ void EventQueue::enqueueStateUpdate(StateUpdate&& stateUpdate) const {
 }
 
 void EventQueue::onEnqueue() const {
-  if (synchronousAccessRequested_) {
-    // Sync flush has been scheduled, no need to request access to the runtime.
-    return;
-  }
   eventBeat_->request();
 }
 
 void EventQueue::experimental_flushSync() const {
-  synchronousAccessRequested_ = true;
-  runtimeScheduler_->executeNowOnTheSameThread([this](jsi::Runtime& runtime) {
-    synchronousAccessRequested_ = false;
-    onBeat(runtime);
-  });
+  eventBeat_->requestSynchronous();
 }
 
 void EventQueue::onBeat(jsi::Runtime& runtime) const {
-  if (synchronousAccessRequested_) {
-    // Sync flush has been scheduled, let's yield to it.
-    return;
+  if (!ReactNativeFeatureFlags::enableSynchronousStateUpdates()) {
+    flushStateUpdates();
   }
-  flushStateUpdates();
   flushEvents(runtime);
 }
 

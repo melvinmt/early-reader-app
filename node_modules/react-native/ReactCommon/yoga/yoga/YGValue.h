@@ -65,13 +65,16 @@ inline bool operator==(const YGValue& lhs, const YGValue& rhs) {
   switch (lhs.unit) {
     case YGUnitUndefined:
     case YGUnitAuto:
+    case YGUnitFitContent:
+    case YGUnitMaxContent:
+    case YGUnitStretch:
       return true;
     case YGUnitPoint:
     case YGUnitPercent:
       return lhs.value == rhs.value;
+    default:
+      return false;
   }
-
-  return false;
 }
 
 inline bool operator!=(const YGValue& lhs, const YGValue& rhs) {

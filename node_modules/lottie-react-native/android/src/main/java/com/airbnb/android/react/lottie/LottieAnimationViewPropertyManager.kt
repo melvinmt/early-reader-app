@@ -1,8 +1,10 @@
 package com.airbnb.android.react.lottie
 
+import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.Typeface
 import android.net.Uri
+import android.util.Log
 import android.widget.ImageView
 import com.airbnb.lottie.LottieAnimationView
 import com.airbnb.lottie.LottieDrawable
@@ -18,7 +20,7 @@ import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.ReadableType
 import com.facebook.react.views.text.ReactFontManager
-import com.facebook.react.views.text.TextAttributeProps.UNSET
+import com.facebook.react.common.ReactConstants.UNSET
 import com.facebook.react.util.RNLog
 import java.lang.ref.WeakReference
 import java.util.regex.Pattern
@@ -36,6 +38,8 @@ import java.io.FileInputStream
  */
 class LottieAnimationViewPropertyManager(view: LottieAnimationView) {
     private val viewWeakReference: WeakReference<LottieAnimationView>
+    private val TAG = "lottie-react-native"
+
 
     /**
      * Should be set to true if one of the animationName related parameters has changed as a result
@@ -72,7 +76,7 @@ class LottieAnimationViewPropertyManager(view: LottieAnimationView) {
                 return ReactFontManager.getInstance()
                     .getTypeface(fontFamily, UNSET, UNSET, view.context.assets)
             }
-        
+
             override fun fetchFont(fontFamily: String, fontStyle: String, fontName: String): Typeface {
                 val weight = when (fontStyle) {
                     "Thin" -> 100
@@ -103,8 +107,8 @@ class LottieAnimationViewPropertyManager(view: LottieAnimationView) {
         textFilters?.let {
             if (it.size() > 0) {
                 val textDelegate = TextDelegate(view)
-                for (i in 0 until textFilters!!.size()) {
-                    val current = textFilters!!.getMap(i)
+                for (i in 0 until it.size()) {
+                    val current = it.getMap(i) ?: continue
                     val searchText = current.getString("find")
                     val replacementText = current.getString("replace")
                     textDelegate.setText(searchText, replacementText)
@@ -141,7 +145,20 @@ class LottieAnimationViewPropertyManager(view: LottieAnimationView) {
 
             val scheme = runCatching { Uri.parse(assetName).scheme }.getOrNull()
             if (scheme != null) {
-                view.setAnimationFromUrl(assetName)
+                // if the asset path has file:// prefix, which indicates locally stored file, parse the path to be able to load it properly
+                // This is useful for apps, which are using OTA (CodePush, Expo-Updates etc.)
+                if (scheme == "file") {
+                    val uri = Uri.parse(assetName)
+                    uri.path?.let { path ->
+                        val fileWithScheme = File(path)
+                        view.setAnimation(
+                            ZipInputStream(FileInputStream(fileWithScheme)),
+                            assetName.hashCode().toString()
+                        )
+                    } ?: Log.w(TAG, "URI path is null for asset: $assetName")
+                } else {
+                    view.setAnimationFromUrl(assetName)
+                }
                 sourceDotLottie = null
                 return
             }
@@ -219,7 +236,7 @@ class LottieAnimationViewPropertyManager(view: LottieAnimationView) {
         colorFilters?.let { colorFilters ->
             if (colorFilters.size() > 0) {
                 for (i in 0 until colorFilters.size()) {
-                    val current = colorFilters.getMap(i)
+                    val current = colorFilters.getMap(i) ?: continue
                     parseColorFilter(current, view)
                 }
             }
@@ -231,7 +248,7 @@ class LottieAnimationViewPropertyManager(view: LottieAnimationView) {
         view: LottieAnimationView
     ) {
         val color: Int = if (colorFilter.getType("color") == ReadableType.Map) {
-            ColorPropConverter.getColor(colorFilter.getMap("color"), view.context)
+            ColorPropConverter.getColor(colorFilter.getMap("color"), view.context) ?: Color.TRANSPARENT;
         } else {
             colorFilter.getInt("color")
         }

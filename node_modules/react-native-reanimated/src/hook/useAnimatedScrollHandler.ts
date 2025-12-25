@@ -1,12 +1,12 @@
 'use strict';
 import type {
   DependencyList,
-  RNNativeScrollEvent,
   ReanimatedScrollEvent,
+  RNNativeScrollEvent,
 } from './commonTypes';
-import { useHandler } from './useHandler';
 import type { EventHandlerInternal, EventHandlerProcessed } from './useEvent';
 import { useEvent } from './useEvent';
+import { useHandler } from './useHandler';
 
 export type ScrollHandler<
   Context extends Record<string, unknown> = Record<string, unknown>,
@@ -23,7 +23,7 @@ export type ScrollHandlerProcessed<
   Context extends Record<string, unknown> = Record<string, unknown>,
 > = EventHandlerProcessed<RNNativeScrollEvent, Context>;
 
-export type ScrollHandlerInternal = EventHandlerInternal<RNNativeScrollEvent>;
+type ScrollHandlerInternal = EventHandlerInternal<RNNativeScrollEvent>;
 
 /**
  * Lets you run callbacks on ScrollView events. Supports `onScroll`,

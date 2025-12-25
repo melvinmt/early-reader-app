@@ -1,3 +1,5 @@
+import type { EasingFunction } from '../../commonTypes';
+import type { EasingFunctionFactory } from '../../Easing';
 export interface ReanimatedWebTransformProperties {
     translateX?: string;
     translateY?: string;
@@ -14,6 +16,7 @@ export interface ReanimatedWebTransformProperties {
 export interface AnimationStyle {
     opacity?: number;
     transform?: ReanimatedWebTransformProperties[];
+    easing?: EasingFunction | EasingFunctionFactory;
 }
 export interface AnimationData {
     name: string;

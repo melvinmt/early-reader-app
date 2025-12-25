@@ -7,22 +7,35 @@
 
 #pragma once
 
-#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
 
 #include <react/renderer/debug/DebugStringConvertible.h>
 #include <react/renderer/debug/DebugStringConvertibleItem.h>
+#include <react/utils/FloatComparison.h>
 
 namespace facebook::react {
 
 #if RN_DEBUG_STRING_CONVERTIBLE
 
+inline SharedDebugStringConvertible debugStringConvertibleItem(
+    const std::string& name,
+    float value,
+    float defaultValue = {}) {
+  if (floatEquality(value, defaultValue)) {
+    return nullptr;
+  }
+
+  return std::make_shared<DebugStringConvertibleItem>(
+      name, facebook::react::toString(value));
+}
+
 template <typename T>
-inline SharedDebugStringConvertible
-debugStringConvertibleItem(std::string name, T value, T defaultValue = {}) {
+inline SharedDebugStringConvertible debugStringConvertibleItem(
+    const std::string& name,
+    T value,
+    T defaultValue = {}) {
   if (value == defaultValue) {
     return nullptr;
   }
@@ -33,7 +46,7 @@ debugStringConvertibleItem(std::string name, T value, T defaultValue = {}) {
 
 template <typename T>
 inline SharedDebugStringConvertible debugStringConvertibleItem(
-    std::string name,
+    const std::string& name,
     std::optional<T> value,
     T defaultValue = {}) {
   if (!value.has_value()) {
@@ -54,7 +67,7 @@ inline SharedDebugStringConvertibleList operator+(
 }
 
 inline SharedDebugStringConvertible debugStringConvertibleItem(
-    std::string name,
+    const std::string& name,
     DebugStringConvertible value,
     std::string defaultValue) {
   return debugStringConvertibleItem(

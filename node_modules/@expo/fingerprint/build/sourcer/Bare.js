@@ -3,7 +3,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCoreAutolinkingSourcesFromExpoIos = exports.getCoreAutolinkingSourcesFromExpoAndroid = exports.getCoreAutolinkingSourcesFromRncCliAsync = exports.getGitIgnoreSourcesAsync = exports.getPackageJsonScriptSourcesAsync = exports.getBareIosSourcesAsync = exports.getBareAndroidSourcesAsync = void 0;
+exports.getBareAndroidSourcesAsync = getBareAndroidSourcesAsync;
+exports.getBareIosSourcesAsync = getBareIosSourcesAsync;
+exports.getPackageJsonScriptSourcesAsync = getPackageJsonScriptSourcesAsync;
+exports.getGitIgnoreSourcesAsync = getGitIgnoreSourcesAsync;
+exports.getCoreAutolinkingSourcesFromRncCliAsync = getCoreAutolinkingSourcesFromRncCliAsync;
+exports.getCoreAutolinkingSourcesFromExpoAndroid = getCoreAutolinkingSourcesFromExpoAndroid;
+exports.getCoreAutolinkingSourcesFromExpoIos = getCoreAutolinkingSourcesFromExpoIos;
 const spawn_async_1 = __importDefault(require("@expo/spawn-async"));
 const assert_1 = __importDefault(require("assert"));
 const chalk_1 = __importDefault(require("chalk"));
@@ -25,7 +31,6 @@ async function getBareAndroidSourcesAsync(projectRoot, options) {
     }
     return [];
 }
-exports.getBareAndroidSourcesAsync = getBareAndroidSourcesAsync;
 async function getBareIosSourcesAsync(projectRoot, options) {
     if (options.platforms.includes('ios')) {
         const result = await (0, Utils_1.getFileBasedHashSourceAsync)(projectRoot, 'ios', 'bareNativeDir');
@@ -36,7 +41,6 @@ async function getBareIosSourcesAsync(projectRoot, options) {
     }
     return [];
 }
-exports.getBareIosSourcesAsync = getBareIosSourcesAsync;
 async function getPackageJsonScriptSourcesAsync(projectRoot, options) {
     if (options.sourceSkips & SourceSkips_1.SourceSkips.PackageJsonScriptsAll) {
         return [];
@@ -62,7 +66,6 @@ async function getPackageJsonScriptSourcesAsync(projectRoot, options) {
     }
     return results;
 }
-exports.getPackageJsonScriptSourcesAsync = getPackageJsonScriptSourcesAsync;
 async function getGitIgnoreSourcesAsync(projectRoot, options) {
     if (options.sourceSkips & SourceSkips_1.SourceSkips.GitIgnore) {
         return [];
@@ -74,7 +77,6 @@ async function getGitIgnoreSourcesAsync(projectRoot, options) {
     }
     return [];
 }
-exports.getGitIgnoreSourcesAsync = getGitIgnoreSourcesAsync;
 async function getCoreAutolinkingSourcesFromRncCliAsync(projectRoot, options, useRNCoreAutolinkingFromExpo) {
     if (useRNCoreAutolinkingFromExpo === true) {
         return [];
@@ -94,19 +96,19 @@ async function getCoreAutolinkingSourcesFromRncCliAsync(projectRoot, options, us
         return [];
     }
 }
-exports.getCoreAutolinkingSourcesFromRncCliAsync = getCoreAutolinkingSourcesFromRncCliAsync;
 async function getCoreAutolinkingSourcesFromExpoAndroid(projectRoot, options, useRNCoreAutolinkingFromExpo) {
     if (useRNCoreAutolinkingFromExpo === false || !options.platforms.includes('android')) {
         return [];
     }
+    const args = [
+        (0, ExpoResolver_1.resolveExpoAutolinkingCliPath)(projectRoot),
+        'react-native-config',
+        '--json',
+        '--platform',
+        'android',
+    ];
     try {
-        const { stdout } = await (0, spawn_async_1.default)('node', [
-            (0, ExpoResolver_1.resolveExpoAutolinkingCliPath)(projectRoot),
-            'react-native-config',
-            '--json',
-            '--platform',
-            'android',
-        ], { cwd: projectRoot });
+        const { stdout } = await (0, spawn_async_1.default)('node', args, { cwd: projectRoot });
         const config = JSON.parse(stdout);
         const results = await parseCoreAutolinkingSourcesAsync({
             config,
@@ -121,7 +123,6 @@ async function getCoreAutolinkingSourcesFromExpoAndroid(projectRoot, options, us
         return [];
     }
 }
-exports.getCoreAutolinkingSourcesFromExpoAndroid = getCoreAutolinkingSourcesFromExpoAndroid;
 async function getCoreAutolinkingSourcesFromExpoIos(projectRoot, options, useRNCoreAutolinkingFromExpo) {
     if (useRNCoreAutolinkingFromExpo === false || !options.platforms.includes('ios')) {
         return [];
@@ -148,7 +149,6 @@ async function getCoreAutolinkingSourcesFromExpoIos(projectRoot, options, useRNC
         return [];
     }
 }
-exports.getCoreAutolinkingSourcesFromExpoIos = getCoreAutolinkingSourcesFromExpoIos;
 async function parseCoreAutolinkingSourcesAsync({ config, reasons, contentsId, platform, }) {
     const logTag = platform
         ? `react-native core autolinking dir for ${platform}`

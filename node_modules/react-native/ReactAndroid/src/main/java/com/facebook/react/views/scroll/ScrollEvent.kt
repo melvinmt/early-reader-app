@@ -7,11 +7,13 @@
 
 package com.facebook.react.views.scroll
 
+import android.os.SystemClock
 import androidx.core.util.Pools.SynchronizedPool
 import com.facebook.infer.annotation.Assertions
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactSoftExceptionLogger
 import com.facebook.react.bridge.WritableMap
+import com.facebook.react.bridge.buildReadableMap
 import com.facebook.react.uimanager.PixelUtil.toDIPFromPixel
 import com.facebook.react.uimanager.common.ViewUtil
 import com.facebook.react.uimanager.events.Event
@@ -27,7 +29,7 @@ public class ScrollEvent private constructor() : Event<ScrollEvent>() {
   private var scrollViewWidth = 0
   private var scrollViewHeight = 0
   private var scrollEventType: ScrollEventType? = null
-  private var experimental_isSynchronous = false
+  private var timestamp: Long = 0
 
   override fun onDispose() {
     try {
@@ -51,9 +53,10 @@ public class ScrollEvent private constructor() : Event<ScrollEvent>() {
       contentHeight: Int,
       scrollViewWidth: Int,
       scrollViewHeight: Int,
-      experimental_isSynchronous: Boolean,
   ) {
-    super.init(surfaceId, viewTag)
+    val timestampMs = SystemClock.uptimeMillis()
+    super.init(surfaceId, viewTag, timestampMs)
+
     this.scrollEventType = scrollEventType
     this.scrollX = scrollX
     this.scrollY = scrollY
@@ -63,7 +66,7 @@ public class ScrollEvent private constructor() : Event<ScrollEvent>() {
     this.contentHeight = contentHeight
     this.scrollViewWidth = scrollViewWidth
     this.scrollViewHeight = scrollViewHeight
-    this.experimental_isSynchronous = experimental_isSynchronous
+    this.timestamp = timestampMs
   }
 
   override fun getEventName(): String =
@@ -71,28 +74,34 @@ public class ScrollEvent private constructor() : Event<ScrollEvent>() {
 
   override fun canCoalesce(): Boolean = scrollEventType == ScrollEventType.SCROLL
 
-  override fun experimental_isSynchronous(): Boolean {
-    return experimental_isSynchronous
-  }
-
   override fun getEventData(): WritableMap {
-    val contentInset = Arguments.createMap()
-    contentInset.putDouble("top", 0.0)
-    contentInset.putDouble("bottom", 0.0)
-    contentInset.putDouble("left", 0.0)
-    contentInset.putDouble("right", 0.0)
-    val contentOffset = Arguments.createMap()
-    contentOffset.putDouble("x", toDIPFromPixel(scrollX).toDouble())
-    contentOffset.putDouble("y", toDIPFromPixel(scrollY).toDouble())
-    val contentSize = Arguments.createMap()
-    contentSize.putDouble("width", toDIPFromPixel(contentWidth.toFloat()).toDouble())
-    contentSize.putDouble("height", toDIPFromPixel(contentHeight.toFloat()).toDouble())
-    val layoutMeasurement = Arguments.createMap()
-    layoutMeasurement.putDouble("width", toDIPFromPixel(scrollViewWidth.toFloat()).toDouble())
-    layoutMeasurement.putDouble("height", toDIPFromPixel(scrollViewHeight.toFloat()).toDouble())
-    val velocity = Arguments.createMap()
-    velocity.putDouble("x", xVelocity.toDouble())
-    velocity.putDouble("y", yVelocity.toDouble())
+    val contentInset = buildReadableMap {
+      put("top", 0.0)
+      put("bottom", 0.0)
+      put("left", 0.0)
+      put("right", 0.0)
+    }
+
+    val contentOffset = buildReadableMap {
+      put("x", toDIPFromPixel(scrollX).toDouble())
+      put("y", toDIPFromPixel(scrollY).toDouble())
+    }
+
+    val contentSize = buildReadableMap {
+      put("width", toDIPFromPixel(contentWidth.toFloat()).toDouble())
+      put("height", toDIPFromPixel(contentHeight.toFloat()).toDouble())
+    }
+
+    val layoutMeasurement = buildReadableMap {
+      put("width", toDIPFromPixel(scrollViewWidth.toFloat()).toDouble())
+      put("height", toDIPFromPixel(scrollViewHeight.toFloat()).toDouble())
+    }
+
+    val velocity = buildReadableMap {
+      put("x", toDIPFromPixel(xVelocity).toDouble())
+      put("y", toDIPFromPixel(yVelocity).toDouble())
+    }
+
     val event = Arguments.createMap()
     event.putMap("contentInset", contentInset)
     event.putMap("contentOffset", contentOffset)
@@ -100,6 +109,7 @@ public class ScrollEvent private constructor() : Event<ScrollEvent>() {
     event.putMap("layoutMeasurement", layoutMeasurement)
     event.putMap("velocity", velocity)
     event.putInt("target", viewTag)
+    event.putDouble("timestamp", timestamp.toDouble())
     event.putBoolean("responderIgnoreScroll", true)
     return event
   }
@@ -121,7 +131,6 @@ public class ScrollEvent private constructor() : Event<ScrollEvent>() {
         contentHeight: Int,
         scrollViewWidth: Int,
         scrollViewHeight: Int,
-        experimental_isSynchronous: Boolean,
     ): ScrollEvent =
         (EVENTS_POOL.acquire() ?: ScrollEvent()).apply {
           init(
@@ -135,8 +144,7 @@ public class ScrollEvent private constructor() : Event<ScrollEvent>() {
               contentWidth,
               contentHeight,
               scrollViewWidth,
-              scrollViewHeight,
-              experimental_isSynchronous)
+              scrollViewHeight)
         }
 
     @Deprecated(
@@ -168,7 +176,6 @@ public class ScrollEvent private constructor() : Event<ScrollEvent>() {
             contentHeight,
             scrollViewWidth,
             scrollViewHeight,
-            false,
         )
   }
 }

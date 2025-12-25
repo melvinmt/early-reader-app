@@ -26,7 +26,9 @@ class HostPlatformViewProps : public BaseViewProps {
   HostPlatformViewProps(
       const PropsParserContext& context,
       const HostPlatformViewProps& sourceProps,
-      const RawProps& rawProps);
+      const RawProps& rawProps,
+      const std::function<bool(const std::string&)>& filterObjectKeys =
+          nullptr);
 
   void setProp(
       const PropsParserContext& context,
@@ -45,6 +47,7 @@ class HostPlatformViewProps : public BaseViewProps {
   bool hasTVPreferredFocus{false};
   bool needsOffscreenAlphaCompositing{false};
   bool renderToHardwareTextureAndroid{false};
+  bool screenReaderFocusable{false};
 
 #pragma mark - Convenience Methods
 
@@ -52,6 +55,11 @@ class HostPlatformViewProps : public BaseViewProps {
 
 #if RN_DEBUG_STRING_CONVERTIBLE
   SharedDebugStringConvertibleList getDebugProps() const override;
+#endif
+
+#ifdef RN_SERIALIZABLE_STATE
+  ComponentName getDiffPropsImplementationTarget() const override;
+  folly::dynamic getDiffProps(const Props* prevProps) const override;
 #endif
 };
 

@@ -39,16 +39,11 @@ RCT_EXPORT_MODULE()
 
 - (NSDictionary *)getConstants
 {
-  __block NSDictionary *constants;
-  RCTUnsafeExecuteOnMainQueueSync(^{
-    constants = @{
-      @"const1" : @YES,
-      @"const2" : @(390),
-      @"const3" : @"something",
-    };
-  });
-
-  return constants;
+  return @{
+    @"const1" : @YES,
+    @"const2" : @(390),
+    @"const3" : @"something",
+  };
 }
 
 // TODO: Remove once fully migrated to TurboModule.
@@ -141,8 +136,8 @@ RCT_EXPORT_SYNCHRONOUS_TYPED_METHOD(NSDictionary *, getValue : (double)x y : (NS
 {
   return @{
     @"x" : @(x),
-    @"y" : y ?: [NSNull null],
-    @"z" : z ?: [NSNull null],
+    @"y" : y ? y : [NSNull null],
+    @"z" : z ? z : [NSNull null],
   };
 }
 

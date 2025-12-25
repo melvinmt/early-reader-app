@@ -9,9 +9,9 @@ import { View } from 'react-native';
 import SearchBarNativeComponent, { Commands as SearchBarNativeCommands } from '../fabric/SearchBarNativeComponent';
 const NativeSearchBar = SearchBarNativeComponent;
 const NativeSearchBarCommands = SearchBarNativeCommands;
-function SearchBar(props, ref) {
+function SearchBar(props, forwardedRef) {
   const searchBarRef = React.useRef(null);
-  React.useImperativeHandle(ref, () => ({
+  React.useImperativeHandle(forwardedRef, () => ({
     blur: () => {
       _callMethodWithRef(ref => NativeSearchBarCommands.blur(ref));
     },

@@ -28,6 +28,7 @@ import type {
 const {
   UnsupportedEnumDeclarationParserError,
   UnsupportedGenericParserError,
+  UnsupportedObjectPropertyWithIndexerTypeAnnotationParserError,
   UnsupportedTypeAnnotationParserError,
 } = require('../../errors');
 const {parseObjectProperty} = require('../../parsers-commons');
@@ -36,8 +37,10 @@ const {
   emitCommonTypes,
   emitDictionary,
   emitFunction,
+  emitNumberLiteral,
   emitPromise,
   emitRootTag,
+  emitStringLiteral,
   emitUnion,
   translateArrayTypeAnnotation,
   typeAliasResolution,
@@ -100,6 +103,8 @@ function translateObjectTypeAnnotation(
 
   return typeAliasResolution(
     typeResolutionStatus,
+    /* $FlowFixMe[incompatible-call] Natural Inference rollout. See
+     * https://fburl.com/workplace/6291gfvu */
     objectTypeAnnotation,
     aliasMap,
     nullable,
@@ -288,7 +293,7 @@ function translateTypeAnnotation(
         typeScriptTypeAnnotation,
         nullable,
         flattenProperties(
-          flattenIntersectionType(typeAnnotation, types),
+          flattenIntersectionType(typeAnnotation, parser, types),
           types,
           parser,
         ),
@@ -308,6 +313,18 @@ function translateTypeAnnotation(
         const indexSignatures = typeAnnotation.members.filter(
           member => member.type === 'TSIndexSignature',
         );
+
+        const properties = typeAnnotation.members.filter(
+          member => member.type === 'TSPropertySignature',
+        );
+
+        if (indexSignatures.length > 0 && properties.length > 0) {
+          throw new UnsupportedObjectPropertyWithIndexerTypeAnnotationParserError(
+            hasteModuleName,
+            typeAnnotation,
+          );
+        }
+
         if (indexSignatures.length > 0) {
           // check the property type to prevent developers from using unsupported types
           // the return value from `translateTypeAnnotation` is unused
@@ -382,6 +399,24 @@ function translateTypeAnnotation(
     }
     case 'TSUnionType': {
       return emitUnion(nullable, hasteModuleName, typeAnnotation, parser);
+    }
+    case 'TSLiteralType': {
+      const literal = typeAnnotation.literal;
+      switch (literal.type) {
+        case 'StringLiteral': {
+          return emitStringLiteral(nullable, literal.value);
+        }
+        case 'NumericLiteral': {
+          return emitNumberLiteral(nullable, literal.value);
+        }
+        default: {
+          throw new UnsupportedTypeAnnotationParserError(
+            hasteModuleName,
+            typeAnnotation,
+            parser.language(),
+          );
+        }
+      }
     }
     default: {
       const commonType = emitCommonTypes(

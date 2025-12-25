@@ -4,10 +4,12 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
+ * @flow strict-local
  * @format
  */
 
 'use strict';
+
 import PooledClass from './PooledClass';
 
 const twoArgumentPooler = PooledClass.twoArgumentPooler;
@@ -19,11 +21,14 @@ const twoArgumentPooler = PooledClass.twoArgumentPooler;
  * @param {number} height Height of bounding rectangle.
  * @constructor BoundingDimensions
  */
-function BoundingDimensions(width, height) {
+// $FlowFixMe[missing-this-annot]
+function BoundingDimensions(width: number, height: number) {
   this.width = width;
   this.height = height;
 }
 
+// $FlowFixMe[prop-missing]
+// $FlowFixMe[missing-this-annot]
 BoundingDimensions.prototype.destructor = function () {
   this.width = null;
   this.height = null;
@@ -33,13 +38,16 @@ BoundingDimensions.prototype.destructor = function () {
  * @param {HTMLElement} element Element to return `BoundingDimensions` for.
  * @return {BoundingDimensions} Bounding dimensions of `element`.
  */
-BoundingDimensions.getPooledFromElement = function (element) {
+BoundingDimensions.getPooledFromElement = function (
+  element: HTMLElement,
+): typeof BoundingDimensions {
+  // $FlowFixMe[prop-missing]
   return BoundingDimensions.getPooled(
     element.offsetWidth,
     element.offsetHeight,
   );
 };
 
-PooledClass.addPoolingTo(BoundingDimensions, twoArgumentPooler);
+PooledClass.addPoolingTo(BoundingDimensions as $FlowFixMe, twoArgumentPooler);
 
-module.exports = BoundingDimensions;
+export default BoundingDimensions;

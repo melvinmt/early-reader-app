@@ -112,6 +112,10 @@ class RuntimeDecorator : public Base, private jsi::Instrumentation {
     return plain_;
   }
 
+  ICast* castInterface(const UUID& interfaceUUID) override {
+    return plain().castInterface(interfaceUUID);
+  }
+
   Value evaluateJavaScript(
       const std::shared_ptr<const Buffer>& buffer,
       const std::string& sourceURL) override {
@@ -182,6 +186,10 @@ class RuntimeDecorator : public Base, private jsi::Instrumentation {
   PropNameID createPropNameIDFromString(const String& str) override {
     return plain_.createPropNameIDFromString(str);
   };
+  PropNameID createPropNameIDFromUtf16(const char16_t* utf16, size_t length)
+      override {
+    return plain_.createPropNameIDFromUtf16(utf16, length);
+  }
   PropNameID createPropNameIDFromSymbol(const Symbol& sym) override {
     return plain_.createPropNameIDFromSymbol(sym);
   };
@@ -221,8 +229,38 @@ class RuntimeDecorator : public Base, private jsi::Instrumentation {
   String createStringFromUtf8(const uint8_t* utf8, size_t length) override {
     return plain_.createStringFromUtf8(utf8, length);
   };
+  String createStringFromUtf16(const char16_t* utf16, size_t length) override {
+    return plain_.createStringFromUtf16(utf16, length);
+  }
   std::string utf8(const String& s) override {
     return plain_.utf8(s);
+  }
+
+  std::u16string utf16(const String& str) override {
+    return plain_.utf16(str);
+  }
+  std::u16string utf16(const PropNameID& sym) override {
+    return plain_.utf16(sym);
+  }
+
+  void getStringData(
+      const jsi::String& str,
+      void* ctx,
+      void (
+          *cb)(void* ctx, bool ascii, const void* data, size_t num)) override {
+    plain_.getStringData(str, ctx, cb);
+  }
+
+  void getPropNameIdData(
+      const jsi::PropNameID& sym,
+      void* ctx,
+      void (
+          *cb)(void* ctx, bool ascii, const void* data, size_t num)) override {
+    plain_.getPropNameIdData(sym, ctx, cb);
+  }
+
+  Object createObjectWithPrototype(const Value& prototype) override {
+    return plain_.createObjectWithPrototype(prototype);
   }
 
   Object createObject() override {
@@ -257,6 +295,14 @@ class RuntimeDecorator : public Base, private jsi::Instrumentation {
 
   void setExternalMemoryPressure(const Object& obj, size_t amt) override {
     plain_.setExternalMemoryPressure(obj, amt);
+  }
+
+  void setPrototypeOf(const Object& object, const Value& prototype) override {
+    plain_.setPrototypeOf(object, prototype);
+  }
+
+  Value getPrototypeOf(const Object& object) override {
+    return plain_.getPrototypeOf(object);
   }
 
   Value getProperty(const Object& o, const PropNameID& name) override {
@@ -350,6 +396,17 @@ class RuntimeDecorator : public Base, private jsi::Instrumentation {
       override {
     return plain_.callAsConstructor(f, args, count);
   };
+
+  void setRuntimeDataImpl(
+      const UUID& uuid,
+      const void* data,
+      void (*deleter)(const void* data)) override {
+    return plain_.setRuntimeDataImpl(uuid, data, deleter);
+  }
+
+  const void* getRuntimeDataImpl(const UUID& uuid) override {
+    return plain_.getRuntimeDataImpl(uuid);
+  }
 
   // Private data for managing scopes.
   Runtime::ScopeState* pushScope() override {
@@ -534,6 +591,11 @@ class WithRuntimeDecorator : public RuntimeDecorator<Plain, Base> {
   // the derived class.
   WithRuntimeDecorator(Plain& plain, With& with) : RD(plain), with_(with) {}
 
+  ICast* castInterface(const UUID& interfaceUUID) override {
+    Around around{with_};
+    return RD::castInterface(interfaceUUID);
+  }
+
   Value evaluateJavaScript(
       const std::shared_ptr<const Buffer>& buffer,
       const std::string& sourceURL) override {
@@ -614,6 +676,11 @@ class WithRuntimeDecorator : public RuntimeDecorator<Plain, Base> {
     Around around{with_};
     return RD::createPropNameIDFromUtf8(utf8, length);
   };
+  PropNameID createPropNameIDFromUtf16(const char16_t* utf16, size_t length)
+      override {
+    Around around{with_};
+    return RD::createPropNameIDFromUtf16(utf16, length);
+  }
   PropNameID createPropNameIDFromString(const String& str) override {
     Around around{with_};
     return RD::createPropNameIDFromString(str);
@@ -669,15 +736,51 @@ class WithRuntimeDecorator : public RuntimeDecorator<Plain, Base> {
     Around around{with_};
     return RD::createStringFromUtf8(utf8, length);
   };
+  String createStringFromUtf16(const char16_t* utf16, size_t length) override {
+    Around around{with_};
+    return RD::createStringFromUtf16(utf16, length);
+  }
   std::string utf8(const String& s) override {
     Around around{with_};
     return RD::utf8(s);
+  }
+
+  std::u16string utf16(const String& str) override {
+    Around around{with_};
+    return RD::utf16(str);
+  }
+  std::u16string utf16(const PropNameID& sym) override {
+    Around around{with_};
+    return RD::utf16(sym);
+  }
+
+  void getStringData(
+      const jsi::String& str,
+      void* ctx,
+      void (
+          *cb)(void* ctx, bool ascii, const void* data, size_t num)) override {
+    Around around{with_};
+    RD::getStringData(str, ctx, cb);
+  }
+
+  void getPropNameIdData(
+      const jsi::PropNameID& sym,
+      void* ctx,
+      void (
+          *cb)(void* ctx, bool ascii, const void* data, size_t num)) override {
+    Around around{with_};
+    RD::getPropNameIdData(sym, ctx, cb);
   }
 
   Value createValueFromJsonUtf8(const uint8_t* json, size_t length) override {
     Around around{with_};
     return RD::createValueFromJsonUtf8(json, length);
   };
+
+  Object createObjectWithPrototype(const Value& prototype) override {
+    Around around{with_};
+    return RD::createObjectWithPrototype(prototype);
+  }
 
   Object createObject() override {
     Around around{with_};
@@ -709,6 +812,16 @@ class WithRuntimeDecorator : public RuntimeDecorator<Plain, Base> {
     Around around{with_};
     RD::setNativeState(o, state);
   };
+
+  void setPrototypeOf(const Object& object, const Value& prototype) override {
+    Around around{with_};
+    RD::setPrototypeOf(object, prototype);
+  }
+
+  Value getPrototypeOf(const Object& object) override {
+    Around around{with_};
+    return RD::getPrototypeOf(object);
+  }
 
   Value getProperty(const Object& o, const PropNameID& name) override {
     Around around{with_};
@@ -863,6 +976,19 @@ class WithRuntimeDecorator : public RuntimeDecorator<Plain, Base> {
     Around around{with_};
     RD::setExternalMemoryPressure(obj, amount);
   };
+
+  void setRuntimeDataImpl(
+      const UUID& uuid,
+      const void* data,
+      void (*deleter)(const void* data)) override {
+    Around around{with_};
+    RD::setRuntimeDataImpl(uuid, data, deleter);
+  }
+
+  const void* getRuntimeDataImpl(const UUID& uuid) override {
+    Around around{with_};
+    return RD::getRuntimeDataImpl(uuid);
+  }
 
  private:
   // Wrap an RAII type around With& to guarantee after always happens.

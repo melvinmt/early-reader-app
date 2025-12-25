@@ -7,12 +7,12 @@
 
 #pragma once
 
-#include <folly/dynamic.h>
-#include <react/renderer/attributedstring/AttributedString.h>
+#include <react/renderer/attributedstring/AttributedStringBox.h>
 #include <react/renderer/attributedstring/ParagraphAttributes.h>
-#include <react/renderer/mapbuffer/MapBuffer.h>
-#include <react/renderer/mapbuffer/MapBufferBuilder.h>
 #include <react/renderer/textlayoutmanager/TextLayoutManager.h>
+
+#include <folly/dynamic.h>
+#include <react/renderer/mapbuffer/MapBuffer.h>
 
 namespace facebook::react {
 
@@ -21,19 +21,40 @@ namespace facebook::react {
  */
 class AndroidTextInputState final {
  public:
-  int64_t mostRecentEventCount{0};
+  AndroidTextInputState() = default;
 
-  /**
-   * Stores an opaque cache ID used on the Java side to refer to a specific
-   * AttributedString for measurement purposes only.
-   */
-  int64_t cachedAttributedStringId{0};
+  AndroidTextInputState(
+      AttributedStringBox attributedStringBox,
+      AttributedString reactTreeAttributedString,
+      ParagraphAttributes paragraphAttributes,
+      int64_t mostRecentEventCount)
+      : attributedStringBox(std::move(attributedStringBox)),
+        reactTreeAttributedString(std::move(reactTreeAttributedString)),
+        paragraphAttributes(std::move(paragraphAttributes)),
+        mostRecentEventCount(mostRecentEventCount) {}
+
+  AndroidTextInputState(
+      const AndroidTextInputState& previousState,
+      const folly::dynamic& data)
+      : attributedStringBox(previousState.attributedStringBox),
+        reactTreeAttributedString(previousState.reactTreeAttributedString),
+        paragraphAttributes(previousState.paragraphAttributes),
+        mostRecentEventCount(data.getDefault(
+                                     "mostRecentEventCount",
+                                     previousState.mostRecentEventCount)
+                                 .getInt()),
+        cachedAttributedStringId(data.getDefault(
+                                         "opaqueCacheId",
+                                         previousState.cachedAttributedStringId)
+                                     .getInt()) {}
+
+  folly::dynamic getDynamic() const;
+  MapBuffer getMapBuffer() const;
 
   /*
-   * All content of <TextInput> component represented as an `AttributedString`.
-   * Only set if changed from the React tree's perspective.
+   * All content of <TextInput> component.
    */
-  AttributedString attributedString{};
+  AttributedStringBox attributedStringBox;
 
   /*
    * All content of <TextInput> component represented as an `AttributedString`.
@@ -48,33 +69,15 @@ class AndroidTextInputState final {
    * Represents all visual attributes of a paragraph of text represented as
    * a ParagraphAttributes.
    */
-  ParagraphAttributes paragraphAttributes{};
+  ParagraphAttributes paragraphAttributes;
+
+  int64_t mostRecentEventCount{0};
 
   /**
-   * Communicates Android theme padding back to the ShadowNode / Component
-   * Descriptor for layout.
+   * Stores an opaque cache ID used on the Java side to refer to a specific
+   * AttributedString for measurement purposes only.
    */
-  float defaultThemePaddingStart{NAN};
-  float defaultThemePaddingEnd{NAN};
-  float defaultThemePaddingTop{NAN};
-  float defaultThemePaddingBottom{NAN};
-
-  AndroidTextInputState(
-      int64_t mostRecentEventCount,
-      AttributedString attributedString,
-      AttributedString reactTreeAttributedString,
-      ParagraphAttributes paragraphAttributes,
-      float defaultThemePaddingStart,
-      float defaultThemePaddingEnd,
-      float defaultThemePaddingTop,
-      float defaultThemePaddingBottom);
-
-  AndroidTextInputState() = default;
-  AndroidTextInputState(
-      const AndroidTextInputState& previousState,
-      const folly::dynamic& data);
-  folly::dynamic getDynamic() const;
-  MapBuffer getMapBuffer() const;
+  int64_t cachedAttributedStringId{0};
 };
 
 } // namespace facebook::react
