@@ -68,16 +68,14 @@ export default function WordSwipeDetector({
       // Determine which letter zone we're in
       const letterIndex = Math.floor((event.x - letterWidth) / letterWidth);
       if (letterIndex >= 0 && letterIndex < word.length) {
-        // Use runOnJS to safely update React state during gesture
-        runOnJS((index: number) => {
-          if (index >= currentLetterIndex) {
-            setCurrentLetterIndex(index);
-            if (!visitedLetters.has(index)) {
-              setVisitedLetters((prev) => new Set([...prev, index]));
-              onLetterEnter(index);
-            }
+        // Check if we're moving left-to-right
+        if (letterIndex >= currentLetterIndex) {
+          setCurrentLetterIndex(letterIndex);
+          if (!visitedLetters.has(letterIndex)) {
+            setVisitedLetters((prev) => new Set([...prev, letterIndex]));
+            onLetterEnter(letterIndex);
           }
-        })(letterIndex);
+        }
       }
     })
     .onEnd(() => {
