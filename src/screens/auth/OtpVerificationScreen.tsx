@@ -8,7 +8,7 @@ import { Parent } from '@/types/database';
 export default function OtpVerificationScreen() {
   const params = useLocalSearchParams();
   const email = (params.email as string) || '';
-  const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [resending, setResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const inputRefs = useRef<(TextInput | null)[]>([]);
@@ -44,7 +44,7 @@ export default function OtpVerificationScreen() {
       } else {
         Alert.alert('Success', 'A new code has been sent to your email.');
         // Clear OTP inputs
-        setOtp(['', '', '', '', '', '', '', '']);
+        setOtp(['', '', '', '', '', '']);
         inputRefs.current[0]?.focus();
         // Set 60 second cooldown
         setResendCooldown(60);
@@ -67,7 +67,7 @@ export default function OtpVerificationScreen() {
     setOtp(newOtp);
 
     // Auto-focus next input
-    if (value && index < 7) {
+    if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
   };
@@ -80,8 +80,8 @@ export default function OtpVerificationScreen() {
 
   const handleVerify = async () => {
     const token = otp.join('');
-    if (token.length !== 8) {
-      Alert.alert('Error', 'Please enter the complete 8-digit code');
+    if (token.length !== 6) {
+      Alert.alert('Error', 'Please enter the complete 6-digit code');
       return;
     }
 
@@ -89,7 +89,7 @@ export default function OtpVerificationScreen() {
 
     if (error) {
       Alert.alert('Error', error.message || 'Invalid code. Please try again.');
-      setOtp(['', '', '', '', '', '', '', '']);
+      setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } else if (session?.user) {
       // Store parent in local SQLite
@@ -116,7 +116,7 @@ export default function OtpVerificationScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Check your email</Text>
       <Text style={styles.subtitle}>
-        We sent an 8-digit code to{'\n'}
+        We sent a 6-digit code to{'\n'}
         <Text style={styles.email}>{email}</Text>
       </Text>
 
