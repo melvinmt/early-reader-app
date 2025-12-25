@@ -114,12 +114,15 @@ const styles = StyleSheet.create({
   },
   swipeArea: {
     width: '100%',
+    minHeight: 40,
+    paddingVertical: 8,
   },
   progressTrack: {
-    height: 8,
+    height: 40,
     backgroundColor: '#e0e0e0',
-    borderRadius: 4,
+    borderRadius: 20,
     overflow: 'hidden',
+    justifyContent: 'center',
   },
   progressFill: {
     height: '100%',
