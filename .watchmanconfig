@@ -1,0 +1,16 @@
+{
+  "ignore_dirs": [
+    ".git",
+    "node_modules",
+    ".expo",
+    "ios/Pods",
+    "ios/build",
+    "android/build",
+    "android/.gradle",
+    "assets"
+  ],
+  "fsevents_latency": 0.05,
+  "settle": 20
+}
+
+

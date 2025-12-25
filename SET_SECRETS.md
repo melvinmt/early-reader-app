@@ -40,3 +40,4 @@ After setting secrets, the Edge Functions will be able to call external APIs. Wi
 - **OpenAI API Key:** https://platform.openai.com/api-keys
 
 
+

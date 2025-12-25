@@ -53,3 +53,4 @@ supabase functions deploy --no-verify-jwt
 **Warning:** This removes authentication at the platform level. Your functions will be publicly accessible.
 
 
+

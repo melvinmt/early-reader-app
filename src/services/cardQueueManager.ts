@@ -20,6 +20,30 @@ import { generateWord, generateImage, segmentPhonemes } from './ai/edgeFunctions
 import { getLevel, getPhonemesUpToLevel, LEVELS } from '@/data/levels';
 import { calculateSM2, mapPronunciationToQuality } from '@/utils/sm2';
 import { validatePronunciation } from '@/utils/pronunciation';
+import { getLocale } from '@/config/locale';
+import type { DistarCard } from '@/data/distarCards';
+// Static imports for each supported locale (Metro bundler doesn't support dynamic template imports)
+import * as distarCardsEnUS from '@/data/distarCards.en-US';
+import * as distarCardsDefault from '@/data/distarCards';
+
+// Locale to cards module mapping
+const LOCALE_CARDS_MAP: Record<string, typeof distarCardsDefault> = {
+  'en-US': distarCardsEnUS,
+};
+
+// Get cards module based on locale (static mapping instead of dynamic import)
+function getDistarCardsModule() {
+  const locale = getLocale();
+  const localeModule = LOCALE_CARDS_MAP[locale];
+  
+  if (localeModule) {
+    return localeModule;
+  }
+  
+  // Fallback to default if locale-specific cards don't exist
+  console.warn(`Cards for locale ${locale} not found, falling back to default`);
+  return distarCardsDefault;
+}
 
 export interface LearningCard {
   word: string;
@@ -27,6 +51,7 @@ export interface LearningCard {
   imageUrl: string;
   progress: CardProgress | null; // null if new card
   level: number;
+  distarCard?: DistarCard; // Reference to pre-generated DISTAR card
 }
 
 export interface CardQueueResult {
@@ -63,16 +88,24 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   const newCards: LearningCard[] = [];
 
   if (cardsNeeded > 0) {
-    // Generate new cards for current level
+    // Use pre-generated DISTAR cards instead of AI generation
     for (let i = 0; i < cardsNeeded; i++) {
       try {
-        const card = await generateNewCard(childId, currentLevel, levelData.phonemes);
+        const card = await generateNewCardFromStatic(childId, currentLevel);
         if (card) {
           newCards.push(card);
         }
       } catch (error) {
-        console.error('Error generating new card:', error);
-        // Continue with other cards if one fails
+        console.error('Error loading static card:', error);
+        // Fallback to AI generation if static cards not available
+        try {
+          const aiCard = await generateNewCard(childId, currentLevel, levelData.phonemes);
+          if (aiCard) {
+            newCards.push(aiCard);
+          }
+        } catch (aiError) {
+          console.error('Error generating AI card:', aiError);
+        }
       }
     }
   }
@@ -125,7 +158,88 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
 }
 
 /**
- * Generate a new learning card
+ * Generate a new learning card from pre-generated DISTAR cards
+ */
+async function generateNewCardFromStatic(
+  childId: string,
+  level: number
+): Promise<LearningCard | null> {
+  // Get all words this child has already seen
+  const database = await initDatabase();
+  const existingWords = await database.getAllAsync<{ word: string }>(
+    `SELECT DISTINCT word FROM card_progress WHERE child_id = ?`,
+    [childId]
+  );
+  const seenWords = new Set(existingWords.map(w => w.word));
+  
+  // Load locale-specific cards
+  const cardsModule = getDistarCardsModule();
+  const { getCardsUpToLesson } = cardsModule;
+  
+  // Get available cards up to current lesson (level maps to lesson)
+  const availableCards = getCardsUpToLesson(level).filter(
+    card => !seenWords.has(card.plainText)
+  );
+  
+  if (availableCards.length === 0) {
+    console.warn('No available static cards for level', level);
+    return null;
+  }
+  
+  // Select a random card
+  const distarCard = availableCards[Math.floor(Math.random() * availableCards.length)];
+  
+  // Check if progress already exists
+  const existingProgress = await getCardProgress(childId, distarCard.plainText);
+  
+  if (existingProgress) {
+    // Card already exists, try another one
+    const remainingCards = availableCards.filter(c => c.id !== distarCard.id);
+    if (remainingCards.length === 0) return null;
+    const nextCard = remainingCards[Math.floor(Math.random() * remainingCards.length)];
+    return createLearningCardFromDistar(childId, level, nextCard);
+  }
+  
+  return createLearningCardFromDistar(childId, level, distarCard);
+}
+
+/**
+ * Create a LearningCard from a DistarCard
+ */
+async function createLearningCardFromDistar(
+  childId: string,
+  level: number,
+  distarCard: DistarCard
+): Promise<LearningCard> {
+  // Create initial progress entry
+  const progressId = `${childId}-${distarCard.plainText}-${Date.now()}`;
+  const now = new Date().toISOString();
+  const progress: CardProgress = {
+    id: progressId,
+    child_id: childId,
+    word: distarCard.plainText,
+    ease_factor: 2.5, // Default SM-2 ease factor
+    interval_days: 0, // Show immediately
+    next_review_at: now,
+    attempts: 0,
+    successes: 0,
+    last_seen_at: null,
+  };
+
+  await createOrUpdateCardProgress(progress);
+
+  return {
+    word: distarCard.plainText,
+    phonemes: distarCard.phonemes,
+    imageUrl: distarCard.imagePath, // Use static asset path
+    progress,
+    level,
+    distarCard, // Include reference to full DISTAR card data
+  };
+}
+
+/**
+ * Generate a new learning card (AI fallback - kept for backward compatibility)
  */
 async function generateNewCard(
   childId: string,
@@ -471,9 +585,13 @@ export async function getNextCard(childId: string): Promise<LearningCard | null>
     }
   }
   
-  // No available cards (all were seen recently), generate a new one
-  console.log('All existing cards were recently seen, generating new card...');
-  const card = await generateNewCard(childId, currentLevel, levelData.phonemes);
-  return card;
+  // No available cards (all were seen recently), try to get a new static card
+  console.log('All existing cards were recently seen, loading new static card...');
+  const card = await generateNewCardFromStatic(childId, currentLevel);
+  if (card) return card;
+  
+  // Fallback to AI generation if no static cards available
+  console.log('No static cards available, falling back to AI generation...');
+  return await generateNewCard(childId, currentLevel, levelData.phonemes);
 }
 

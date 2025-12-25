@@ -39,3 +39,4 @@ You should see:
 The error `"OPENAI_API_KEY not configured"` means you need to set this secret. Once set, the Edge Functions will be able to call OpenAI's Realtime API.
 
 
+

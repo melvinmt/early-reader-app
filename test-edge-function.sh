@@ -26,3 +26,4 @@ echo "2. JWT_TOKEN is valid and not expired"
 echo "3. Secrets are set: supabase secrets set GEMINI_API_KEY=your-key"
 
 
+

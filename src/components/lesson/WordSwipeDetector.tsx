@@ -1,11 +1,14 @@
 import { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useSharedValue, runOnJS } from 'react-native-reanimated';
+import { DistarCard } from '@/data/distarCards';
+import { audioPlayer } from '@/services/audio/audioPlayer';
 
 interface WordSwipeDetectorProps {
   word: string;
   phonemes: string[];
+  distarCard?: DistarCard; // Optional DISTAR card with audio paths
   onLetterEnter: (index: number) => void;
   onSwipeComplete: (success: boolean) => void;
 }
@@ -15,6 +18,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function WordSwipeDetector({
   word,
   phonemes,
+  distarCard,
   onLetterEnter,
   onSwipeComplete,
 }: WordSwipeDetectorProps) {
@@ -68,6 +72,14 @@ export default function WordSwipeDetector({
           return newSet;
         });
         onLetterEnterRef.current?.(index);
+        
+        // Play phoneme audio if available
+        if (distarCard?.phonemeAudioPaths?.[index]) {
+          audioPlayer.playSoundFromAsset(distarCard.phonemeAudioPaths[index]).catch(console.error);
+        } else if (phonemes[index]) {
+          // Fallback: play phoneme by symbol
+          audioPlayer.playPhoneme(phonemes[index]).catch(console.error);
+        }
       }
     }
   };
@@ -94,6 +106,16 @@ export default function WordSwipeDetector({
     const visitedArray = Array.from(visitedSet).sort((a, b) => a - b);
     const inOrder = visitedArray.every((val, idx) => val === idx);
     
+    // Play full word audio on successful swipe
+    if (allVisited && inOrder) {
+      if (distarCard?.audioPath) {
+        audioPlayer.playSoundFromAsset(distarCard.audioPath).catch(console.error);
+      } else {
+        // Fallback: play word
+        audioPlayer.playWord(word).catch(console.error);
+      }
+    }
+    
     // Reset state
     setVisitedLetters(new Set());
     setCurrentLetterIndex(-1);
@@ -102,6 +124,16 @@ export default function WordSwipeDetector({
     
     // Call completion handler
     handleSwipeComplete(allVisited && inOrder);
+  };
+  
+  // Handle long press for sounded-out version
+  const handleLongPress = () => {
+    if (distarCard?.soundedOutPath) {
+      audioPlayer.playSoundFromAsset(distarCard.soundedOutPath).catch(console.error);
+    } else {
+      // Fallback: play sounded-out word
+      audioPlayer.playWord(word, true).catch(console.error);
+    }
   };
 
   const panGesture = Gesture.Pan()
@@ -164,9 +196,13 @@ export default function WordSwipeDetector({
       </View>
 
       <GestureDetector gesture={panGesture}>
-        <View style={styles.swipeArea}>
-          <Text style={styles.swipeHint}>Swipe under the word</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.swipeArea}
+          onLongPress={handleLongPress}
+          delayLongPress={500}
+        >
+          <Text style={styles.swipeHint}>Swipe under the word (long press for sounded-out)</Text>
+        </TouchableOpacity>
       </GestureDetector>
     </View>
   );

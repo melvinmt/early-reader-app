@@ -6,12 +6,12 @@
     "start": "expo start",
     "start:clear": "expo start --clear",
     "start:tunnel": "expo start --tunnel",
-    "reset": "./reset-expo.sh",
-    "fix": "./fix-expo-stuck.sh",
-    "fix:ios": "./fix-ios-bundling.sh",
+    "fix": "./fix.sh",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "generate-cards": "ts-node scripts/generate-cards.ts",
+    "generate-cards:full": "ts-node scripts/generate-cards.ts --full"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -22,6 +22,7 @@
     "expo-av": "~15.0.2",
     "expo-blur": "~14.0.3",
     "expo-crypto": "~14.0.2",
+    "expo-file-system": "~17.0.1",
     "expo-router": "~4.0.0",
     "expo-sqlite": "~15.1.4",
     "expo-status-bar": "~2.0.0",
@@ -38,7 +39,11 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "@types/node": "^20.0.0",
     "@types/react": "~18.3.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.4.0",
+    "ts-node": "^10.9.0",
     "typescript": "^5.3.0"
   },
   "private": true

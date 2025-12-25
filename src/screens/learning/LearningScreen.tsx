@@ -375,12 +375,17 @@ export default function LearningScreen() {
           }}
         />
 
-        <WordDisplay word={currentCard.word} phonemes={currentCard.phonemes} />
+        <WordDisplay 
+          word={currentCard.word} 
+          phonemes={currentCard.phonemes}
+          distarCard={currentCard.distarCard}
+        />
 
         {state === 'ready' && (
           <WordSwipeDetector
             word={currentCard.word}
             phonemes={currentCard.phonemes}
+            distarCard={currentCard.distarCard}
             onLetterEnter={handleLetterEnter}
             onSwipeComplete={handleSwipeComplete}
           />

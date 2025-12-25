@@ -83,3 +83,4 @@ If you still get "Invalid JWT" errors after deployment:
 - **Token Refresh:** The app code automatically refreshes expired tokens before calling Edge Functions.
 
 
+

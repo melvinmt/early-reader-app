@@ -42,3 +42,4 @@ Use the **legacy anon key** in your client configuration. Even though it's marke
 When Supabase adds publishable key support to Edge Functions, you can migrate. For now, using the legacy anon key is the correct approach for Edge Functions with JWT verification.
 
 
+
