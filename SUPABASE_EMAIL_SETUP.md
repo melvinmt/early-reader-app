@@ -1,10 +1,10 @@
 # Supabase Email Template Configuration
 
 ## Problem
-Supabase is sending Magic Link emails instead of 6-digit OTP codes.
+Supabase is sending confirmation links instead of 6-digit OTP codes.
 
 ## Solution
-We use `signInWithOtp()` which uses the **Magic Link** email template. Configure this template to send a 6-digit OTP code that looks like a signup confirmation email by including `{{ .Token }}` instead of `{{ .ConfirmationURL }}`.
+Configure the email template used by `signInWithOtp()` to send a 6-digit OTP code that looks like a signup confirmation email by including `{{ .Token }}` instead of `{{ .ConfirmationURL }}`.
 
 ## Step-by-Step Instructions
 
@@ -16,20 +16,19 @@ We use `signInWithOtp()` which uses the **Magic Link** email template. Configure
    - Go to: **Authentication** → **Email Templates**
    - Or direct link: `https://supabase.com/dashboard/project/YOUR_PROJECT_REF/auth/templates`
 
-3. **Edit the Magic Link Template**
-   - Click on **"Magic Link"** template
+3. **Edit the Email Template**
+   - Find the template used for OTP/signup confirmation
    - This is the template used by `signInWithOtp()` method
-   - **Note:** Even though it's called "Magic Link", we configure it to send OTP codes
 
 4. **Update the Template Content**
    
    **CRITICAL:** The template must ONLY contain `{{ .Token }}` and must NOT contain `{{ .ConfirmationURL }}`.
    
-   **Current (Magic Link - WRONG):**
+   **Current (With Link - WRONG):**
    ```html
-   <h2>Magic Link</h2>
-   <p>Follow this link to login:</p>
-   <p><a href="{{ .ConfirmationURL }}">Log In</a></p>
+   <h2>Confirm Your Signup</h2>
+   <p>Follow this link to confirm:</p>
+   <p><a href="{{ .ConfirmationURL }}">Confirm</a></p>
    ```
 
    **Updated (Signup Confirmation with OTP - CORRECT):**
@@ -50,8 +49,8 @@ We use `signInWithOtp()` which uses the **Magic Link** email template. Configure
 
 ## How It Works
 
-- When `signInWithOtp()` is called, Supabase checks the Magic Link template
-- **If the template contains `{{ .ConfirmationURL }}` (even if `{{ .Token }}` is also present), it sends a Magic Link**
+- When `signInWithOtp()` is called, Supabase checks the email template
+- **If the template contains `{{ .ConfirmationURL }}` (even if `{{ .Token }}` is also present), it sends a confirmation link**
 - **If the template contains ONLY `{{ .Token }}` and NO `{{ .ConfirmationURL }}`, it sends a 6-digit OTP code**
 - **You must completely remove `{{ .ConfirmationURL }}` from the template for OTP to work**
 
@@ -76,13 +75,13 @@ After updating the template:
 
 ## Troubleshooting
 
-**Still receiving Magic Links?**
+**Still receiving confirmation links instead of OTP codes?**
 
 1. **Check the template again** - Search for `{{ .ConfirmationURL }}` and remove it completely
-2. **Check the subject line** - The subject should not reference "Magic Link"
+2. **Check the subject line** - The subject should reference "Confirm Your Signup" or similar
 3. **Wait a few minutes** - Template changes can take a few minutes to propagate
 4. **Try a different email** - Sometimes email clients cache old templates
-5. **Check if you're editing the right template** - Make sure you're editing "Magic Link", not "Confirm signup" or another template
+5. **Check if you're editing the right template** - Make sure you're editing the template used by `signInWithOtp()`
 
 ## References
 
