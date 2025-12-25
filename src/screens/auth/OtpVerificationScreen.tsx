@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '@/stores/authStore';
-import { createParent } from '@/services/storage';
+import { createParent, getParent, getChildrenByParentId } from '@/services/storage';
 import { Parent } from '@/types/database';
 
 export default function OtpVerificationScreen() {
@@ -57,7 +57,35 @@ export default function OtpVerificationScreen() {
   };
 
   const handleOtpChange = (index: number, value: string) => {
-    // Only allow digits
+    // Handle paste: if multiple digits are pasted into the first field, distribute them
+    if (index === 0 && value.length > 1) {
+      // Extract only digits from pasted text
+      const digits = value.replace(/\D/g, '').slice(0, 6);
+      
+      if (digits.length > 0) {
+        const newOtp: string[] = [];
+        // Fill fields with pasted digits
+        for (let i = 0; i < 6; i++) {
+          newOtp[i] = digits[i] || '';
+        }
+        setOtp(newOtp);
+        
+        // Focus the last filled field or the last field if all are filled
+        const lastFilledIndex = Math.min(digits.length - 1, 5);
+        inputRefs.current[lastFilledIndex]?.focus();
+        
+        // Auto-verify if all 6 digits are pasted - pass the token directly to avoid state race condition
+        if (digits.length === 6) {
+          // Use the digits directly instead of waiting for state update
+          setTimeout(() => {
+            handleVerifyWithToken(digits.join(''));
+          }, 50);
+        }
+        return;
+      }
+    }
+
+    // Single character input - only allow digits
     if (value && !/^\d$/.test(value)) {
       return;
     }
@@ -78,8 +106,7 @@ export default function OtpVerificationScreen() {
     }
   };
 
-  const handleVerify = async () => {
-    const token = otp.join('');
+  const handleVerifyWithToken = async (token: string) => {
     if (token.length !== 6) {
       Alert.alert('Error', 'Please enter the complete 6-digit code');
       return;
@@ -92,7 +119,7 @@ export default function OtpVerificationScreen() {
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } else if (session?.user) {
-      // Store parent in local SQLite
+      // Store parent in local SQLite (will be ignored if already exists)
       const parent: Parent = {
         id: session.user.id,
         email: email,
@@ -103,13 +130,30 @@ export default function OtpVerificationScreen() {
 
       try {
         await createParent(parent);
-        // Navigate to add children screen
+        
+        // Check if parent already has children
+        const existingParent = await getParent(session.user.id);
+        if (existingParent) {
+          const children = await getChildrenByParentId(session.user.id);
+          if (children.length > 0) {
+            // Parent exists and has children - go to children selection
+            router.replace('/children');
+            return;
+          }
+        }
+        
+        // New parent or no children - go to add children screen
         router.replace('/onboarding/add-children');
       } catch (error) {
         console.error('Error creating parent:', error);
         Alert.alert('Error', 'Failed to save account. Please try again.');
       }
     }
+  };
+
+  const handleVerify = async () => {
+    const token = otp.join('');
+    await handleVerifyWithToken(token);
   };
 
   return (
@@ -130,7 +174,7 @@ export default function OtpVerificationScreen() {
             onChangeText={(value) => handleOtpChange(index, value)}
             onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
             keyboardType="number-pad"
-            maxLength={1}
+            maxLength={index === 0 ? 6 : 1}
             selectTextOnFocus
           />
         ))}

@@ -7,9 +7,12 @@ echo "🧹 Cleaning Expo and Metro caches..."
 
 # Stop any running Metro/Expo processes
 echo "📴 Stopping running processes..."
-pkill -f "expo start" || true
-pkill -f "metro" || true
-pkill -f "node.*expo" || true
+pkill -9 -f "expo start" || true
+pkill -9 -f "metro" || true
+pkill -9 -f "node.*expo" || true
+pkill -9 -f "node.*metro" || true
+# Kill any process using port 8081
+lsof -ti:8081 | xargs kill -9 2>/dev/null || true
 
 # Clear Expo cache
 echo "🗑️  Clearing Expo cache..."
@@ -20,6 +23,12 @@ echo "🗑️  Clearing Metro bundler cache..."
 rm -rf $TMPDIR/metro-* 2>/dev/null || true
 rm -rf $TMPDIR/haste-map-* 2>/dev/null || true
 rm -rf $TMPDIR/react-* 2>/dev/null || true
+
+# Reset iOS Simulator connection (prevents bundling hangs)
+echo "📱 Resetting iOS Simulator connection..."
+killall Simulator 2>/dev/null || true
+xcrun simctl uninstall booted com.instareader.app 2>/dev/null || true
+sleep 1
 
 # Skip watchman - it often hangs and is not critical for Expo reset
 echo "⏭️  Skipping Watchman (optional, can cause hangs)"

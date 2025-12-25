@@ -1,0 +1,19 @@
+# Supabase Edge Functions Configuration
+# This file configures Edge Functions behavior
+
+# Disable platform-level JWT verification for all functions
+# We'll implement custom apikey verification in the function code
+# This allows us to use publishable keys while still verifying user JWTs
+[functions.generate-word]
+verify_jwt = false
+
+[functions.generate-image]
+verify_jwt = false
+
+[functions.get-realtime-token]
+verify_jwt = false
+
+[functions.segment-phonemes]
+verify_jwt = false
+
+

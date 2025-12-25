@@ -55,7 +55,14 @@ Deno.serve(async (req: Request) => {
     }
 
     // Parse request body
-    const { prompt, word } = await req.json();
+    const { word } = await req.json();
+
+    if (!word || typeof word !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'Missing required parameter: word' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (!GEMINI_API_KEY) {
       return new Response(
@@ -64,11 +71,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const imagePrompt = prompt || `A simple, friendly cartoon illustration of ${word || 'a word'}, child-friendly style, white background, no text`;
+    // Segment word into phonemes using Gemini
+    const prompt = `Break down the word "${word}" into its individual phonemes (sounds). Return ONLY a JSON array of phonemes, nothing else. Example: ["m", "a", "t"]`;
 
-    // Call Nano Banana (Gemini Image Generation)
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: {
@@ -79,7 +86,7 @@ Deno.serve(async (req: Request) => {
             {
               parts: [
                 {
-                  text: imagePrompt,
+                  text: prompt,
                 },
               ],
             },
@@ -91,23 +98,26 @@ Deno.serve(async (req: Request) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Gemini API error:', errorText);
-      throw new Error(`Image generation error: ${response.statusText}`);
+      throw new Error(`Gemini API error: ${response.statusText}`);
     }
 
     const data = await response.json();
-    
-    // Extract base64 image from response
-    const imageBase64 = data.candidates[0]?.content?.parts[0]?.inlineData?.data || '';
+    const phonemesText = data.candidates[0]?.content?.parts[0]?.text?.trim() || '';
 
-    if (!imageBase64) {
-      throw new Error('No image data returned from Gemini');
+    // Try to parse as JSON array, fallback to simple character split
+    let phonemes: string[] = [];
+    try {
+      phonemes = JSON.parse(phonemesText);
+      if (!Array.isArray(phonemes)) {
+        throw new Error('Not an array');
+      }
+    } catch {
+      // Fallback: split word into characters
+      phonemes = word.split('');
     }
 
-    // Return base64 data URL (client will handle storage)
-    const imageUrl = `data:image/png;base64,${imageBase64}`;
-
     return new Response(
-      JSON.stringify({ imageUrl }),
+      JSON.stringify({ phonemes }),
       {
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +126,7 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error: any) {
-    console.error('Error generating image:', error);
+    console.error('Error segmenting phonemes:', error);
     return new Response(
       JSON.stringify({ error: error.message || 'Internal server error' }),
       {

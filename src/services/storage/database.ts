@@ -101,8 +101,9 @@ async function createTables(database: SQLite.SQLiteDatabase) {
 // Parent CRUD operations
 export async function createParent(parent: Parent): Promise<void> {
   const database = await initDatabase();
+  // Use INSERT OR IGNORE to handle existing parents gracefully
   await database.runAsync(
-    `INSERT INTO parents (id, email, created_at, subscription_status, settings)
+    `INSERT OR IGNORE INTO parents (id, email, created_at, subscription_status, settings)
      VALUES (?, ?, ?, ?, ?)`,
     [parent.id, parent.email, parent.created_at, parent.subscription_status, parent.settings]
   );
@@ -305,6 +306,8 @@ export async function getSessionsByChildId(childId: string): Promise<Session[]> 
   );
   return result;
 }
+
+
 
 
 

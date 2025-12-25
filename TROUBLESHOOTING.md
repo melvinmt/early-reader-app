@@ -121,6 +121,51 @@ npm run fix
 ./fix-expo-stuck.sh
 ```
 
+### 8. **iOS Bundling Stuck at 100%** (Most Common After Restart)
+iOS bundling shows 100% but never completes. This happens when:
+- Metro bundler is waiting for simulator acknowledgment
+- Simulator has stale connection
+- Bundle cache is corrupted
+
+**Symptoms:**
+- `iOS node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ 100.0% (1086/1228)`
+- Stuck at 100% and never finishes
+- Happens frequently after restarting `npm start`
+
+**Quick Fix:**
+```bash
+npm run fix:ios
+```
+
+This runs `fix-ios-bundling.sh` which:
+1. Kills all Metro bundler processes
+2. Resets iOS Simulator connection
+3. Clears Metro bundler cache
+4. Uninstalls app from simulator
+5. Starts fresh with `--clear` flag
+
+**Manual Steps:**
+```bash
+# Kill Metro
+pkill -9 -f metro
+lsof -ti:8081 | xargs kill -9
+
+# Reset simulator
+killall Simulator
+xcrun simctl uninstall booted com.instareader.app
+
+# Clear cache
+rm -rf $TMPDIR/metro-* $TMPDIR/haste-map-*
+
+# Restart
+npm run start:clear
+```
+
+**Prevention:**
+- Always use `npm run start:clear` instead of `npm start` after restarting
+- Wait for Metro to fully start before opening iOS Simulator
+- If bundling hangs, press `Ctrl+C` and run `npm run fix:ios`
+
 ## Quick Fix Commands
 
 ### Nuclear Option (Most Thorough)
@@ -206,5 +251,6 @@ npm run start:tunnel
    curl http://localhost:8081
    # Or use your Mac's IP address
    ```
+
 
 

@@ -8,6 +8,7 @@
     "start:tunnel": "expo start --tunnel",
     "reset": "./reset-expo.sh",
     "fix": "./fix-expo-stuck.sh",
+    "fix:ios": "./fix-ios-bundling.sh",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web"

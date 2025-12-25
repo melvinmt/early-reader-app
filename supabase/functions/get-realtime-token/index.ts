@@ -1,8 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 const EXPECTED_PUBLISHABLE_KEY = Deno.env.get('PUBLISHABLE_KEY') ?? '';
 
 Deno.serve(async (req: Request) => {
@@ -54,60 +54,42 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Parse request body
-    const { prompt, word } = await req.json();
-
-    if (!GEMINI_API_KEY) {
+    if (!OPENAI_API_KEY) {
       return new Response(
-        JSON.stringify({ error: 'GEMINI_API_KEY not configured' }),
+        JSON.stringify({ error: 'OPENAI_API_KEY not configured' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const imagePrompt = prompt || `A simple, friendly cartoon illustration of ${word || 'a word'}, child-friendly style, white background, no text`;
-
-    // Call Nano Banana (Gemini Image Generation)
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: imagePrompt,
-                },
-              ],
-            },
-          ],
-        }),
-      }
-    );
+    // Get ephemeral token from OpenAI Realtime API
+    const response = await fetch('https://api.openai.com/v1/realtime/models/gpt-4o-realtime-preview-2024-12-17/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-realtime-preview-2024-12-17',
+        voice: 'alloy',
+        instructions: 'You are a helpful reading tutor for children learning to read.',
+      }),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Gemini API error:', errorText);
-      throw new Error(`Image generation error: ${response.statusText}`);
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${response.statusText}`);
     }
 
     const data = await response.json();
-    
-    // Extract base64 image from response
-    const imageBase64 = data.candidates[0]?.content?.parts[0]?.inlineData?.data || '';
+    const ephemeralToken = data.client_secret?.value || data.token || '';
 
-    if (!imageBase64) {
-      throw new Error('No image data returned from Gemini');
+    if (!ephemeralToken) {
+      throw new Error('No ephemeral token returned from OpenAI');
     }
 
-    // Return base64 data URL (client will handle storage)
-    const imageUrl = `data:image/png;base64,${imageBase64}`;
-
     return new Response(
-      JSON.stringify({ imageUrl }),
+      JSON.stringify({ token: ephemeralToken }),
       {
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +98,7 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error: any) {
-    console.error('Error generating image:', error);
+    console.error('Error getting ephemeral token:', error);
     return new Response(
       JSON.stringify({ error: error.message || 'Internal server error' }),
       {
