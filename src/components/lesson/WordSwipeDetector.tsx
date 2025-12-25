@@ -139,32 +139,23 @@ export default function WordSwipeDetector({
   const panGesture = Gesture.Pan()
     .onStart((event) => {
       startX.value = event.x;
-      translateX.value = 0; // Track relative position, not absolute
+      translateX.value = 0;
     })
     .onUpdate((event) => {
-      // Track relative movement for visual feedback only (not used for animation)
       translateX.value = event.x - startX.value;
 
       // Determine which letter zone we're in based on absolute position
       const letterIndex = Math.floor((event.x - letterWidth) / letterWidth);
       if (letterIndex >= 0 && letterIndex < word.length) {
-        // Use runOnJS to safely update React state from gesture handler
-        // Check against ref value (not React state) to avoid crashes
         if (letterIndex >= currentLetterIndexRef.current) {
           runOnJS(updateLetterState)(letterIndex);
         }
       }
     })
     .onEnd(() => {
-      // Reset tracking value
       translateX.value = 0;
-      
-      // Use runOnJS to safely call the handler
       runOnJS(handleSwipeEnd)();
     });
-
-  // No animation style - swipe area stays in place
-  // We only track the gesture, not animate the UI
 
   return (
     <View style={styles.container}>
@@ -200,8 +191,10 @@ export default function WordSwipeDetector({
           style={styles.swipeArea}
           onLongPress={handleLongPress}
           delayLongPress={500}
+          activeOpacity={0.8}
         >
-          <Text style={styles.swipeHint}>Swipe under the word (long press for sounded-out)</Text>
+          <Text style={styles.swipeHint}>👆 Swipe under the letters</Text>
+          <Text style={styles.swipeSubHint}>Long press to hear it sounded out</Text>
         </TouchableOpacity>
       </GestureDetector>
     </View>
@@ -217,56 +210,68 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginBottom: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 16,
+    paddingVertical: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   letterZone: {
     alignItems: 'center',
     padding: 8,
+    borderRadius: 8,
   },
   letterZoneActive: {
-    backgroundColor: '#E3F2FD',
-    borderRadius: 8,
+    backgroundColor: 'rgba(33, 150, 243, 0.3)',
   },
   letterZoneVisited: {
-    backgroundColor: '#C8E6C9',
-    borderRadius: 8,
+    backgroundColor: 'rgba(76, 175, 80, 0.3)',
   },
   letter: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
+    color: '#333',
     marginBottom: 8,
   },
   letterVisited: {
-    color: '#4CAF50',
+    color: '#2E7D32',
   },
   guide: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   guideDot: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 10,
+    color: '#999',
   },
   guideArrow: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 10,
+    color: '#999',
+    marginLeft: 2,
   },
   swipeArea: {
-    height: 60,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
+    height: 80,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   swipeHint: {
-    fontSize: 14,
+    fontSize: 18,
+    color: '#333',
+    fontWeight: '600',
+  },
+  swipeSubHint: {
+    fontSize: 12,
     color: '#666',
+    marginTop: 4,
   },
 });
-
-
-
-
-
-
-
-

@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Image, StyleSheet, Animated, Text } from 'react-native';
+import { View, Image, StyleSheet, Animated, Text, Dimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface BlurredImageRevealProps {
   imageUri: string;
   isRevealed: boolean;
+  isFullScreen?: boolean; // When true, image fills entire screen
   onRevealComplete?: () => void;
 }
 
 export default function BlurredImageReveal({
   imageUri,
   isRevealed,
+  isFullScreen = false,
   onRevealComplete,
 }: BlurredImageRevealProps) {
   const blurIntensity = useRef(new Animated.Value(50)).current; // Start with heavy blur (0-100)
@@ -22,7 +26,7 @@ export default function BlurredImageReveal({
       Animated.parallel([
         Animated.timing(blurIntensity, {
           toValue: 0,
-          duration: 800,
+          duration: 1200, // Slightly longer for full reveal experience
           useNativeDriver: false, // Blur doesn't support native driver
         }),
         Animated.timing(opacityAnimation, {
@@ -56,7 +60,7 @@ export default function BlurredImageReveal({
   // Don't render if no image URI
   if (!imageUri) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, isFullScreen && styles.fullScreenContainer]}>
         <View style={styles.placeholder}>
           <Text style={styles.placeholderText}>Image loading...</Text>
         </View>
@@ -65,9 +69,13 @@ export default function BlurredImageReveal({
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.imageContainer}>
-        <Image source={{ uri: imageUri }} style={styles.image} resizeMode="contain" />
+    <View style={[styles.container, isFullScreen && styles.fullScreenContainer]}>
+      <View style={[styles.imageContainer, isFullScreen && styles.fullScreenImageContainer]}>
+        <Image 
+          source={{ uri: imageUri }} 
+          style={[styles.image, isFullScreen && styles.fullScreenImage]} 
+          resizeMode="cover" 
+        />
         
         {/* Real Gaussian blur overlay that animates */}
         {currentBlur > 0 && (
@@ -79,7 +87,7 @@ export default function BlurredImageReveal({
         )}
       </View>
 
-      {!isRevealed && (
+      {!isRevealed && !isFullScreen && (
         <Animated.View
           style={[
             styles.overlay,
@@ -104,13 +112,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  fullScreenContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    zIndex: 0,
+  },
   imageContainer: {
     width: '100%',
     height: '100%',
   },
+  fullScreenImageContainer: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
   image: {
     width: '100%',
     height: '100%',
+  },
+  fullScreenImage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
   },
   overlay: {
     position: 'absolute',
@@ -146,11 +172,3 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 });
-
-
-
-
-
-
-
-

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getCardQueue, recordCardCompletion, getNextCard, LearningCard } from '@/services/cardQueueManager';
 import { validatePronunciation } from '@/utils/pronunciation';
@@ -11,7 +11,9 @@ import ConfettiCelebration from '@/components/ui/ConfettiCelebration';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { createSession, updateSession } from '@/services/storage/database';
 
-type LearningState = 'loading' | 'ready' | 'processing' | 'complete';
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+type LearningState = 'loading' | 'ready' | 'revealing' | 'processing' | 'complete';
 
 export default function LearningScreen() {
   const params = useLocalSearchParams();
@@ -28,6 +30,9 @@ export default function LearningScreen() {
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  // Animation for UI fade out during reveal
+  const uiOpacity = useRef(new Animated.Value(1)).current;
 
   // Pre-loaded next card (loaded in background)
   const nextCardRef = useRef<LearningCard | null>(null);
@@ -66,9 +71,6 @@ export default function LearningScreen() {
         cards_completed: 0,
         duration_seconds: 0,
       });
-
-      // Voice service disabled for now - can be added later
-      // Voice is optional and not required for core functionality
     } catch (error) {
       console.error('Error initializing session:', error);
     }
@@ -76,8 +78,6 @@ export default function LearningScreen() {
 
   const cleanup = async () => {
     try {
-      // Voice service disabled - no cleanup needed
-      
       if (sessionId && sessionStartTime) {
         const duration = Math.floor((Date.now() - sessionStartTime.getTime()) / 1000);
         await updateSession(sessionId, new Date().toISOString(), cardsCompleted, duration);
@@ -87,23 +87,50 @@ export default function LearningScreen() {
     }
   };
 
+  // Play prompt audio when card is ready
+  const playPromptAudio = async (card: LearningCard) => {
+    try {
+      if (card.distarCard?.promptPath) {
+        await audioPlayer.playSoundFromAsset(card.distarCard.promptPath);
+      }
+    } catch (error) {
+      console.error('Error playing prompt audio:', error);
+    }
+  };
+
+  // Play word audio when user taps the word
+  const handleWordTap = () => {
+    if (currentCard?.distarCard?.audioPath) {
+      audioPlayer.playSoundFromAsset(currentCard.distarCard.audioPath).catch(console.error);
+    }
+  };
+
+  // Play great job audio on successful swipe
+  const playGreatJobAudio = async () => {
+    try {
+      if (currentCard?.distarCard?.greatJobPath) {
+        await audioPlayer.playSoundFromAsset(currentCard.distarCard.greatJobPath);
+      }
+    } catch (error) {
+      console.error('Error playing great job audio:', error);
+    }
+  };
+
   // Pre-load next card in background (doesn't interfere with current card)
   const preloadNextCard = async () => {
-    if (isLoadingNextRef.current) return; // Already loading
+    if (isLoadingNextRef.current) return;
     
     try {
       isLoadingNextRef.current = true;
       const card = await getNextCard(childId);
       
       if (card) {
-        // Validate and prepare the card
         if (!card.word) {
           console.warn('Pre-loaded card missing word, will skip');
           nextCardRef.current = null;
           return;
         }
         
-        // Ensure phonemes exist
         if (!card.phonemes || card.phonemes.length === 0) {
           card.phonemes = card.word.split('');
         }
@@ -123,13 +150,15 @@ export default function LearningScreen() {
 
   const loadNextCard = async () => {
     try {
+      // Reset UI opacity for new card
+      uiOpacity.setValue(1);
+      
       // Check if we have a pre-loaded card ready
       if (nextCardRef.current) {
         console.log('Using pre-loaded card:', nextCardRef.current.word);
         const preloadedCard = nextCardRef.current;
-        nextCardRef.current = null; // Clear it
+        nextCardRef.current = null;
         
-        // Use pre-loaded card immediately (no loading state needed)
         setCurrentCard(preloadedCard);
         setIsImageRevealed(false);
         setAttempts(0);
@@ -137,6 +166,9 @@ export default function LearningScreen() {
         voiceTranscriptRef.current = '';
         voicePhonemesRef.current = [];
         setState('ready');
+        
+        // Play prompt audio for the new card
+        playPromptAudio(preloadedCard);
         
         // Immediately start loading the next card in background
         preloadNextCard();
@@ -149,7 +181,6 @@ export default function LearningScreen() {
       const card = await getNextCard(childId);
       
       if (!card) {
-        // No more cards
         Alert.alert('Great job!', 'You\'ve completed all available cards for today.');
         router.back();
         return;
@@ -158,12 +189,10 @@ export default function LearningScreen() {
       console.log('Card loaded:', { 
         word: card.word, 
         phonemes: card.phonemes, 
-        phonemesLength: card.phonemes?.length,
-        imageUrl: card.imageUrl,
-        hasImage: !!card.imageUrl 
+        hasImage: !!card.imageUrl,
+        hasPrompt: !!card.distarCard?.promptPath,
       });
       
-      // Validate card has required data
       if (!card.word) {
         console.error('Card missing word:', card);
         Alert.alert('Error', 'Card is missing word. Please try again.');
@@ -171,16 +200,9 @@ export default function LearningScreen() {
         return;
       }
       
-      // Ensure phonemes exist (fallback to word characters if missing)
       if (!card.phonemes || card.phonemes.length === 0) {
         console.warn('Card missing phonemes, using word characters:', card.word);
         card.phonemes = card.word.split('');
-      }
-      
-      // Image URL is optional - can be generated later or use placeholder
-      if (!card.imageUrl) {
-        console.warn('Card missing image URL, will generate on swipe');
-        // Image will be generated when needed
       }
 
       setCurrentCard(card);
@@ -191,40 +213,41 @@ export default function LearningScreen() {
       voicePhonemesRef.current = [];
       setState('ready');
 
-      // Start pre-loading the next card in background (non-blocking)
-      preloadNextCard();
+      // Play prompt audio for the new card
+      playPromptAudio(card);
 
-      // Voice service disabled - skip context injection
+      // Start pre-loading the next card in background
+      preloadNextCard();
     } catch (error) {
       console.error('Error loading card:', error);
       Alert.alert('Error', `Failed to load card: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      // Don't navigate back, allow retry
     }
   };
 
-  // Voice service disabled - handler removed
-
   const handleLetterEnter = async (index: number) => {
-    // Audio disabled for now
-    // if (currentCard && currentCard.phonemes[index]) {
-    //   audioPlayer.playPhoneme(currentCard.phonemes[index]).catch((err) => {
-    //     console.warn('Could not play phoneme sound:', err);
-    //   });
-    // }
+    // Phoneme audio is handled in WordSwipeDetector
   };
 
   const handleSwipeComplete = async (success: boolean) => {
     if (!currentCard) return;
 
     if (success) {
-      // Swipe was successful - reveal image immediately
-      setIsImageRevealed(true);
+      // Start revealing state - hide UI and show fullscreen image
+      setState('revealing');
       
-      // Process card as successful (voice is optional enhancement)
-      // The core flow is: swipe → image revealed → card complete
-      await processCardResult(true);
+      // Fade out UI
+      Animated.timing(uiOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      
+      // Play great job audio
+      playGreatJobAudio();
+      
+      // Reveal image
+      setIsImageRevealed(true);
     } else {
-      // Swipe failed, try again
       setAttempts(attempts + 1);
       if (attempts >= 2) {
         setNeededHelp(true);
@@ -233,92 +256,42 @@ export default function LearningScreen() {
     }
   };
 
-  const processCardResult = async (swipeSuccess: boolean) => {
-    if (!currentCard) {
-      console.error('processCardResult called but currentCard is null');
-      return;
-    }
+  const handleRevealComplete = async () => {
+    if (!currentCard) return;
 
     try {
-      setState('processing');
+      // Record completion
+      await recordCardCompletion(childId, currentCard.word, {
+        success: true,
+        attempts: attempts + 1,
+        matchScore: 1.0,
+        neededHelp,
+      });
 
-      // Validate pronunciation (voice is optional - if no voice, use swipe success)
-      // Core flow: swipe success = card success
-      const hasVoiceTranscript = voiceTranscriptRef.current && voiceTranscriptRef.current !== '';
-      const pronunciationResult = hasVoiceTranscript
-        ? validatePronunciation(
-            currentCard.word,
-            currentCard.phonemes,
-            voiceTranscriptRef.current,
-            voicePhonemesRef.current.length > 0 ? voicePhonemesRef.current : undefined
-          )
-        : { isCorrect: true, matchScore: 1.0 }; // If no voice, swipe success = correct
-
-      // Overall success: swipe must succeed, and if voice is available, pronunciation must be correct
-      // If voice is not available, swipe success is sufficient
-      const overallSuccess = swipeSuccess && (hasVoiceTranscript ? pronunciationResult.isCorrect : true);
-
-      // Record completion (with error handling)
-      try {
-        await recordCardCompletion(childId, currentCard.word, {
-          success: overallSuccess,
-          attempts: attempts + 1,
-          matchScore: pronunciationResult.matchScore,
-          neededHelp,
-        });
-      } catch (recordError) {
-        console.error('Error recording card completion:', recordError);
-        // Continue even if recording fails - don't block the UI
-      }
-
-      if (overallSuccess) {
-        // Success! Show confetti and move to next card
-        // Audio disabled for now
-        // audioPlayer.playSuccess().catch((err) => {
-        //   console.warn('Could not play success sound:', err);
-        // });
-        
-        setShowConfetti(true);
-        setCardsCompleted(cardsCompleted + 1);
-        setProgress((cardsCompleted + 1) / 10); // Assuming 10 cards per session
-        
-        // Brief delay to show success, then move to next card
-        setTimeout(() => {
-          setShowConfetti(false);
-          setState('ready');
-          loadNextCard();
-        }, 2000);
-      } else {
-        // Try again (shouldn't happen with swipe-only flow, but keep for safety)
-        // Audio disabled for now
-        // audioPlayer.playTryAgain().catch((err) => {
-        //   console.warn('Could not play try again sound:', err);
-        // });
-        
-        setAttempts(attempts + 1);
-        setIsImageRevealed(false);
+      setCardsCompleted(cardsCompleted + 1);
+      setProgress((cardsCompleted + 1) / 10);
+      
+      // Wait a moment to enjoy the revealed image, then move to next card
+      setTimeout(() => {
+        setShowConfetti(false);
         setState('ready');
-        
-        if (attempts >= 2) {
-          // After 3 attempts, move on
-          Alert.alert('Keep practicing!', 'Let\'s try the next word.');
-          loadNextCard();
-        }
-      }
+        loadNextCard();
+      }, 2500); // Show revealed image for 2.5 seconds
     } catch (error) {
-      console.error('Error processing card result:', error);
-      // Don't show alert - just log and continue
-      // Reset to ready state so user can try again
+      console.error('Error recording completion:', error);
       setState('ready');
+      loadNextCard();
     }
   };
 
   const handleHelp = () => {
     if (!currentCard) return;
     setNeededHelp(true);
-    setIsImageRevealed(true);
-    // Play word audio
-    // In production, use TTS to speak the word
+    
+    // Play the word audio to help
+    if (currentCard.distarCard?.audioPath) {
+      audioPlayer.playSoundFromAsset(currentCard.distarCard.audioPath).catch(console.error);
+    }
   };
 
   const handleSkip = async () => {
@@ -348,65 +321,87 @@ export default function LearningScreen() {
 
   if (state === 'loading' || !currentCard) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
         <Text style={styles.loadingText}>Loading your next word...</Text>
       </View>
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.levelText}>Level {currentCard.level}</Text>
-        <Text style={styles.progressText}>
-          {cardsCompleted} / 10 cards
-        </Text>
-      </View>
-
-      <ProgressBar progress={progress} style={styles.progressBar} />
-
-      <View style={styles.content}>
+  // During reveal: show only the fullscreen unblurring image
+  if (state === 'revealing') {
+    return (
+      <View style={styles.container}>
         <BlurredImageReveal
           imageUri={currentCard.imageUrl}
           isRevealed={isImageRevealed}
-          onRevealComplete={() => {
-            // Image reveal animation complete
-          }}
+          isFullScreen={true}
+          onRevealComplete={handleRevealComplete}
         />
-
-        <WordDisplay 
-          word={currentCard.word} 
-          phonemes={currentCard.phonemes}
-          distarCard={currentCard.distarCard}
+        <ConfettiCelebration
+          visible={true}
+          onComplete={() => {}}
         />
+      </View>
+    );
+  }
 
-        {state === 'ready' && (
-          <WordSwipeDetector
-            word={currentCard.word}
+  return (
+    <View style={styles.container}>
+      {/* Full-screen blurred background image */}
+      <BlurredImageReveal
+        imageUri={currentCard.imageUrl}
+        isRevealed={false}
+        isFullScreen={true}
+      />
+
+      {/* UI overlay on top of the background */}
+      <Animated.View style={[styles.uiOverlay, { opacity: uiOpacity }]}>
+        <View style={styles.header}>
+          <Text style={styles.levelText}>Level {currentCard.level}</Text>
+          <Text style={styles.progressText}>
+            {cardsCompleted} / 10 cards
+          </Text>
+        </View>
+
+        <ProgressBar progress={progress} style={styles.progressBar} />
+
+        <View style={styles.content}>
+          <WordDisplay 
+            word={currentCard.word} 
             phonemes={currentCard.phonemes}
             distarCard={currentCard.distarCard}
-            onLetterEnter={handleLetterEnter}
-            onSwipeComplete={handleSwipeComplete}
+            onWordTap={handleWordTap}
+            style={styles.wordDisplay}
           />
-        )}
 
-        {state === 'processing' && (
-          <View style={styles.processingContainer}>
-            <ActivityIndicator size="large" color="#34C759" />
-            <Text style={styles.processingText}>Great job!</Text>
-          </View>
-        )}
-      </View>
+          {state === 'ready' && (
+            <WordSwipeDetector
+              word={currentCard.word}
+              phonemes={currentCard.phonemes}
+              distarCard={currentCard.distarCard}
+              onLetterEnter={handleLetterEnter}
+              onSwipeComplete={handleSwipeComplete}
+            />
+          )}
 
-      <View style={styles.actions}>
-        <Text style={styles.helpButton} onPress={handleHelp}>
-          Need help?
-        </Text>
-        <Text style={styles.skipButton} onPress={handleSkip}>
-          Skip
-        </Text>
-      </View>
+          {state === 'processing' && (
+            <View style={styles.processingContainer}>
+              <ActivityIndicator size="large" color="#34C759" />
+              <Text style={styles.processingText}>Great job!</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.actions}>
+          <Text style={styles.helpButton} onPress={handleHelp}>
+            Need help?
+          </Text>
+          <Text style={styles.skipButton} onPress={handleSkip}>
+            Skip
+          </Text>
+        </View>
+      </Animated.View>
 
       <ConfettiCelebration
         visible={showConfetti}
@@ -419,7 +414,17 @@ export default function LearningScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
+  },
+  loadingContainer: {
+    flex: 1,
     backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uiOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -431,11 +436,17 @@ const styles = StyleSheet.create({
   levelText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#666',
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   progressText: {
     fontSize: 16,
-    color: '#666',
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   progressBar: {
     marginHorizontal: 24,
@@ -446,26 +457,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
+  wordDisplay: {
+    marginBottom: 24,
+  },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-  },
-  listeningContainer: {
-    alignItems: 'center',
-    marginTop: 32,
-  },
-  listeningText: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  hintText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#666',
   },
   processingContainer: {
     alignItems: 'center',
@@ -485,15 +484,22 @@ const styles = StyleSheet.create({
   },
   helpButton: {
     fontSize: 16,
-    color: '#007AFF',
+    color: '#fff',
     fontWeight: '600',
+    backgroundColor: 'rgba(0, 122, 255, 0.8)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   skipButton: {
     fontSize: 16,
-    color: '#FF3B30',
+    color: '#fff',
     fontWeight: '600',
+    backgroundColor: 'rgba(255, 59, 48, 0.8)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
 });
-
-
-
