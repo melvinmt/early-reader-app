@@ -26,11 +26,23 @@ export default function SubscriptionScreen() {
   const [purchasesAvailable, setPurchasesAvailable] = useState(false);
 
   useEffect(() => {
-    // RevenueCat works in Browser Mode in Expo Go, so we can initialize it
-    if (Purchases) {
+    // Only initialize RevenueCat on web platform or in production native builds
+    // Skip in Expo Go to avoid Browser Mode issues
+    if (Purchases && Platform.OS === 'web') {
+      // Web platform - Browser Mode should work
       initializeRevenueCat();
+    } else if (Purchases && Platform.OS !== 'web') {
+      // Native platform - only initialize if not in Expo Go
+      // In Expo Go, Purchases won't be available anyway, so this is a safety check
+      try {
+        initializeRevenueCat();
+      } catch (e) {
+        console.log('RevenueCat not available in Expo Go');
+        setInitializing(false);
+        setPurchasesAvailable(false);
+      }
     } else {
-      // If Purchases is not available, still show the screen but mark as unavailable
+      // Purchases not available (Expo Go or missing package)
       setInitializing(false);
       setPurchasesAvailable(false);
     }
@@ -40,24 +52,68 @@ export default function SubscriptionScreen() {
     try {
       if (!session?.user) {
         Alert.alert('Error', 'Please sign in first');
+        setInitializing(false);
+        return;
+      }
+
+      const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
+      if (!apiKey) {
+        console.warn('RevenueCat API key not found in environment variables');
+        setPurchasesAvailable(false);
+        setInitializing(false);
         return;
       }
 
       // Initialize RevenueCat with user ID
-      await Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
-      await Purchases.configure({
-        apiKey: process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || '',
-      });
-      await Purchases.logIn(session.user.id);
+      // Only set log level if available (may not be in Browser Mode)
+      if (Purchases.setLogLevel) {
+        try {
+          await Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+        } catch (e) {
+          // Log level setting may fail in Browser Mode, continue anyway
+          console.log('Could not set RevenueCat log level:', e);
+        }
+      }
+
+      // Configure RevenueCat
+      // In Browser Mode, configure may work differently
+      try {
+        await Purchases.configure({
+          apiKey: apiKey,
+        });
+      } catch (configureError: any) {
+        // If configure fails due to browser API issues, try alternative initialization
+        if (configureError?.message?.includes('search') || configureError?.message?.includes('undefined')) {
+          console.warn('RevenueCat Browser Mode initialization issue, using fallback');
+          // Try to continue without full initialization - Browser Mode may still work
+        } else {
+          throw configureError;
+        }
+      }
+
+      // Log in user
+      if (Purchases.logIn) {
+        await Purchases.logIn(session.user.id);
+      }
 
       // Get available packages
-      const offerings = await Purchases.getOfferings();
-      if (offerings.current) {
-        setPackages(offerings.current.availablePackages);
-        setPurchasesAvailable(true);
+      if (Purchases.getOfferings) {
+        const offerings = await Purchases.getOfferings();
+        if (offerings?.current) {
+          setPackages(offerings.current.availablePackages || []);
+          setPurchasesAvailable(true);
+        } else {
+          setPurchasesAvailable(false);
+        }
+      } else {
+        setPurchasesAvailable(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error initializing RevenueCat:', error);
+      // If it's a browser API error, mark as unavailable but don't show error to user
+      if (error?.message?.includes('search') || error?.message?.includes('undefined')) {
+        console.warn('RevenueCat Browser Mode not fully supported in this environment');
+      }
       setPurchasesAvailable(false);
     } finally {
       setInitializing(false);
