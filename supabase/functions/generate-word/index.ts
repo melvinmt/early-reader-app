@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Parse request body
-    const { level, phonemes, childId } = await req.json();
+    const { level, phonemes, childId, excludedWords = [] } = await req.json();
 
     if (!level || !phonemes || !Array.isArray(phonemes) || !childId) {
       return new Response(
@@ -72,8 +72,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Generate word using Gemini
-    const prompt = `Generate a simple, phonetically regular word suitable for a ${level}-year-old learning to read. The word must use ONLY these phonemes in order: ${phonemes.join(', ')}. Return ONLY the word itself, nothing else.`;
+    // Generate word using Gemini with variation
+    const excludeText = excludedWords.length > 0 
+      ? ` Do NOT use these words (already seen): ${excludedWords.join(', ')}.` 
+      : '';
+    
+    const variationHint = excludedWords.length > 0
+      ? ' Generate a DIFFERENT word than the ones already seen. Be creative and vary your responses.'
+      : '';
+    
+    const prompt = `Generate a simple, phonetically regular word suitable for a ${level}-year-old learning to read. The word must use ONLY these phonemes in order: ${phonemes.join(', ')}.${excludeText}${variationHint} Return ONLY the word itself, nothing else.`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,

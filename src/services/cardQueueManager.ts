@@ -12,6 +12,7 @@ import {
   incrementChildCardsCompleted,
   createOrUpdateContentCache,
   getContentCache,
+  initDatabase,
 } from './storage/database';
 import { CardProgress, Child } from '@/types/database';
 import { generateWord, segmentPhonemes } from './ai/edgeFunctions';
@@ -130,24 +131,34 @@ async function generateNewCard(
   level: number,
   phonemes: string[]
 ): Promise<LearningCard | null> {
+  // Get all words this child has already seen to exclude them
+  const database = await initDatabase();
+  const existingWords = await database.getAllAsync<{ word: string }>(
+    `SELECT DISTINCT word FROM card_progress WHERE child_id = ?`,
+    [childId]
+  );
+  let excludedWords = existingWords.map(w => w.word);
+  
   // Retry up to 5 times to get a unique word
   const maxRetries = 5;
   let attempts = 0;
   
   while (attempts < maxRetries) {
     try {
-      // Generate word via AI
+      // Generate word via AI, passing excluded words for variation
       const generated = await generateWord({
         level,
         phonemes,
         childId,
+        excludedWords: excludedWords, // Pass excluded words to get variation
       });
 
       // Check if we already have progress for this word
       const existingProgress = await getCardProgress(childId, generated.word);
 
       if (existingProgress) {
-        // Word already exists, try again
+        // Word already exists, add it to excluded list and try again
+        excludedWords.push(generated.word);
         attempts++;
         console.log(`Word "${generated.word}" already exists, retrying (${attempts}/${maxRetries})...`);
         continue;

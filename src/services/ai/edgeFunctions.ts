@@ -56,6 +56,7 @@ export interface GenerateWordParams {
   level: number;
   phonemes: string[];
   childId: string;
+  excludedWords?: string[]; // Words to exclude for variation
 }
 
 /**
@@ -73,6 +74,7 @@ export async function generateWord(params: GenerateWordParams): Promise<Generate
         level: params.level,
         phonemes: params.phonemes,
         childId: params.childId,
+        excludedWords: params.excludedWords || [],
       },
     });
 
