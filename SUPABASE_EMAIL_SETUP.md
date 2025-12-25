@@ -77,11 +77,15 @@ After updating the template:
 
 **Still receiving confirmation links instead of OTP codes?**
 
+**See `SUPABASE_EMAIL_FIX.md` for detailed step-by-step instructions.**
+
+Quick checklist:
 1. **Check the template again** - Search for `{{ .ConfirmationURL }}` and remove it completely
 2. **Check the subject line** - The subject should reference "Confirm Your Signup" or similar
 3. **Wait a few minutes** - Template changes can take a few minutes to propagate
 4. **Try a different email** - Sometimes email clients cache old templates
 5. **Check if you're editing the right template** - Make sure you're editing the template used by `signInWithOtp()`
+6. **Request a NEW code** - Old emails will still have links, you need to request a fresh OTP after updating the template
 
 ## References
 
