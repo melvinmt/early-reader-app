@@ -53,3 +53,4 @@ export function hasImageAsset(assetPath: string): boolean {
          assetPath.startsWith('http://') || 
          assetPath.startsWith('https://');
 }
+
