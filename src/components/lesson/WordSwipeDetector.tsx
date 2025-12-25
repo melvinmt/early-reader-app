@@ -54,9 +54,8 @@ export default function WordSwipeDetector({
     
     const success = finalProgress >= 0.8; // 80% swipe = success
     
-    if (success && distarCard?.audioPath) {
-      audioPlayer.playSoundFromAsset(distarCard.audioPath).catch(console.error);
-    }
+    // Don't play audio here - it will be played in the sequence by LearningScreen
+    // Sequence: great-job.mp3 → 1s delay → audio.mp3
     
     setIsActive(false);
     setSwipeProgress(0);
