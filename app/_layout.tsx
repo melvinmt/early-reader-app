@@ -2,14 +2,19 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '@/stores/authStore';
-import { initDatabase } from '@/services/storage';
+import { initDatabase, clearTestingData } from '@/services/storage';
 
 export default function RootLayout() {
   const { initialize, session, initialized } = useAuthStore();
 
   useEffect(() => {
     // Initialize database
-    initDatabase().catch(console.error);
+    initDatabase()
+      .then(() => {
+        // Clear testing data on startup (for testing purposes)
+        return clearTestingData();
+      })
+      .catch(console.error);
 
     // Initialize auth
     if (!initialized) {

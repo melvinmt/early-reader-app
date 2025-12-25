@@ -98,6 +98,40 @@ async function createTables(database: SQLite.SQLiteDatabase) {
   `);
 }
 
+/**
+ * Clear all cards, progressions, and cache for testing purposes
+ * Keeps children and parents intact
+ */
+export async function clearTestingData(): Promise<void> {
+  const database = await initDatabase();
+  
+  try {
+    // Clear card progress
+    await database.execAsync('DELETE FROM card_progress;');
+    console.log('Cleared card_progress table');
+    
+    // Clear content cache (words and images)
+    await database.execAsync('DELETE FROM content_cache;');
+    console.log('Cleared content_cache table');
+    
+    // Clear sessions
+    await database.execAsync('DELETE FROM sessions;');
+    console.log('Cleared sessions table');
+    
+    // Reset children's progress counters
+    await database.execAsync(`
+      UPDATE children 
+      SET current_level = 1, total_cards_completed = 0;
+    `);
+    console.log('Reset children progress counters');
+    
+    console.log('✅ All testing data cleared (cards, progressions, cache, sessions)');
+  } catch (error) {
+    console.error('Error clearing testing data:', error);
+    throw error;
+  }
+}
+
 // Parent CRUD operations
 export async function createParent(parent: Parent): Promise<void> {
   const database = await initDatabase();
