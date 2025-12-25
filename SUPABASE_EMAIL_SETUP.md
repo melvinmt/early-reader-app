@@ -4,7 +4,7 @@
 Supabase is sending Magic Link emails instead of 6-digit OTP codes.
 
 ## Solution
-Configure the **Magic Link** email template in your Supabase Dashboard to include `{{ .Token }}` instead of `{{ .ConfirmationURL }}`.
+We use `signInWithOtp()` which uses the **Magic Link** email template. Configure this template to send a 6-digit OTP code that looks like a signup confirmation email by including `{{ .Token }}` instead of `{{ .ConfirmationURL }}`.
 
 ## Step-by-Step Instructions
 
@@ -19,6 +19,7 @@ Configure the **Magic Link** email template in your Supabase Dashboard to includ
 3. **Edit the Magic Link Template**
    - Click on **"Magic Link"** template
    - This is the template used by `signInWithOtp()` method
+   - **Note:** Even though it's called "Magic Link", we configure it to send OTP codes
 
 4. **Update the Template Content**
    
@@ -31,11 +32,12 @@ Configure the **Magic Link** email template in your Supabase Dashboard to includ
    <p><a href="{{ .ConfirmationURL }}">Log In</a></p>
    ```
 
-   **Updated (OTP Code - CORRECT):**
+   **Updated (Signup Confirmation with OTP - CORRECT):**
    ```html
-   <h2>Your login code</h2>
-   <p>Your 6-digit code is: <strong>{{ .Token }}</strong></p>
-   <p>Enter this code in the app to sign in.</p>
+   <h2>Confirm Your Signup</h2>
+   <p>Your 6-digit verification code is:</p>
+   <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px;">{{ .Token }}</p>
+   <p>Enter this code in the app to complete your signup.</p>
    ```
    
    **⚠️ IMPORTANT:** 
