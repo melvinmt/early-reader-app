@@ -337,9 +337,12 @@ async function checkLevelProgression(childId: string): Promise<void> {
   }
 }
 
+// Track current card index for simple cycling through all cards
+let currentCardIndex = 0;
+
 /**
  * Get next card from queue
- * Simplified for testing: shows all existing cards first, then generates new ones
+ * Simplified for testing: cycles through all static cards in order
  */
 export async function getNextCard(childId: string): Promise<LearningCard | null> {
   // Get child info first
@@ -349,99 +352,37 @@ export async function getNextCard(childId: string): Promise<LearningCard | null>
   }
   
   const currentLevel = child.current_level;
-  const levelData = getLevel(currentLevel);
   
-  if (!levelData) {
-    throw new Error(`Invalid level: ${currentLevel}`);
+  // Get all static cards
+  const allStaticCards = getAllStaticCards();
+  
+  if (allStaticCards.length === 0) {
+    console.warn('No static cards available');
+    return null;
   }
   
-  // Simplified: Get ALL existing cards (not just "due" ones) for testing
-  const allCards = await getAllCardsForChild(childId);
+  // Get the current card and advance the index
+  const distarCard = allStaticCards[currentCardIndex];
+  currentCardIndex = (currentCardIndex + 1) % allStaticCards.length;
   
-  // Filter out cards that were just seen (within last 5 seconds) to prevent immediate repeats
-  const now = Date.now();
-  const recentlySeenCards = allCards.filter(card => {
-    if (!card.last_seen_at) return false;
-    const lastSeen = new Date(card.last_seen_at).getTime();
-    return (now - lastSeen) < 5000; // 5 seconds
-  });
+  console.log(`Showing card ${currentCardIndex}/${allStaticCards.length}: ${distarCard.plainText} (${distarCard.id})`);
   
-  // Get cards that haven't been seen recently
-  const availableCards = allCards.filter(card => {
-    if (!card.last_seen_at) return true; // Never seen, include it
-    const lastSeen = new Date(card.last_seen_at).getTime();
-    return (now - lastSeen) >= 5000; // Not seen in last 5 seconds
-  });
-  
-  if (availableCards.length > 0) {
-    // Sort by last_seen_at (null first, then oldest)
-    const sortedCards = availableCards.sort((a, b) => {
-      if (!a.last_seen_at && !b.last_seen_at) return 0;
-      if (!a.last_seen_at) return -1;
-      if (!b.last_seen_at) return 1;
-      return new Date(a.last_seen_at).getTime() - new Date(b.last_seen_at).getTime();
-    });
-    
-    const progress = sortedCards[0];
-    
-    // Try to find matching static card for this word
-    const allStaticCards = getAllStaticCards();
-    const matchingStaticCard = allStaticCards.find(c => c.plainText === progress.word);
-    
-    let phonemes: string[] = [];
-    let imageUrl = '';
-    let distarCard: DistarCard | undefined = matchingStaticCard;
-    
-    if (matchingStaticCard) {
-      // Use data from static card
-      phonemes = matchingStaticCard.phonemes;
-      imageUrl = matchingStaticCard.imagePath;
-    } else {
-      // Legacy card - try to load from cache
-      const cachedWord = await getContentCache('word', progress.word);
-      const cachedImage = await getContentCache('image', progress.word);
-      
-      if (cachedWord) {
-        const wordData = JSON.parse(cachedWord.content_data);
-        phonemes = wordData.phonemes || [];
-      } else {
-        // Fallback: use characters as phonemes
-        phonemes = progress.word.split('');
-      }
-      
-      if (cachedImage) {
-        const imageData = JSON.parse(cachedImage.content_data);
-        imageUrl = imageData.imageUrl || '';
-      }
-    }
-    
-    // Return card if we have word and phonemes
-    if (progress.word && phonemes.length > 0) {
-      // Update last_seen_at immediately when card is loaded
-      const updatedProgress: CardProgress = {
-        ...progress,
-        last_seen_at: new Date().toISOString(),
-      };
-      await createOrUpdateCardProgress(updatedProgress);
-      
-      return {
-        word: progress.word,
-        phonemes,
-        imageUrl,
-        progress: updatedProgress,
-        level: currentLevel,
-        distarCard,
-      };
-    }
-  }
-  
-  // No available cards (all were seen recently), try to get a new static card
-  console.log('All existing cards were recently seen, loading new static card...');
-  const card = await generateNewCardFromStatic(childId, currentLevel);
-  if (card) return card;
-  
-  // No more static cards available
-  console.log('No static cards available');
-  return null;
+  // Create a learning card from the static card
+  return {
+    word: distarCard.plainText,
+    phonemes: distarCard.phonemes,
+    imageUrl: distarCard.imagePath,
+    progress: null, // No progress tracking for now
+    level: currentLevel,
+    distarCard,
+  };
 }
+
+/**
+ * Reset card index to start from the beginning
+ */
+export function resetCardIndex(): void {
+  currentCardIndex = 0;
+}
+
 
