@@ -72,12 +72,7 @@ export default function LearningScreen() {
 
   const cleanup = async () => {
     try {
-      // Disconnect voice service if connected (optional)
-      try {
-        await realtimeVoiceService.disconnect();
-      } catch (voiceError) {
-        // Voice service may not be connected, ignore
-      }
+      // Voice service disabled - no cleanup needed
       
       if (sessionId && sessionStartTime) {
         const duration = Math.floor((Date.now() - sessionStartTime.getTime()) / 1000);
@@ -148,9 +143,11 @@ export default function LearningScreen() {
   // Voice service disabled - handler removed
 
   const handleLetterEnter = async (index: number) => {
-    // Play phoneme sound when letter is entered
+    // Play phoneme sound when letter is entered (optional - don't block)
     if (currentCard && currentCard.phonemes[index]) {
-      await audioPlayer.playPhoneme(currentCard.phonemes[index]);
+      audioPlayer.playPhoneme(currentCard.phonemes[index]).catch((err) => {
+        console.warn('Could not play phoneme sound:', err);
+      });
     }
   };
 
@@ -175,38 +172,50 @@ export default function LearningScreen() {
   };
 
   const processCardResult = async (swipeSuccess: boolean) => {
-    if (!currentCard) return;
-
-    setState('processing');
-
-    // Validate pronunciation (voice is optional - if no voice, use swipe success)
-    // Core flow: swipe success = card success
-    const hasVoiceTranscript = voiceTranscriptRef.current && voiceTranscriptRef.current !== '';
-    const pronunciationResult = hasVoiceTranscript
-      ? validatePronunciation(
-          currentCard.word,
-          currentCard.phonemes,
-          voiceTranscriptRef.current,
-          voicePhonemesRef.current.length > 0 ? voicePhonemesRef.current : undefined
-        )
-      : { isCorrect: true, matchScore: 1.0 }; // If no voice, swipe success = correct
-
-    // Overall success: swipe must succeed, and if voice is available, pronunciation must be correct
-    // If voice is not available, swipe success is sufficient
-    const overallSuccess = swipeSuccess && (hasVoiceTranscript ? pronunciationResult.isCorrect : true);
+    if (!currentCard) {
+      console.error('processCardResult called but currentCard is null');
+      return;
+    }
 
     try {
-      // Record completion
-      await recordCardCompletion(childId, currentCard.word, {
-        success: overallSuccess,
-        attempts: attempts + 1,
-        matchScore: pronunciationResult.matchScore,
-        neededHelp,
-      });
+      setState('processing');
+
+      // Validate pronunciation (voice is optional - if no voice, use swipe success)
+      // Core flow: swipe success = card success
+      const hasVoiceTranscript = voiceTranscriptRef.current && voiceTranscriptRef.current !== '';
+      const pronunciationResult = hasVoiceTranscript
+        ? validatePronunciation(
+            currentCard.word,
+            currentCard.phonemes,
+            voiceTranscriptRef.current,
+            voicePhonemesRef.current.length > 0 ? voicePhonemesRef.current : undefined
+          )
+        : { isCorrect: true, matchScore: 1.0 }; // If no voice, swipe success = correct
+
+      // Overall success: swipe must succeed, and if voice is available, pronunciation must be correct
+      // If voice is not available, swipe success is sufficient
+      const overallSuccess = swipeSuccess && (hasVoiceTranscript ? pronunciationResult.isCorrect : true);
+
+      // Record completion (with error handling)
+      try {
+        await recordCardCompletion(childId, currentCard.word, {
+          success: overallSuccess,
+          attempts: attempts + 1,
+          matchScore: pronunciationResult.matchScore,
+          neededHelp,
+        });
+      } catch (recordError) {
+        console.error('Error recording card completion:', recordError);
+        // Continue even if recording fails - don't block the UI
+      }
 
       if (overallSuccess) {
         // Success! Show confetti and move to next card
-        await audioPlayer.playSuccess();
+        // Audio is optional - don't block on it
+        audioPlayer.playSuccess().catch((err) => {
+          console.warn('Could not play success sound:', err);
+        });
+        
         setShowConfetti(true);
         setCardsCompleted(cardsCompleted + 1);
         setProgress((cardsCompleted + 1) / 10); // Assuming 10 cards per session
@@ -219,7 +228,11 @@ export default function LearningScreen() {
         }, 2000);
       } else {
         // Try again (shouldn't happen with swipe-only flow, but keep for safety)
-        await audioPlayer.playTryAgain();
+        // Audio is optional - don't block on it
+        audioPlayer.playTryAgain().catch((err) => {
+          console.warn('Could not play try again sound:', err);
+        });
+        
         setAttempts(attempts + 1);
         setIsImageRevealed(false);
         setState('ready');
@@ -231,8 +244,10 @@ export default function LearningScreen() {
         }
       }
     } catch (error) {
-      console.error('Error recording card completion:', error);
-      Alert.alert('Error', 'Failed to save progress. Please try again.');
+      console.error('Error processing card result:', error);
+      // Don't show alert - just log and continue
+      // Reset to ready state so user can try again
+      setState('ready');
     }
   };
 

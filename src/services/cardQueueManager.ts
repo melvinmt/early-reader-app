@@ -217,10 +217,25 @@ export async function recordCardCompletion(
   }
 ): Promise<void> {
   // Get current progress
-  const progress = await getCardProgress(childId, word);
+  let progress = await getCardProgress(childId, word);
 
+  // If progress doesn't exist, create it (can happen if card was just generated)
   if (!progress) {
-    throw new Error('Card progress not found');
+    console.warn('Card progress not found, creating new progress entry for:', word);
+    const progressId = `${childId}-${word}-${Date.now()}`;
+    const now = new Date().toISOString();
+    progress = {
+      id: progressId,
+      child_id: childId,
+      word: word,
+      ease_factor: 2.5, // Default SM-2 ease factor
+      interval_days: 0,
+      next_review_at: now,
+      attempts: 0,
+      successes: 0,
+      last_seen_at: null,
+    };
+    await createOrUpdateCardProgress(progress);
   }
 
   // Calculate SM-2 quality rating
