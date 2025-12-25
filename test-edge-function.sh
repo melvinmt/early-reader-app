@@ -28,3 +28,4 @@ echo "3. Secrets are set: supabase secrets set GEMINI_API_KEY=your-key"
 
 
 
+
