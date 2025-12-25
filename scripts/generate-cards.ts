@@ -490,21 +490,21 @@ async function generateWordCards(): Promise<any[]> {
     ],
     // Lessons 11-20: d, i, th, c (adding more consonants)
     '11-20': [
-      'sad', 'dad', 'mad', 'did', 'sit', 'mit', 'rim', 'dim', 'sir', 'stir',
-      'this', 'that', 'them', 'cat', 'cast', 'mist', 'dist', 'scat', 'scam', 'trim'
+      'glad', 'dad', 'lad', 'did', 'sit', 'mit', 'rim', 'dim', 'sir', 'stir',
+      'this', 'that', 'them', 'cat', 'cast', 'mist', 'dist', 'scat', 'scan', 'trim'
     ],
     // Lessons 21-30: o, n, f, u, l (vowels and consonants)
     '21-30': [
-      'on', 'not', 'rot', 'dot', 'cot', 'con', 'non', 'ton', 'son', 'fan',
+      'on', 'not', 'tot', 'dot', 'cot', 'con', 'non', 'ton', 'son', 'fan',
       'tan', 'ran', 'man', 'can', 'tin', 'fin', 'fun', 'run', 'sun', 'nun',
-      'cut', 'nut', 'rut', 'lot', 'let', 'lit', 'fit', 'fat', 'flat', 'slit'
+      'nut', 'but', 'put', 'lot', 'let', 'lit', 'fit', 'fat', 'flat', 'flit'
     ],
     // Lessons 31-40: w, g, sh, ā, h (more sounds)
     '31-40': [
       'win', 'wit', 'wet', 'wed', 'wag', 'wig', 'will', 'well', 'wall', 'gum',
-      'gun', 'got', 'get', 'gut', 'tag', 'tug', 'rug', 'mug', 'dug', 'hug',
-      'wish', 'fish', 'dish', 'shut', 'shot', 'shin', 'ship', 'shop', 'has', 'had',
-      'him', 'his', 'hot', 'hit', 'hut', 'hate', 'late', 'date', 'gate', 'rate'
+      'run', 'got', 'get', 'gut', 'tag', 'tug', 'rug', 'mug', 'dug', 'hug',
+      'wish', 'fish', 'dish', 'shut', 'spot', 'shin', 'ship', 'shop', 'has', 'had',
+      'him', 'his', 'hot', 'hat', 'hut', 'late', 'date', 'gate', 'rate', 'bake'
     ],
     // Lessons 41-50: k, ō, v, p, ar (more consonants and long o)
     '41-50': [
@@ -516,9 +516,9 @@ async function generateWordCards(): Promise<any[]> {
     // Lessons 51-60: ch, e, b, ing, ī (digraphs and long i)
     '51-60': [
       'chop', 'chip', 'chin', 'chat', 'chess', 'chest', 'chick', 'check', 'rich', 'much',
-      'such', 'each', 'teach', 'reach', 'bed', 'bet', 'beg', 'bell', 'best', 'bent',
-      'bit', 'big', 'bug', 'bus', 'but', 'bad', 'bag', 'bat', 'back', 'ball',
-      'sing', 'ring', 'king', 'wing', 'thing', 'bring', 'string', 'spring', 'swing', 'sting',
+      'such', 'each', 'teach', 'reach', 'bed', 'pet', 'beg', 'bell', 'best', 'bent',
+      'bib', 'big', 'bug', 'bus', 'but', 'pad', 'bag', 'bat', 'back', 'ball',
+      'sing', 'ring', 'king', 'wing', 'thing', 'bring', 'string', 'spring', 'swing', 'cling',
       'ice', 'nice', 'rice', 'mice', 'dice', 'like', 'bike', 'hike', 'time', 'dime'
     ],
     // Lessons 61-70: y, er, oo, j, wh (more digraphs)
@@ -526,33 +526,33 @@ async function generateWordCards(): Promise<any[]> {
       'yes', 'yet', 'yell', 'yam', 'yarn', 'yard', 'year', 'yeast', 'yellow', 'yonder',
       'her', 'fern', 'herd', 'term', 'verb', 'ever', 'never', 'over', 'under', 'after',
       'sister', 'mister', 'winter', 'better', 'letter', 'butter', 'mother', 'father', 'brother', 'other',
-      'moon', 'soon', 'noon', 'room', 'boom', 'zoom', 'broom', 'groom', 'bloom', 'gloom',
-      'food', 'mood', 'cool', 'pool', 'tool', 'fool', 'drool', 'school', 'stool', 'spool',
+      'moon', 'soon', 'noon', 'room', 'boom', 'zoom', 'broom', 'groom', 'bloom', 'room',
+      'food', 'mood', 'cool', 'pool', 'tool', 'wool', 'drool', 'school', 'stool', 'spool',
       'jam', 'jet', 'job', 'jog', 'jug', 'just', 'jump', 'jest', 'join', 'joke',
-      'when', 'what', 'where', 'which', 'while', 'white', 'whale', 'wheat', 'wheel', 'whip'
+      'when', 'what', 'where', 'which', 'while', 'white', 'whale', 'wheat', 'wheel', 'whim'
     ],
     // Lessons 71-80: ȳ, ū, qu, x, z (final consonants and long vowels)
     '71-80': [
-      'my', 'by', 'cry', 'dry', 'fly', 'fry', 'pry', 'sky', 'sly', 'spy',
-      'try', 'why', 'shy', 'thy', 'sty', 'guy', 'buy', 'dye', 'eye', 'rye',
-      'use', 'fuse', 'muse', 'ruse', 'cute', 'mute', 'flute', 'brute', 'prune', 'tune',
-      'dune', 'June', 'rule', 'rude', 'crude', 'prude', 'duke', 'Luke', 'huge', 'fume',
-      'quick', 'quit', 'quiz', 'queen', 'quest', 'quiet', 'quilt', 'quote', 'quack', 'quake',
+      'my', 'by', 'cry', 'dry', 'fly', 'fry', 'pry', 'sky', 'sly', 'why',
+      'try', 'shy', 'thy', 'sty', 'guy', 'buy', 'dye', 'eye', 'rye', 'pie',
+      'use', 'fuse', 'muse', 'lose', 'cute', 'mute', 'flute', 'route', 'prune', 'tune',
+      'dune', 'June', 'rule', 'mule', 'cure', 'pure', 'duke', 'Luke', 'huge', 'fume',
+      'quick', 'quip', 'quiz', 'queen', 'quest', 'quiet', 'quilt', 'quote', 'quack', 'quake',
       'ox', 'ax', 'box', 'fox', 'mix', 'fix', 'six', 'wax', 'tax', 'max',
-      'next', 'text', 'flex', 'hex', 'vex', 'rex', 'index', 'apex', 'latex', 'annex',
+      'next', 'text', 'flex', 'lex', 'vex', 'rex', 'index', 'apex', 'latex', 'annex',
       'zip', 'zap', 'zoo', 'zone', 'zero', 'zest', 'zinc', 'zoom', 'fizz', 'buzz',
-      'fuzz', 'jazz', 'quiz', 'maze', 'haze', 'gaze', 'daze', 'raze', 'blaze', 'craze'
+      'fuzz', 'jazz', 'quiz', 'maze', 'haze', 'gaze', 'daze', 'laze', 'blaze', 'craze'
     ],
     // Lessons 81-90: ea, ai, ou (vowel digraphs)
     '81-90': [
-      'eat', 'beat', 'heat', 'meat', 'neat', 'seat', 'bead', 'dead', 'head', 'lead',
-      'read', 'bread', 'spread', 'thread', 'dread', 'tread', 'mean', 'bean', 'lean', 'dean',
+      'eat', 'beat', 'heat', 'meat', 'neat', 'seat', 'bead', 'read', 'head', 'lead',
+      'bread', 'spread', 'thread', 'tread', 'ahead', 'mean', 'bean', 'lean', 'dean', 'wean',
       'clean', 'dream', 'cream', 'stream', 'scream', 'gleam', 'team', 'seam', 'beam', 'ream',
-      'rain', 'pain', 'main', 'gain', 'chain', 'brain', 'drain', 'grain', 'plain', 'Spain',
-      'train', 'strain', 'sprain', 'stain', 'tail', 'rail', 'sail', 'mail', 'nail', 'pail',
-      'fail', 'bail', 'hail', 'jail', 'trail', 'snail', 'frail', 'wait', 'bait', 'gait',
-      'out', 'our', 'hour', 'sour', 'flour', 'loud', 'cloud', 'proud', 'round', 'sound',
-      'found', 'ground', 'bound', 'hound', 'mound', 'pound', 'wound', 'count', 'mount', 'shout'
+      'rain', 'gain', 'main', 'chain', 'brain', 'train', 'grain', 'plain', 'Spain', 'stain',
+      'tail', 'rail', 'sail', 'mail', 'nail', 'pail', 'hail', 'bail', 'trail', 'snail',
+      'wait', 'bait', 'gait', 'saint', 'paint', 'faint', 'taint', 'quaint', 'plaint', 'strait',
+      'out', 'our', 'hour', 'four', 'flour', 'loud', 'cloud', 'proud', 'round', 'sound',
+      'found', 'ground', 'bound', 'hound', 'mound', 'pound', 'round', 'count', 'mount', 'shout'
     ],
     // Lessons 91-100: Review and complex words (all phonemes)
     '91-100': [
@@ -844,7 +844,7 @@ async function generateSentenceCards(): Promise<any[]> {
     
     // Additional sentences for variety (grouped by lesson range)
     { text: 'see the cat', lesson: 15 },
-    { text: 'I am sad', lesson: 18 },
+    { text: 'I am glad', lesson: 18 },
     { text: 'the rat ran', lesson: 20 },
     { text: 'not on the dot', lesson: 25 },
     { text: 'the man ran to the van', lesson: 28 },
@@ -853,7 +853,7 @@ async function generateSentenceCards(): Promise<any[]> {
     { text: 'the shop is shut', lesson: 38 },
     { text: 'I gave him a gift', lesson: 48 },
     { text: 'the rich king is nice', lesson: 55 },
-    { text: 'the big bug bit him', lesson: 58 },
+    { text: 'the big bug is red', lesson: 58 },
     { text: 'I am reading a good book', lesson: 65 },
     { text: 'the moon is in the sky', lesson: 72 },
     { text: 'I am happy to be here', lesson: 78 },
