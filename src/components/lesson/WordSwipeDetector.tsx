@@ -1,9 +1,8 @@
 import { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useSharedValue, runOnJS } from 'react-native-reanimated';
 import { DistarCard } from '@/data/distarCards';
-import { audioPlayer } from '@/services/audio/audioPlayer';
 
 interface WordSwipeDetectorProps {
   word: string;
@@ -11,6 +10,7 @@ interface WordSwipeDetectorProps {
   distarCard?: DistarCard;
   onLetterEnter: (index: number) => void;
   onSwipeComplete: (success: boolean) => void;
+  renderHint?: boolean; // Whether to render the hint text below
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -21,6 +21,7 @@ export default function WordSwipeDetector({
   distarCard,
   onLetterEnter,
   onSwipeComplete,
+  renderHint = false,
 }: WordSwipeDetectorProps) {
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [isActive, setIsActive] = useState(false);
@@ -53,9 +54,6 @@ export default function WordSwipeDetector({
     if (!isMountedRef.current) return;
     
     const success = finalProgress >= 0.8; // 80% swipe = success
-    
-    // Don't play audio here - it will be played in the sequence by LearningScreen
-    // Sequence: great-job.mp3 → 1s delay → audio.mp3
     
     setIsActive(false);
     setSwipeProgress(0);
@@ -99,29 +97,13 @@ export default function WordSwipeDetector({
               ]} 
             />
           </View>
-          
-          {/* Swipe instruction */}
-          <View style={styles.swipeContent}>
-            <Text style={styles.swipeIcon}>👉</Text>
-            <Text style={styles.swipeText}>
-              {isActive ? 'Keep going!' : 'Swipe right to reveal'}
-            </Text>
-            <Text style={styles.swipeIcon}>✨</Text>
-          </View>
         </View>
       </GestureDetector>
 
-      {/* Long press hint */}
-      <Pressable 
-        onLongPress={() => {
-          if (distarCard?.soundedOutPath) {
-            audioPlayer.playSoundFromAsset(distarCard.soundedOutPath).catch(console.error);
-          }
-        }}
-        delayLongPress={500}
-      >
-        <Text style={styles.longPressHint}>Long press to hear it sounded out</Text>
-      </Pressable>
+      {/* Swipe hint text below */}
+      {renderHint && (
+        <Text style={styles.swipeHint}>👉 Swipe right to reveal the image ✨</Text>
+      )}
     </View>
   );
 }
@@ -129,25 +111,15 @@ export default function WordSwipeDetector({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    paddingHorizontal: 16,
-    marginTop: 24,
   },
   swipeArea: {
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    width: '100%',
   },
   progressTrack: {
     height: 8,
     backgroundColor: '#e0e0e0',
     borderRadius: 4,
     overflow: 'hidden',
-    marginBottom: 16,
   },
   progressFill: {
     height: '100%',
@@ -157,24 +129,11 @@ const styles = StyleSheet.create({
   progressFillActive: {
     backgroundColor: '#2E7D32',
   },
-  swipeContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  swipeIcon: {
-    fontSize: 24,
-  },
-  swipeText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  longPressHint: {
+  swipeHint: {
     textAlign: 'center',
-    marginTop: 12,
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 16,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
   },
 });

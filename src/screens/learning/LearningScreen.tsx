@@ -218,35 +218,6 @@ export default function LearningScreen() {
     }
   };
 
-  const handleHelp = () => {
-    if (!currentCard) return;
-    setNeededHelp(true);
-    if (currentCard.distarCard?.audioPath) {
-      audioPlayer.playSoundFromAsset(currentCard.distarCard.audioPath).catch(console.error);
-    }
-  };
-
-  const handleSkip = () => {
-    if (!currentCard) return;
-    
-    Alert.alert('Skip Card?', 'Move to the next card?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Skip',
-        style: 'destructive',
-        onPress: async () => {
-          await recordCardCompletion(childId, currentCard.word, {
-            success: false,
-            attempts: attempts + 1,
-            matchScore: 0,
-            neededHelp: true,
-          });
-          loadNextCard();
-        },
-      },
-    ]);
-  };
-
   if (state === 'loading' || !currentCard) {
     return (
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
@@ -306,32 +277,27 @@ export default function LearningScreen() {
         ))}
       </View>
 
-      {/* Main content */}
+      {/* Main content - combined card */}
       <View style={styles.content}>
-        <WordDisplay
-          word={currentCard.word}
-          phonemes={currentCard.phonemes}
-          distarCard={currentCard.distarCard}
-          onWordTap={handleWordTap}
-        />
+        <View style={styles.combinedCard}>
+          <WordDisplay
+            word={currentCard.word}
+            phonemes={currentCard.phonemes}
+            distarCard={currentCard.distarCard}
+            onWordTap={handleWordTap}
+          />
 
-        <WordSwipeDetector
-          word={currentCard.word}
-          phonemes={currentCard.phonemes}
-          distarCard={currentCard.distarCard}
-          onLetterEnter={() => {}}
-          onSwipeComplete={handleSwipeComplete}
-        />
-      </View>
+          <View style={styles.divider} />
 
-      {/* Bottom actions */}
-      <View style={styles.actions}>
-        <Pressable style={styles.helpButton} onPress={handleHelp}>
-          <Text style={styles.buttonText}>🔊 Help</Text>
-        </Pressable>
-        <Pressable style={styles.skipButton} onPress={handleSkip}>
-          <Text style={styles.buttonText}>Skip →</Text>
-        </Pressable>
+          <WordSwipeDetector
+            word={currentCard.word}
+            phonemes={currentCard.phonemes}
+            distarCard={currentCard.distarCard}
+            onLetterEnter={() => {}}
+            onSwipeComplete={handleSwipeComplete}
+            renderHint={true}
+          />
+        </View>
       </View>
 
       <ConfettiCelebration visible={showConfetti} onComplete={() => setShowConfetti(false)} />
@@ -405,31 +371,24 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
+    paddingHorizontal: 16,
     paddingBottom: 40,
     zIndex: 2,
   },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  combinedCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderRadius: 20,
     paddingHorizontal: 24,
-    paddingBottom: 40,
-    zIndex: 2,
+    paddingVertical: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  helpButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 25,
-  },
-  skipButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 25,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+  divider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 24,
   },
 });

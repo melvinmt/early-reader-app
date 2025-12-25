@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { DistarCard } from '@/data/distarCards';
 import { audioPlayer } from '@/services/audio/audioPlayer';
 
@@ -7,7 +7,6 @@ interface WordDisplayProps {
   phonemes: string[];
   distarCard?: DistarCard;
   onWordTap?: () => void;
-  style?: object;
 }
 
 export default function WordDisplay({ 
@@ -15,7 +14,6 @@ export default function WordDisplay({
   phonemes, 
   distarCard, 
   onWordTap,
-  style,
 }: WordDisplayProps) {
   const displayText = distarCard?.display || word;
   const isSentence = displayText.includes(' ');
@@ -30,50 +28,29 @@ export default function WordDisplay({
   };
 
   return (
-    <View style={[styles.container, style]}>
-      <Pressable onPress={handleWordPress} style={styles.pressable}>
-        <View style={styles.card}>
-          {isSentence ? (
-            // Sentence display - show words with proper spacing
-            <View style={styles.sentenceContainer}>
-              {words.map((w, index) => (
-                <Text key={index} style={styles.sentenceWord}>
-                  {w}{index < words.length - 1 ? ' ' : ''}
-                </Text>
-              ))}
-            </View>
-          ) : (
-            // Single word/letter display - large centered
-            <Text style={styles.wordText}>{displayText}</Text>
-          )}
-          
-          <Text style={styles.tapHint}>👆 Tap to hear</Text>
+    <Pressable onPress={handleWordPress} style={styles.wordPressable}>
+      {isSentence ? (
+        // Sentence display - show words with proper spacing
+        <View style={styles.sentenceContainer}>
+          {words.map((w, index) => (
+            <Text key={index} style={styles.sentenceWord}>
+              {w}{index < words.length - 1 ? ' ' : ''}
+            </Text>
+          ))}
         </View>
-      </Pressable>
-    </View>
+      ) : (
+        // Single word/letter display - large centered
+        <Text style={styles.wordText}>{displayText}</Text>
+      )}
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wordPressable: {
     alignItems: 'center',
-    width: '100%',
-  },
-  pressable: {
-    width: '100%',
-    paddingHorizontal: 16,
-  },
-  card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderRadius: 20,
-    paddingVertical: 32,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    justifyContent: 'center',
+    paddingVertical: 24,
   },
   wordText: {
     fontSize: 72,
@@ -93,10 +70,5 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginHorizontal: 4,
     marginVertical: 4,
-  },
-  tapHint: {
-    marginTop: 16,
-    fontSize: 14,
-    color: '#888',
   },
 });
