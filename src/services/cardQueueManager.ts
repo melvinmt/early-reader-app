@@ -16,7 +16,7 @@ import {
   initDatabase,
 } from './storage/database';
 import { CardProgress, Child } from '@/types/database';
-import { generateWord, segmentPhonemes } from './ai/edgeFunctions';
+import { generateWord, generateImage, segmentPhonemes } from './ai/edgeFunctions';
 import { getLevel, getPhonemesUpToLevel, LEVELS } from '@/data/levels';
 import { calculateSM2, mapPronunciationToQuality } from '@/utils/sm2';
 import { validatePronunciation } from '@/utils/pronunciation';
@@ -154,6 +154,12 @@ async function generateNewCard(
         excludedWords: excludedWords, // Pass excluded words to get variation
       });
 
+      console.log('Generated word response:', { 
+        word: generated.word, 
+        hasImageUrl: !!generated.imageUrl,
+        imageUrlLength: generated.imageUrl?.length || 0 
+      });
+
       // Check if we already have progress for this word
       const existingProgress = await getCardProgress(childId, generated.word);
 
@@ -163,6 +169,20 @@ async function generateNewCard(
         attempts++;
         console.log(`Word "${generated.word}" already exists, retrying (${attempts}/${maxRetries})...`);
         continue;
+      }
+
+      // If image URL is missing, generate it separately
+      let finalImageUrl = generated.imageUrl;
+      if (!finalImageUrl || finalImageUrl.trim() === '') {
+        console.log('Image URL missing from word generation, generating image separately...');
+        try {
+          const imagePrompt = `A simple, friendly cartoon illustration of "${generated.word}", child-friendly style, white background, no text`;
+          finalImageUrl = await generateImage(imagePrompt);
+          console.log('Image generated successfully:', !!finalImageUrl);
+        } catch (imageError) {
+          console.error('Failed to generate image:', imageError);
+          // Continue without image - it's optional
+        }
       }
 
       // Cache the word and image
@@ -185,7 +205,7 @@ async function generateNewCard(
         content_type: 'image',
         content_key: generated.word,
         content_data: JSON.stringify({
-          imageUrl: generated.imageUrl,
+          imageUrl: finalImageUrl,
         }),
         file_path: null,
         created_at: new Date().toISOString(),
@@ -212,7 +232,7 @@ async function generateNewCard(
       return {
         word: generated.word,
         phonemes: generated.phonemes,
-        imageUrl: generated.imageUrl,
+        imageUrl: finalImageUrl,
         progress,
         level,
       };
@@ -391,6 +411,32 @@ export async function getNextCard(childId: string): Promise<LearningCard | null>
     if (cachedImage) {
       const imageData = JSON.parse(cachedImage.content_data);
       imageUrl = imageData.imageUrl || '';
+    }
+    
+    // If image is missing, generate it now
+    if (!imageUrl || imageUrl.trim() === '') {
+      console.log('Image missing for existing card, generating now...', progress.word);
+      try {
+        const imagePrompt = `A simple, friendly cartoon illustration of "${progress.word}", child-friendly style, white background, no text`;
+        imageUrl = await generateImage(imagePrompt);
+        
+        // Cache the generated image
+        if (imageUrl) {
+          await createOrUpdateContentCache({
+            id: `${childId}-image-${progress.word}`,
+            content_type: 'image',
+            content_key: progress.word,
+            content_data: JSON.stringify({ imageUrl }),
+            file_path: null,
+            created_at: new Date().toISOString(),
+            expires_at: null,
+          });
+          console.log('Image generated and cached for:', progress.word);
+        }
+      } catch (imageError) {
+        console.error('Failed to generate image for existing card:', imageError);
+        // Continue without image - it's optional
+      }
     }
     
     // Return card even if imageUrl is missing (can generate on demand)
