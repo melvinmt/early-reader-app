@@ -17,12 +17,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   initialize: async () => {
     try {
-      // Get current session
-      const { data: { session } } = await supabase.auth.getSession();
+      // Get current session from storage
+      // This will restore the session if it was persisted
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error getting session:', error);
+      }
+      
+      console.log('Session restored:', session ? 'Yes' : 'No');
+      if (session) {
+        console.log('Session user:', session.user.email);
+      }
+      
       set({ session, initialized: true });
 
-      // Listen for auth changes
-      supabase.auth.onAuthStateChange((_event, session) => {
+      // Listen for auth changes (sign in, sign out, token refresh, etc.)
+      supabase.auth.onAuthStateChange((event, session) => {
+        console.log('Auth state changed:', event, session ? 'Session exists' : 'No session');
         set({ session });
       });
     } catch (error) {
