@@ -1,12 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  runOnJS,
-} from 'react-native-reanimated';
+import { useSharedValue, runOnJS } from 'react-native-reanimated';
 
 interface WordSwipeDetectorProps {
   word: string;
@@ -89,15 +84,36 @@ export default function WordSwipeDetector({
     }
   };
 
+  // Helper to handle swipe end (called from gesture handler via runOnJS)
+  const handleSwipeEnd = () => {
+    if (!isMountedRef.current) return;
+    
+    // Capture values from refs (safe to access in JS context)
+    const visitedSet = new Set(visitedLettersRef.current);
+    const allVisited = visitedSet.size === word.length;
+    const visitedArray = Array.from(visitedSet).sort((a, b) => a - b);
+    const inOrder = visitedArray.every((val, idx) => val === idx);
+    
+    // Reset state
+    setVisitedLetters(new Set());
+    setCurrentLetterIndex(-1);
+    currentLetterIndexRef.current = -1;
+    visitedLettersRef.current = new Set();
+    
+    // Call completion handler
+    handleSwipeComplete(allVisited && inOrder);
+  };
+
   const panGesture = Gesture.Pan()
     .onStart((event) => {
       startX.value = event.x;
-      translateX.value = event.x;
+      translateX.value = 0; // Track relative position, not absolute
     })
     .onUpdate((event) => {
-      translateX.value = event.x;
+      // Track relative movement for visual feedback only (not used for animation)
+      translateX.value = event.x - startX.value;
 
-      // Determine which letter zone we're in
+      // Determine which letter zone we're in based on absolute position
       const letterIndex = Math.floor((event.x - letterWidth) / letterWidth);
       if (letterIndex >= 0 && letterIndex < word.length) {
         // Use runOnJS to safely update React state from gesture handler
@@ -108,33 +124,15 @@ export default function WordSwipeDetector({
       }
     })
     .onEnd(() => {
-      // Reset animation first
-      translateX.value = withSpring(0);
+      // Reset tracking value
+      translateX.value = 0;
       
-      // Use runOnJS to safely access refs and call callbacks
-      runOnJS(() => {
-        // Capture values from refs (safe to access in JS context)
-        const visitedSet = new Set(visitedLettersRef.current);
-        const allVisited = visitedSet.size === word.length;
-        const visitedArray = Array.from(visitedSet).sort((a, b) => a - b);
-        const inOrder = visitedArray.every((val, idx) => val === idx);
-        
-        // Reset state
-        setVisitedLetters(new Set());
-        setCurrentLetterIndex(-1);
-        currentLetterIndexRef.current = -1;
-        visitedLettersRef.current = new Set();
-        
-        // Call completion handler
-        handleSwipeComplete(allVisited && inOrder);
-      })();
+      // Use runOnJS to safely call the handler
+      runOnJS(handleSwipeEnd)();
     });
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: translateX.value - startX.value }],
-    };
-  });
+  // No animation style - swipe area stays in place
+  // We only track the gesture, not animate the UI
 
   return (
     <View style={styles.container}>
@@ -166,9 +164,9 @@ export default function WordSwipeDetector({
       </View>
 
       <GestureDetector gesture={panGesture}>
-        <Animated.View style={[styles.swipeArea, animatedStyle]}>
+        <View style={styles.swipeArea}>
           <Text style={styles.swipeHint}>Swipe under the word</Text>
-        </Animated.View>
+        </View>
       </GestureDetector>
     </View>
   );

@@ -143,12 +143,12 @@ export default function LearningScreen() {
   // Voice service disabled - handler removed
 
   const handleLetterEnter = async (index: number) => {
-    // Play phoneme sound when letter is entered (optional - don't block)
-    if (currentCard && currentCard.phonemes[index]) {
-      audioPlayer.playPhoneme(currentCard.phonemes[index]).catch((err) => {
-        console.warn('Could not play phoneme sound:', err);
-      });
-    }
+    // Audio disabled for now
+    // if (currentCard && currentCard.phonemes[index]) {
+    //   audioPlayer.playPhoneme(currentCard.phonemes[index]).catch((err) => {
+    //     console.warn('Could not play phoneme sound:', err);
+    //   });
+    // }
   };
 
   const handleSwipeComplete = async (success: boolean) => {
@@ -211,10 +211,10 @@ export default function LearningScreen() {
 
       if (overallSuccess) {
         // Success! Show confetti and move to next card
-        // Audio is optional - don't block on it
-        audioPlayer.playSuccess().catch((err) => {
-          console.warn('Could not play success sound:', err);
-        });
+        // Audio disabled for now
+        // audioPlayer.playSuccess().catch((err) => {
+        //   console.warn('Could not play success sound:', err);
+        // });
         
         setShowConfetti(true);
         setCardsCompleted(cardsCompleted + 1);
@@ -228,10 +228,10 @@ export default function LearningScreen() {
         }, 2000);
       } else {
         // Try again (shouldn't happen with swipe-only flow, but keep for safety)
-        // Audio is optional - don't block on it
-        audioPlayer.playTryAgain().catch((err) => {
-          console.warn('Could not play try again sound:', err);
-        });
+        // Audio disabled for now
+        // audioPlayer.playTryAgain().catch((err) => {
+        //   console.warn('Could not play try again sound:', err);
+        // });
         
         setAttempts(attempts + 1);
         setIsImageRevealed(false);
