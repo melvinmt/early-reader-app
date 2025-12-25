@@ -9,14 +9,52 @@ export default function OtpVerificationScreen() {
   const params = useLocalSearchParams();
   const email = (params.email as string) || '';
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [resending, setResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const router = useRouter();
-  const { verifyOtp } = useAuthStore();
+  const { verifyOtp, sendOtp } = useAuthStore();
 
   useEffect(() => {
     // Focus first input on mount
     inputRefs.current[0]?.focus();
   }, []);
+
+  useEffect(() => {
+    // Cooldown timer for resend
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => {
+        setResendCooldown(resendCooldown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
+  const handleResend = async () => {
+    if (resending || resendCooldown > 0) {
+      return;
+    }
+
+    setResending(true);
+    try {
+      const { error } = await sendOtp(email);
+      
+      if (error) {
+        Alert.alert('Error', error.message || 'Failed to resend code. Please try again.');
+      } else {
+        Alert.alert('Success', 'A new code has been sent to your email.');
+        // Clear OTP inputs
+        setOtp(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+        // Set 60 second cooldown
+        setResendCooldown(60);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleOtpChange = (index: number, value: string) => {
     // Only allow digits
@@ -103,13 +141,17 @@ export default function OtpVerificationScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.resendButton}
-        onPress={() => {
-          // TODO: Resend OTP
-          Alert.alert('Info', 'Resend functionality coming soon');
-        }}
+        style={[styles.resendButton, (resending || resendCooldown > 0) && styles.resendButtonDisabled]}
+        onPress={handleResend}
+        disabled={resending || resendCooldown > 0}
       >
-        <Text style={styles.resendText}>Resend code</Text>
+        <Text style={[styles.resendText, (resending || resendCooldown > 0) && styles.resendTextDisabled]}>
+          {resending
+            ? 'Sending...'
+            : resendCooldown > 0
+            ? `Resend code (${resendCooldown}s)`
+            : 'Resend code'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -170,11 +212,18 @@ const styles = StyleSheet.create({
   resendButton: {
     alignItems: 'center',
   },
+  resendButtonDisabled: {
+    opacity: 0.5,
+  },
   resendText: {
     color: '#007AFF',
     fontSize: 14,
   },
+  resendTextDisabled: {
+    color: '#999',
+  },
 });
+
 
 
 
