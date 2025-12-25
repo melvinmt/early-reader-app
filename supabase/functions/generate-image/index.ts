@@ -69,9 +69,9 @@ Deno.serve(async (req: Request) => {
     console.log('Generating image with Nano Banana (Gemini 2.5 Flash Image) API');
     console.log('Prompt:', imagePrompt);
     
-    // Use Nano Banana (Gemini 2.5 Flash Image) API
-    // According to Google's documentation, Nano Banana is accessed via gemini-2.0-flash-exp
-    // with image generation capabilities
+    // Use Nano Banana (Gemini 2.0 Flash Exp) API for image generation
+    // Note: responseMimeType cannot be 'image/png' - it only accepts text formats
+    // The API returns image data in parts[1].inlineData.data
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
       {
@@ -89,10 +89,6 @@ Deno.serve(async (req: Request) => {
               ],
             },
           ],
-          // Request image output format
-          generationConfig: {
-            responseMimeType: 'image/png',
-          },
         }),
       }
     );
@@ -126,23 +122,24 @@ Deno.serve(async (req: Request) => {
     });
     
     // Extract image data from Nano Banana response
-    // The response should have: candidates[0].content.parts[0].inlineData.data
+    // The response structure is: candidates[0].content.parts[0].text (description)
+    // and candidates[0].content.parts[1].inlineData.data (actual image)
     let imageBase64 = '';
     
-    // Standard structure: data.candidates[0].content.parts[0].inlineData.data
-    if (data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data) {
-      imageBase64 = data.candidates[0].content.parts[0].inlineData.data;
-      console.log('Found image data in inlineData.data, length:', imageBase64.length);
-    } 
-    // Alternative: direct base64 in parts[0]
-    else if (data.candidates?.[0]?.content?.parts?.[0]?.data) {
-      imageBase64 = data.candidates[0].content.parts[0].data;
-      console.log('Found image data in parts[0].data, length:', imageBase64.length);
+    // Check all parts for inlineData
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i]?.inlineData?.data) {
+        imageBase64 = parts[i].inlineData.data;
+        console.log(`Found image data in parts[${i}].inlineData.data, length:`, imageBase64.length);
+        break;
+      }
     }
-    // Check if response is already base64 encoded
-    else if (typeof data === 'string' && data.startsWith('data:image')) {
-      imageBase64 = data.split(',')[1]; // Extract base64 from data URL
-      console.log('Found image data in data URL format, length:', imageBase64.length);
+    
+    // Fallback: try parts[0] if not found in loop
+    if (!imageBase64 && data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data) {
+      imageBase64 = data.candidates[0].content.parts[0].inlineData.data;
+      console.log('Found image data in parts[0].inlineData.data (fallback), length:', imageBase64.length);
     }
     
     // Log what we found
