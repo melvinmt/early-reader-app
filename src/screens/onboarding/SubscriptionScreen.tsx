@@ -29,11 +29,23 @@ export default function SubscriptionScreen() {
     if (Purchases) {
       initializeRevenueCat();
     } else {
-      // Skip initialization in Expo Go
+      // Automatically skip subscription screen in Expo Go / dev mode
       setInitializing(false);
       setPurchasesAvailable(false);
+      // Auto-skip to children screen
+      const autoSkip = async () => {
+        if (session?.user) {
+          try {
+            await updateParentSubscriptionStatus(session.user.id, 'active');
+          } catch (error) {
+            console.error('Error updating subscription status:', error);
+          }
+        }
+        router.replace('/children');
+      };
+      autoSkip();
     }
-  }, []);
+  }, [session, router]);
 
   const initializeRevenueCat = async () => {
     try {
@@ -101,14 +113,14 @@ export default function SubscriptionScreen() {
   const handleSkip = async () => {
     // Allow skipping for now (trial mode)
     // In Expo Go, we'll just mark as active for development
-    if (session?.user && !purchasesAvailable) {
+    if (session?.user) {
       try {
         await updateParentSubscriptionStatus(session.user.id, 'active');
       } catch (error) {
         console.error('Error updating subscription status:', error);
       }
     }
-    router.replace('/(tabs)/children');
+    router.replace('/children');
   };
 
   if (initializing) {
