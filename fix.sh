@@ -10,8 +10,14 @@ echo "🔧 Comprehensive Expo/React Native Fix"
 echo "========================================"
 echo ""
 
-# Step 1: Force kill ALL watchman processes (no shutdown-server which can hang)
-echo "📍 Step 1: Force killing watchman processes..."
+# Step 1: Gracefully shutdown watchman and clear watches
+echo "📍 Step 1: Shutting down watchman..."
+watchman shutdown-server 2>/dev/null || true
+watchman watch-del-all 2>/dev/null || true
+echo "   ✓ Watchman shutdown (if it was running)"
+
+# Step 1b: Force kill any remaining watchman processes (fallback)
+echo "   Killing any remaining watchman processes..."
 pkill -9 -f "watchman" 2>/dev/null || true
 echo "   ✓ Killed all watchman processes"
 
