@@ -75,8 +75,7 @@ export default function BlurredImageReveal({
       width: screenWidth,
       height: screenHeight,
       zIndex: 0,
-      // White background shows on sides in landscape mode
-      backgroundColor: isLandscape ? '#ffffff' : '#000000',
+      backgroundColor: '#000000',
     },
     fullScreenImageContainer: {
       width: screenWidth,
@@ -88,11 +87,20 @@ export default function BlurredImageReveal({
       width: screenWidth,
       height: screenHeight,
     },
+    // Blurred background for landscape mode - scaled up and blurred
+    blurredBackground: {
+      position: 'absolute' as const,
+      top: 0,
+      left: 0,
+      width: screenWidth,
+      height: screenHeight,
+    },
   };
 
-  // In landscape, use 'contain' to show full image with white bars on sides
+  // In landscape, use 'contain' to show full image with blurred sides
   // In portrait, use 'cover' to fill the screen
   const imageResizeMode = isLandscape && isFullScreen ? 'contain' : 'cover';
+  const showBlurredBackground = isLandscape && isFullScreen;
 
   // Show placeholder if no valid image
   if (!hasValidImage) {
@@ -110,6 +118,23 @@ export default function BlurredImageReveal({
 
   return (
     <View style={[styles.container, isFullScreen && dynamicStyles.fullScreenContainer]}>
+      {/* Blurred background image for landscape mode - fills entire screen */}
+      {showBlurredBackground && (
+        <View style={dynamicStyles.blurredBackground}>
+          <Image
+            source={imageSource}
+            style={dynamicStyles.fullScreenImage}
+            resizeMode="cover"
+          />
+          <BlurView
+            intensity={80}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      )}
+      
+      {/* Main image container */}
       <View style={[styles.imageContainer, isFullScreen && dynamicStyles.fullScreenImageContainer]}>
         <Image
           source={imageSource}
@@ -118,13 +143,24 @@ export default function BlurredImageReveal({
           onError={() => setImageError(true)}
         />
 
-        {/* Blur overlay that animates */}
-        {currentBlur > 0 && (
+        {/* Blur overlay that animates (only when not revealed) */}
+        {currentBlur > 0 && !showBlurredBackground && (
           <BlurView
             intensity={currentBlur}
             tint="light"
             style={StyleSheet.absoluteFill}
           />
+        )}
+        
+        {/* For landscape revealed state, show the main image blur overlay */}
+        {currentBlur > 0 && showBlurredBackground && (
+          <View style={styles.landscapeBlurOverlay}>
+            <BlurView
+              intensity={currentBlur}
+              tint="light"
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
         )}
       </View>
 
@@ -158,6 +194,9 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
+  },
+  landscapeBlurOverlay: {
+    ...StyleSheet.absoluteFillObject,
   },
   overlay: {
     position: 'absolute',
