@@ -2,6 +2,11 @@
  * DISTAR Phoneme Definitions
  * Based on "Teach Your Child to Read in 100 Easy Lessons" pronunciation guide
  * All 44 phonemes with their phonetic pronunciations for ElevenLabs TTS
+ * 
+ * Pronunciations are optimized for ElevenLabs TTS to correctly produce the sounds:
+ * - Single consonants need vowel sounds added (e.g., "t" → "tuh") to avoid letter names
+ * - Short vowels need distinct spellings (e.g., "ooo" → "awww" for short 'o')
+ * - Repeated letters (e.g., "www") are avoided as TTS reads them as letter names
  */
 
 export interface DistarPhoneme {
@@ -16,7 +21,7 @@ export interface DistarPhoneme {
 
 /**
  * All 44 DISTAR phonemes in lesson order
- * Based on the pronunciation guide provided
+ * Pronunciations optimized for ElevenLabs TTS
  */
 export const DISTAR_PHONEMES: DistarPhoneme[] = [
   // Lesson 1
@@ -24,31 +29,37 @@ export const DISTAR_PHONEMES: DistarPhoneme[] = [
   { symbol: 's', pronunciation: 'sss', exampleWord: 'bus', lesson: 1, type: 'whispered' },
   
   // Lesson 3
-  { symbol: 'a', pronunciation: 'aah', exampleWord: 'and', lesson: 3, type: 'voiced' },
+  // "aaah" like apple - "aah" is often read as 'father'
+  { symbol: 'a', pronunciation: 'aaah', exampleWord: 'and', lesson: 3, type: 'voiced' },
   
   // Lesson 5
   { symbol: 'ē', pronunciation: 'eee', exampleWord: 'eat', lesson: 5, type: 'voiced', hasMacron: true },
   
   // Lesson 7
-  { symbol: 't', pronunciation: 't', exampleWord: 'cat', lesson: 7, type: 'whispered' },
+  // "tuh" (clipped) - "t" alone is read as the letter name "tee"
+  { symbol: 't', pronunciation: 'tuh', exampleWord: 'cat', lesson: 7, type: 'whispered' },
   
   // Lesson 9
   { symbol: 'r', pronunciation: 'rrr', exampleWord: 'bar', lesson: 9, type: 'voiced' },
   
   // Lesson 12
-  { symbol: 'd', pronunciation: 'd', exampleWord: 'mad', lesson: 12, type: 'voiced' },
+  // "duh" - "d" alone is read as "dee"
+  { symbol: 'd', pronunciation: 'duh', exampleWord: 'mad', lesson: 12, type: 'voiced' },
   
   // Lesson 14
-  { symbol: 'i', pronunciation: 'iii', exampleWord: 'if', lesson: 14, type: 'voiced' },
+  // "ihhh" - "iii" is often read as "eye"
+  { symbol: 'i', pronunciation: 'ihhh', exampleWord: 'if', lesson: 14, type: 'voiced' },
   
   // Lesson 16
   { symbol: 'th', pronunciation: 'thhhh', exampleWord: 'this', lesson: 16, type: 'voiced', isDigraph: true },
   
   // Lesson 19
-  { symbol: 'c', pronunciation: 'c', exampleWord: 'tack', lesson: 19, type: 'whispered' },
+  // "kuh" - "c" alone is read as "see"
+  { symbol: 'c', pronunciation: 'kuh', exampleWord: 'tack', lesson: 19, type: 'whispered' },
   
   // Lesson 21
-  { symbol: 'o', pronunciation: 'ooo', exampleWord: 'ox', lesson: 21, type: 'voiced' },
+  // "awww" - "ooo" is read as "moon". Short 'o' is "aw" (ox)
+  { symbol: 'o', pronunciation: 'awww', exampleWord: 'ox', lesson: 21, type: 'voiced' },
   
   // Lesson 23
   { symbol: 'n', pronunciation: 'nnn', exampleWord: 'pan', lesson: 23, type: 'voiced' },
@@ -57,16 +68,19 @@ export const DISTAR_PHONEMES: DistarPhoneme[] = [
   { symbol: 'f', pronunciation: 'fff', exampleWord: 'stuff', lesson: 25, type: 'whispered' },
   
   // Lesson 27
-  { symbol: 'u', pronunciation: 'uuu', exampleWord: 'under', lesson: 27, type: 'voiced' },
+  // "uhhh" - "uuu" is read as "tube". Short 'u' is "uh"
+  { symbol: 'u', pronunciation: 'uhhh', exampleWord: 'under', lesson: 27, type: 'voiced' },
   
   // Lesson 29
   { symbol: 'l', pronunciation: 'lll', exampleWord: 'pal', lesson: 29, type: 'voiced' },
   
   // Lesson 31
-  { symbol: 'w', pronunciation: 'www', exampleWord: 'wow', lesson: 31, type: 'voiced' },
+  // "wuh" - "www" is read as "Double-U Double-U..."
+  { symbol: 'w', pronunciation: 'wuh', exampleWord: 'wow', lesson: 31, type: 'voiced' },
   
   // Lesson 33
-  { symbol: 'g', pronunciation: 'g', exampleWord: 'tag', lesson: 33, type: 'voiced' },
+  // "guh" - "g" alone is read as "jee"
+  { symbol: 'g', pronunciation: 'guh', exampleWord: 'tag', lesson: 33, type: 'voiced' },
   
   // Lesson 35
   { symbol: 'sh', pronunciation: 'shhh', exampleWord: 'wish', lesson: 35, type: 'whispered', isDigraph: true },
@@ -75,40 +89,50 @@ export const DISTAR_PHONEMES: DistarPhoneme[] = [
   { symbol: 'ā', pronunciation: 'aaa', exampleWord: 'ate', lesson: 37, type: 'voiced', hasMacron: true },
   
   // Lesson 39
-  { symbol: 'h', pronunciation: 'h', exampleWord: 'hat', lesson: 39, type: 'whispered' },
+  // "huh" - "h" alone is read as "aitch"
+  { symbol: 'h', pronunciation: 'huh', exampleWord: 'hat', lesson: 39, type: 'whispered' },
   
   // Lesson 41
-  { symbol: 'k', pronunciation: 'k', exampleWord: 'tack', lesson: 41, type: 'whispered' },
+  // "kuh" - "k" alone is read as "kay"
+  { symbol: 'k', pronunciation: 'kuh', exampleWord: 'tack', lesson: 41, type: 'whispered' },
   
   // Lesson 43
-  { symbol: 'ō', pronunciation: 'ooo', exampleWord: 'over', lesson: 43, type: 'voiced', hasMacron: true },
+  // "ohhh" - safer than "ooo" for long O
+  { symbol: 'ō', pronunciation: 'ohhh', exampleWord: 'over', lesson: 43, type: 'voiced', hasMacron: true },
   
   // Lesson 45
   { symbol: 'v', pronunciation: 'vvv', exampleWord: 'love', lesson: 45, type: 'voiced' },
   
   // Lesson 47
-  { symbol: 'p', pronunciation: 'p', exampleWord: 'sap', lesson: 47, type: 'whispered' },
+  // "puh" - "p" alone is read as "pee"
+  { symbol: 'p', pronunciation: 'puh', exampleWord: 'sap', lesson: 47, type: 'whispered' },
   
   // Lesson 49
-  { symbol: 'ar', pronunciation: 'olrr', exampleWord: 'car', lesson: 49, type: 'voiced', isDigraph: true },
+  // Fixed typo "olrr" -> "arrr"
+  { symbol: 'ar', pronunciation: 'arrr', exampleWord: 'car', lesson: 49, type: 'voiced', isDigraph: true },
   
   // Lesson 51
   { symbol: 'ch', pronunciation: 'ch', exampleWord: 'touch', lesson: 51, type: 'whispered', isDigraph: true },
   
   // Lesson 53
-  { symbol: 'e', pronunciation: 'eee', exampleWord: 'end', lesson: 53, type: 'voiced' },
+  // "ehhh" - "eee" is Long E. Short E needs "eh" sound
+  { symbol: 'e', pronunciation: 'ehhh', exampleWord: 'end', lesson: 53, type: 'voiced' },
   
   // Lesson 55
-  { symbol: 'b', pronunciation: 'b', exampleWord: 'grab', lesson: 55, type: 'voiced' },
+  // "buh" - "b" alone is read as "bee"
+  { symbol: 'b', pronunciation: 'buh', exampleWord: 'grab', lesson: 55, type: 'voiced' },
   
   // Lesson 57
-  { symbol: 'ing', pronunciation: 'iling', exampleWord: 'sing', lesson: 57, type: 'voiced', isDigraph: true },
+  // Fixed typo "iling" -> "ing"
+  { symbol: 'ing', pronunciation: 'ing', exampleWord: 'sing', lesson: 57, type: 'voiced', isDigraph: true },
   
   // Lesson 59
-  { symbol: 'ī', pronunciation: 'iii', exampleWord: 'ice', lesson: 59, type: 'voiced', hasMacron: true },
+  // "eye" for long I sound
+  { symbol: 'ī', pronunciation: 'eye', exampleWord: 'ice', lesson: 59, type: 'voiced', hasMacron: true },
   
   // Lesson 61
-  { symbol: 'y', pronunciation: 'yyye', exampleWord: 'yard', lesson: 61, type: 'voiced' },
+  // "yuh" - "yyye" doesn't work well
+  { symbol: 'y', pronunciation: 'yuh', exampleWord: 'yard', lesson: 61, type: 'voiced' },
   
   // Lesson 63
   { symbol: 'er', pronunciation: 'urrr', exampleWord: 'brother', lesson: 63, type: 'voiced', isDigraph: true },
@@ -117,22 +141,28 @@ export const DISTAR_PHONEMES: DistarPhoneme[] = [
   { symbol: 'oo', pronunciation: 'oooooo', exampleWord: 'moon', lesson: 65, type: 'voiced', isDigraph: true },
   
   // Lesson 67
-  { symbol: 'j', pronunciation: 'j', exampleWord: 'judge', lesson: 67, type: 'voiced' },
+  // "juh" - "j" alone may be read as "jay"
+  { symbol: 'j', pronunciation: 'juh', exampleWord: 'judge', lesson: 67, type: 'voiced' },
   
   // Lesson 69
-  { symbol: 'wh', pronunciation: 'www', exampleWord: 'why', lesson: 69, type: 'whispered', isDigraph: true },
+  // "hwuh" - represents the breathy/whispered WH
+  { symbol: 'wh', pronunciation: 'hwuh', exampleWord: 'why', lesson: 69, type: 'whispered', isDigraph: true },
   
   // Lesson 71
-  { symbol: 'ȳ', pronunciation: 'yyye', exampleWord: 'my', lesson: 71, type: 'voiced', hasMacron: true },
+  // "eye" for long Y sound (like in "my")
+  { symbol: 'ȳ', pronunciation: 'eye', exampleWord: 'my', lesson: 71, type: 'voiced', hasMacron: true },
   
   // Lesson 73
-  { symbol: 'ū', pronunciation: 'ooo', exampleWord: 'use', lesson: 73, type: 'voiced', hasMacron: true },
+  // "yooo" for long U (like in "use")
+  { symbol: 'ū', pronunciation: 'yooo', exampleWord: 'use', lesson: 73, type: 'voiced', hasMacron: true },
   
   // Lesson 75
-  { symbol: 'qu', pronunciation: 'kwww', exampleWord: 'quick', lesson: 75, type: 'whispered', isDigraph: true },
+  // "kwuh" - "kwww" doesn't work well
+  { symbol: 'qu', pronunciation: 'kwuh', exampleWord: 'quick', lesson: 75, type: 'whispered', isDigraph: true },
   
   // Lesson 77
-  { symbol: 'x', pronunciation: 'ksss', exampleWord: 'ox', lesson: 77, type: 'whispered' },
+  // "ks" - cleaner than "ksss"
+  { symbol: 'x', pronunciation: 'ks', exampleWord: 'ox', lesson: 77, type: 'whispered' },
   
   // Lesson 79
   { symbol: 'z', pronunciation: 'zzz', exampleWord: 'buzz', lesson: 79, type: 'voiced' },
@@ -144,7 +174,8 @@ export const DISTAR_PHONEMES: DistarPhoneme[] = [
   { symbol: 'ai', pronunciation: 'aaa', exampleWord: 'rain', lesson: 83, type: 'voiced', isDigraph: true },
   
   // Lesson 89
-  { symbol: 'ou', pronunciation: 'owww', exampleWord: 'loud', lesson: 89, type: 'voiced', isDigraph: true },
+  // "ow" - cleaner than "owww"
+  { symbol: 'ou', pronunciation: 'ow', exampleWord: 'loud', lesson: 89, type: 'voiced', isDigraph: true },
 ];
 
 /**
@@ -167,9 +198,3 @@ export function getPhonemesUpToLesson(lesson: number): DistarPhoneme[] {
 export function getPhonemesForLesson(lesson: number): DistarPhoneme[] {
   return DISTAR_PHONEMES.filter(p => p.lesson === lesson);
 }
-
-
-
-
-
-
