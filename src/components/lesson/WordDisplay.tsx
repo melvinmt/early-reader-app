@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { DistarCard } from '@/data/distarCards';
 import { audioPlayer } from '@/services/audio/audioPlayer';
+import { isTablet, responsiveFontSize, responsiveSpacing } from '@/utils/responsive';
 
 interface WordDisplayProps {
   word: string;
@@ -18,6 +19,7 @@ export default function WordDisplay({
   const displayText = distarCard?.display || word;
   const isSentence = displayText.includes(' ');
   const words = isSentence ? displayText.split(' ') : [displayText];
+  const isTabletDevice = isTablet();
 
   const handleWordPress = () => {
     if (onWordTap) {
@@ -27,20 +29,27 @@ export default function WordDisplay({
     }
   };
 
+  // Dynamic font sizes based on device
+  const wordFontSize = isTabletDevice ? 96 : 72;
+  const sentenceFontSize = isTabletDevice ? 48 : 36;
+
   return (
     <Pressable onPress={handleWordPress} style={styles.wordPressable}>
       {isSentence ? (
         // Sentence display - show words with proper spacing
         <View style={styles.sentenceContainer}>
           {words.map((w, index) => (
-            <Text key={index} style={styles.sentenceWord}>
+            <Text 
+              key={index} 
+              style={[styles.sentenceWord, { fontSize: sentenceFontSize }]}
+            >
               {w}{index < words.length - 1 ? ' ' : ''}
             </Text>
           ))}
         </View>
       ) : (
         // Single word/letter display - large centered
-        <Text style={styles.wordText}>{displayText}</Text>
+        <Text style={[styles.wordText, { fontSize: wordFontSize }]}>{displayText}</Text>
       )}
     </Pressable>
   );
@@ -50,10 +59,10 @@ const styles = StyleSheet.create({
   wordPressable: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 24,
+    paddingVertical: responsiveSpacing(24),
+    minHeight: isTablet() ? 150 : 100,
   },
   wordText: {
-    fontSize: 72,
     fontWeight: 'bold',
     color: '#1a1a1a',
     letterSpacing: 4,
@@ -65,10 +74,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sentenceWord: {
-    fontSize: 36,
     fontWeight: 'bold',
     color: '#1a1a1a',
-    marginHorizontal: 4,
-    marginVertical: 4,
+    marginHorizontal: isTablet() ? 8 : 4,
+    marginVertical: isTablet() ? 8 : 4,
   },
 });

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { recordCardCompletion, getNextCard, LearningCard } from '@/services/cardQueueManager';
@@ -9,6 +9,7 @@ import BlurredImageReveal from '@/components/lesson/BlurredImageReveal';
 import WordSwipeDetector from '@/components/lesson/WordSwipeDetector';
 import ConfettiCelebration from '@/components/ui/ConfettiCelebration';
 import { createSession, updateSession } from '@/services/storage/database';
+import { isTablet, responsiveFontSize, responsiveSpacing } from '@/utils/responsive';
 
 type LearningState = 'loading' | 'ready' | 'revealing';
 
@@ -16,6 +17,9 @@ export default function LearningScreen() {
   const params = useLocalSearchParams();
   const childId = (params.childId as string) || '';
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
+  const isTabletDevice = isTablet();
+  const dynamicStyles = createStyles(isTabletDevice, screenWidth);
 
   const [currentCard, setCurrentCard] = useState<LearningCard | null>(null);
   const [state, setState] = useState<LearningState>('loading');
@@ -220,10 +224,10 @@ export default function LearningScreen() {
 
   if (state === 'loading' || !currentCard) {
     return (
-      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-        <View style={styles.loadingContainer}>
+      <LinearGradient colors={['#667eea', '#764ba2']} style={dynamicStyles.container}>
+        <View style={dynamicStyles.loadingContainer}>
           <ActivityIndicator size="large" color="#fff" />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={dynamicStyles.loadingText}>Loading...</Text>
         </View>
       </LinearGradient>
     );
@@ -231,7 +235,7 @@ export default function LearningScreen() {
 
   if (state === 'revealing') {
     return (
-      <View style={styles.revealContainer}>
+      <View style={dynamicStyles.revealContainer}>
         <BlurredImageReveal
           imageUri={currentCard.imageUrl}
           isRevealed={isImageRevealed}
@@ -243,7 +247,7 @@ export default function LearningScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       {/* Blurred background image */}
       <BlurredImageReveal
         imageUri={currentCard.imageUrl}
@@ -254,32 +258,32 @@ export default function LearningScreen() {
       {/* Gradient overlay for readability */}
       <LinearGradient
         colors={['rgba(102, 126, 234, 0.85)', 'rgba(118, 75, 162, 0.85)']}
-        style={styles.gradientOverlay}
+        style={dynamicStyles.gradientOverlay}
       />
       
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.levelText}>Level {currentCard.level}</Text>
-        <Text style={styles.progressText}>{cardsCompleted}/10</Text>
+      <View style={dynamicStyles.header}>
+        <Text style={dynamicStyles.levelText}>Level {currentCard.level}</Text>
+        <Text style={dynamicStyles.progressText}>{cardsCompleted}/10</Text>
       </View>
 
       {/* Progress dots */}
-      <View style={styles.progressDots}>
+      <View style={dynamicStyles.progressDots}>
         {[...Array(10)].map((_, i) => (
           <View
             key={i}
             style={[
-              styles.dot,
-              i < cardsCompleted && styles.dotCompleted,
-              i === cardsCompleted && styles.dotCurrent,
+              dynamicStyles.dot,
+              i < cardsCompleted && dynamicStyles.dotCompleted,
+              i === cardsCompleted && dynamicStyles.dotCurrent,
             ]}
           />
         ))}
       </View>
 
       {/* Main content - combined card */}
-      <View style={styles.content}>
-        <View style={styles.combinedCard}>
+      <View style={dynamicStyles.content}>
+        <View style={dynamicStyles.combinedCard}>
           <WordDisplay
             word={currentCard.word}
             phonemes={currentCard.phonemes}
@@ -297,7 +301,7 @@ export default function LearningScreen() {
         </View>
         
         {/* Swipe hint caption below card */}
-        <Text style={styles.swipeHint}>Swipe right to reveal the image</Text>
+        <Text style={dynamicStyles.swipeHint}>Swipe right to reveal the image</Text>
       </View>
 
       <ConfettiCelebration visible={showConfetti} onComplete={() => setShowConfetti(false)} />
@@ -305,92 +309,107 @@ export default function LearningScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  gradientOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-  },
-  revealContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 18,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 8,
-    zIndex: 2,
-  },
-  levelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  progressText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  progressDots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    zIndex: 2,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  dotCompleted: {
-    backgroundColor: '#4CAF50',
-  },
-  dotCurrent: {
-    backgroundColor: '#fff',
-    transform: [{ scale: 1.2 }],
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-    zIndex: 2,
-  },
-  combinedCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderRadius: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  swipeHint: {
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-});
+// Dynamic styles based on device type
+const createStyles = (isTabletDevice: boolean, screenWidth: number) => {
+  // Max content width for tablets to prevent stretching
+  const maxContentWidth = isTabletDevice ? Math.min(screenWidth * 0.7, 600) : screenWidth;
+  
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#000',
+    },
+    gradientOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 1,
+    },
+    revealContainer: {
+      flex: 1,
+      backgroundColor: '#000',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 16,
+      fontSize: responsiveFontSize(18),
+      color: '#fff',
+      fontWeight: '600',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: responsiveSpacing(24),
+      paddingTop: responsiveSpacing(60),
+      paddingBottom: responsiveSpacing(8),
+      zIndex: 2,
+      maxWidth: maxContentWidth,
+      alignSelf: 'center',
+      width: '100%',
+    },
+    levelText: {
+      fontSize: responsiveFontSize(16),
+      fontWeight: '600',
+      color: 'rgba(255, 255, 255, 0.9)',
+    },
+    progressText: {
+      fontSize: responsiveFontSize(16),
+      fontWeight: '600',
+      color: 'rgba(255, 255, 255, 0.9)',
+    },
+    progressDots: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: isTabletDevice ? 12 : 8,
+      paddingVertical: responsiveSpacing(16),
+      zIndex: 2,
+    },
+    dot: {
+      width: isTabletDevice ? 14 : 10,
+      height: isTabletDevice ? 14 : 10,
+      borderRadius: isTabletDevice ? 7 : 5,
+      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    dotCompleted: {
+      backgroundColor: '#4CAF50',
+    },
+    dotCurrent: {
+      backgroundColor: '#fff',
+      transform: [{ scale: 1.2 }],
+    },
+    content: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: responsiveSpacing(16),
+      paddingBottom: responsiveSpacing(40),
+      zIndex: 2,
+      maxWidth: maxContentWidth,
+      alignSelf: 'center',
+      width: '100%',
+    },
+    combinedCard: {
+      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+      borderRadius: isTabletDevice ? 28 : 20,
+      paddingHorizontal: responsiveSpacing(24),
+      paddingVertical: responsiveSpacing(32),
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    swipeHint: {
+      textAlign: 'center',
+      marginTop: responsiveSpacing(20),
+      fontSize: responsiveFontSize(14),
+      color: 'rgba(255, 255, 255, 0.9)',
+      fontWeight: '500',
+    },
+  });
+};
+
+// Default styles for static reference
+const styles = createStyles(isTablet(), 390);

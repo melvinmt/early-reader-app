@@ -3,6 +3,7 @@ import { View, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useSharedValue, runOnJS } from 'react-native-reanimated';
 import { DistarCard } from '@/data/distarCards';
+import { isTablet } from '@/utils/responsive';
 
 interface WordSwipeDetectorProps {
   word: string;
@@ -178,19 +179,21 @@ export default function WordSwipeDetector({
   );
 }
 
+const isTabletDevice = isTablet();
+
 const styles = StyleSheet.create({
   container: {
     width: '100%',
   },
   swipeArea: {
     width: '100%',
-    minHeight: 40,
-    paddingVertical: 8,
+    minHeight: isTabletDevice ? 60 : 40,
+    paddingVertical: isTabletDevice ? 12 : 8,
   },
   progressTrack: {
-    height: 40,
+    height: isTabletDevice ? 60 : 40,
     backgroundColor: '#e0e0e0',
-    borderRadius: 20,
+    borderRadius: isTabletDevice ? 30 : 20,
     overflow: 'hidden',
     justifyContent: 'center',
   },
