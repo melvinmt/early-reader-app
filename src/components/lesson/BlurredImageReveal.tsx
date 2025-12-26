@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Image, StyleSheet, Animated, Text, Dimensions, ImageSourcePropType } from 'react-native';
+import { View, Image, StyleSheet, Animated, Text, useWindowDimensions, ImageSourcePropType } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { getImageSource, hasImageAsset } from '@/utils/assetMap';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface BlurredImageRevealProps {
   imageUri: string;
@@ -18,6 +16,7 @@ export default function BlurredImageReveal({
   isFullScreen = false,
   onRevealComplete,
 }: BlurredImageRevealProps) {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const blurIntensity = useRef(new Animated.Value(50)).current;
   const opacityAnimation = useRef(new Animated.Value(1)).current;
   const [currentBlur, setCurrentBlur] = useState(50);
@@ -64,10 +63,32 @@ export default function BlurredImageReveal({
   const imageSource = imageUri ? getImageSource(imageUri) : null;
   const hasValidImage = imageUri && hasImageAsset(imageUri) && !imageError;
 
+  // Dynamic styles based on current screen dimensions
+  const dynamicStyles = {
+    fullScreenContainer: {
+      position: 'absolute' as const,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: screenWidth,
+      height: screenHeight,
+      zIndex: 0,
+    },
+    fullScreenImageContainer: {
+      width: screenWidth,
+      height: screenHeight,
+    },
+    fullScreenImage: {
+      width: screenWidth,
+      height: screenHeight,
+    },
+  };
+
   // Show placeholder if no valid image
   if (!hasValidImage) {
     return (
-      <View style={[styles.container, isFullScreen && styles.fullScreenContainer]}>
+      <View style={[styles.container, isFullScreen && dynamicStyles.fullScreenContainer]}>
         <View style={[styles.placeholder, isFullScreen && styles.fullScreenPlaceholder]}>
           <Text style={styles.placeholderEmoji}>🎨</Text>
           <Text style={styles.placeholderText}>
@@ -79,11 +100,11 @@ export default function BlurredImageReveal({
   }
 
   return (
-    <View style={[styles.container, isFullScreen && styles.fullScreenContainer]}>
-      <View style={[styles.imageContainer, isFullScreen && styles.fullScreenImageContainer]}>
+    <View style={[styles.container, isFullScreen && dynamicStyles.fullScreenContainer]}>
+      <View style={[styles.imageContainer, isFullScreen && dynamicStyles.fullScreenImageContainer]}>
         <Image
           source={imageSource}
-          style={[styles.image, isFullScreen && styles.fullScreenImage]}
+          style={[styles.image, isFullScreen && dynamicStyles.fullScreenImage]}
           resizeMode="cover"
           onError={() => setImageError(true)}
         />
@@ -121,31 +142,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  fullScreenContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    zIndex: 0,
-  },
   imageContainer: {
     width: '100%',
     height: '100%',
   },
-  fullScreenImageContainer: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-  },
   image: {
     width: '100%',
     height: '100%',
-  },
-  fullScreenImage: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
   },
   overlay: {
     position: 'absolute',
