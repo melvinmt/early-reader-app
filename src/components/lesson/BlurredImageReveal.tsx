@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Image, StyleSheet, Animated, Text, useWindowDimensions, ImageSourcePropType } from 'react-native';
+import { View, Image, StyleSheet, Animated, Text, useWindowDimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { getImageSource, hasImageAsset } from '@/utils/assetMap';
 
@@ -17,6 +17,7 @@ export default function BlurredImageReveal({
   onRevealComplete,
 }: BlurredImageRevealProps) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const isLandscape = screenWidth > screenHeight;
   const blurIntensity = useRef(new Animated.Value(50)).current;
   const opacityAnimation = useRef(new Animated.Value(1)).current;
   const [currentBlur, setCurrentBlur] = useState(50);
@@ -63,7 +64,7 @@ export default function BlurredImageReveal({
   const imageSource = imageUri ? getImageSource(imageUri) : null;
   const hasValidImage = imageUri && hasImageAsset(imageUri) && !imageError;
 
-  // Dynamic styles based on current screen dimensions
+  // Dynamic styles based on current screen dimensions and orientation
   const dynamicStyles = {
     fullScreenContainer: {
       position: 'absolute' as const,
@@ -74,16 +75,24 @@ export default function BlurredImageReveal({
       width: screenWidth,
       height: screenHeight,
       zIndex: 0,
+      // White background shows on sides in landscape mode
+      backgroundColor: isLandscape ? '#ffffff' : '#000000',
     },
     fullScreenImageContainer: {
       width: screenWidth,
       height: screenHeight,
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
     },
     fullScreenImage: {
       width: screenWidth,
       height: screenHeight,
     },
   };
+
+  // In landscape, use 'contain' to show full image with white bars on sides
+  // In portrait, use 'cover' to fill the screen
+  const imageResizeMode = isLandscape && isFullScreen ? 'contain' : 'cover';
 
   // Show placeholder if no valid image
   if (!hasValidImage) {
@@ -105,7 +114,7 @@ export default function BlurredImageReveal({
         <Image
           source={imageSource}
           style={[styles.image, isFullScreen && dynamicStyles.fullScreenImage]}
-          resizeMode="cover"
+          resizeMode={imageResizeMode}
           onError={() => setImageError(true)}
         />
 
