@@ -7,7 +7,7 @@
  * - Static card data file for the app
  * 
  * Each card folder contains:
- * - image.png: 9:16 portrait image with colorful background and text
+ * - image.webp: 9:16 portrait image with colorful background and text
  * - prompt.mp3: Initial prompt ("Can you read this word?")
  * - try-again.mp3: Try again prompt with word repeated
  * - no-input.mp3: "I didn't hear anything" prompt (varied per card)
@@ -31,6 +31,7 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 import * as readline from 'readline';
 import axios from 'axios';
+import sharp from 'sharp';
 import { DISTAR_PHONEMES } from '../src/data/distarPhonemes';
 
 // Load environment variables from .env file
@@ -175,9 +176,19 @@ async function generateImage(prompt: string, outputPath: string, displayText?: s
         for (const part of parts) {
           if (part.inlineData?.data) {
             const imageBuffer = Buffer.from(part.inlineData.data, 'base64');
-            fs.writeFileSync(outputPath, imageBuffer);
+            
+            // Convert PNG to WebP for smaller file size (25-35% reduction)
+            // Quality 85 provides excellent visual quality with good compression
+            const webpBuffer = await sharp(imageBuffer)
+              .webp({ quality: 85, effort: 6 })
+              .toBuffer();
+            
+            fs.writeFileSync(outputPath, webpBuffer);
             const labelText = label ? `[${label}] ` : '';
-            console.log(`✓ ${labelText}Generated image: ${path.basename(outputPath)}`);
+            const originalSize = (imageBuffer.length / 1024).toFixed(1);
+            const optimizedSize = (webpBuffer.length / 1024).toFixed(1);
+            const savings = (100 - (webpBuffer.length / imageBuffer.length * 100)).toFixed(0);
+            console.log(`✓ ${labelText}Generated image: ${path.basename(outputPath)} (${originalSize}KB → ${optimizedSize}KB, ${savings}% smaller)`);
             return;
           }
         }
@@ -405,7 +416,7 @@ async function generatePhonemeCards(): Promise<any[]> {
     console.log(`  Generating ${cardLabel} (${cardId})...`);
     
     const cardDir = ensureCardDirectory(cardId);
-    const imagePath = path.join(cardDir, 'image.png');
+    const imagePath = path.join(cardDir, 'image.webp');
     const promptPath = path.join(cardDir, 'prompt.mp3');
     const tryAgainPath = path.join(cardDir, 'try-again.mp3');
     const audioPath = path.join(cardDir, 'audio.mp3');
@@ -459,7 +470,7 @@ async function generatePhonemeCards(): Promise<any[]> {
       phonemes: [phoneme.symbol],
       phonemeAudioPaths: [`assets/${LOCALE}/${cardId}/audio.mp3`],
       lesson: phoneme.lesson,
-      imagePath: `assets/${LOCALE}/${cardId}/image.png`,
+      imagePath: `assets/${LOCALE}/${cardId}/image.webp`,
       promptPath: `assets/${LOCALE}/${cardId}/prompt.mp3`,
       tryAgainPath: `assets/${LOCALE}/${cardId}/try-again.mp3`,
       noInputPath: `assets/${LOCALE}/${cardId}/no-input.mp3`,
@@ -608,7 +619,7 @@ async function generateWordCards(): Promise<any[]> {
       
       const cardDir = ensureCardDirectory(cardId);
       
-      const imagePath = path.join(cardDir, 'image.png');
+      const imagePath = path.join(cardDir, 'image.webp');
       const promptPath = path.join(cardDir, 'prompt.mp3');
       const tryAgainPath = path.join(cardDir, 'try-again.mp3');
       const audioPath = path.join(cardDir, 'audio.mp3');
@@ -662,7 +673,7 @@ async function generateWordCards(): Promise<any[]> {
         phonemes,
         ...(phonemeAudioPaths.length > 0 && { phonemeAudioPaths }),
         lesson,
-        imagePath: `assets/${LOCALE}/${cardId}/image.png`,
+        imagePath: `assets/${LOCALE}/${cardId}/image.webp`,
         promptPath: `assets/${LOCALE}/${cardId}/prompt.mp3`,
         tryAgainPath: `assets/${LOCALE}/${cardId}/try-again.mp3`,
         noInputPath: `assets/${LOCALE}/${cardId}/no-input.mp3`,
@@ -703,7 +714,7 @@ async function generateWordCards(): Promise<any[]> {
       
       const cardDir = ensureCardDirectory(cardId);
       
-      const imagePath = path.join(cardDir, 'image.png');
+      const imagePath = path.join(cardDir, 'image.webp');
       const promptPath = path.join(cardDir, 'prompt.mp3');
       const tryAgainPath = path.join(cardDir, 'try-again.mp3');
       const audioPath = path.join(cardDir, 'audio.mp3');
@@ -757,7 +768,7 @@ async function generateWordCards(): Promise<any[]> {
         phonemes,
         phonemeAudioPaths,
         lesson,
-        imagePath: `assets/${LOCALE}/${cardId}/image.png`,
+        imagePath: `assets/${LOCALE}/${cardId}/image.webp`,
         promptPath: `assets/${LOCALE}/${cardId}/prompt.mp3`,
         tryAgainPath: `assets/${LOCALE}/${cardId}/try-again.mp3`,
         noInputPath: `assets/${LOCALE}/${cardId}/no-input.mp3`,
@@ -917,7 +928,7 @@ async function generateSentenceCards(): Promise<any[]> {
     
     const cardDir = ensureCardDirectory(cardId);
     
-    const imagePath = path.join(cardDir, 'image.png');
+    const imagePath = path.join(cardDir, 'image.webp');
     const promptPath = path.join(cardDir, 'prompt.mp3');
     const tryAgainPath = path.join(cardDir, 'try-again.mp3');
     const audioPath = path.join(cardDir, 'audio.mp3');
@@ -970,7 +981,7 @@ async function generateSentenceCards(): Promise<any[]> {
       ...(phonemeAudioPaths.length > 0 && { phonemeAudioPaths }),
       ...(wordAudioPaths.length > 0 && { wordAudioPaths }),
       lesson: sentence.lesson,
-      imagePath: `assets/${LOCALE}/${cardId}/image.png`,
+      imagePath: `assets/${LOCALE}/${cardId}/image.webp`,
       promptPath: `assets/${LOCALE}/${cardId}/prompt.mp3`,
       tryAgainPath: `assets/${LOCALE}/${cardId}/try-again.mp3`,
       noInputPath: `assets/${LOCALE}/${cardId}/no-input.mp3`,
@@ -1138,7 +1149,7 @@ function generateAssetMappings(cards: any[]): void {
 // Image assets
 const IMAGE_ASSETS: Record<string, any> = {
 ${Array.from(imagePaths).sort().map(imgPath => {
-  // Convert path like "assets/en-US/001-l/image.png" to require path
+  // Convert path like "assets/en-US/001-l/image.webp" to require path
   const requirePath = imgPath.replace(/^assets\//, '../../assets/');
   return `  '${imgPath}': require('${requirePath}'),`;
 }).join('\n')}
