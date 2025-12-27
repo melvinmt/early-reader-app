@@ -227,9 +227,8 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
     }
   };
 
-  const content = (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+  const scrollContent = (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>Add Your Children</Text>
         {asModal && (
@@ -300,8 +299,7 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
         style={styles.continueButton}
         disabled={!canContinue() || saving}
       />
-      </ScrollView>
-    </SafeAreaView>
+    </ScrollView>
   );
 
   if (asModal) {
@@ -312,16 +310,20 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
         animationType="slide"
         onRequestClose={() => onComplete?.()}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={styles.modalOverlay} edges={['top', 'bottom']}>
           <View style={styles.modalContent}>
-            {content}
+            {scrollContent}
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
     );
   }
 
-  return content;
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {scrollContent}
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -371,8 +373,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     width: '90%',
-    maxHeight: '90%',
-    overflow: 'hidden',
+    maxHeight: '85%',
+    flex: 0,
   },
   subtitle: {
     fontSize: 16,
