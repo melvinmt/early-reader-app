@@ -7,7 +7,8 @@ import Button from '@/components/ui/Button';
 interface ChildForm {
   id: string;
   name: string;
-  age: number | null;
+  birthMonth: number | null;
+  birthYear: number | null;
 }
 
 interface AddChildrenScreenProps {
@@ -15,20 +16,60 @@ interface AddChildrenScreenProps {
   asModal?: boolean;
 }
 
-const AGE_OPTIONS = [3, 4, 5, 6, 7, 8];
+const MONTHS = [
+  { value: 1, label: 'January' },
+  { value: 2, label: 'February' },
+  { value: 3, label: 'March' },
+  { value: 4, label: 'April' },
+  { value: 5, label: 'May' },
+  { value: 6, label: 'June' },
+  { value: 7, label: 'July' },
+  { value: 8, label: 'August' },
+  { value: 9, label: 'September' },
+  { value: 10, label: 'October' },
+  { value: 11, label: 'November' },
+  { value: 12, label: 'December' },
+];
+
+// Generate year options (current year back to 10 years ago)
+const getYearOptions = () => {
+  const currentYear = new Date().getFullYear();
+  const years = [];
+  for (let i = 0; i <= 10; i++) {
+    years.push(currentYear - i);
+  }
+  return years;
+};
+
+// Calculate age from birth month and year
+const calculateAge = (birthMonth: number, birthYear: number): number => {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1; // getMonth() returns 0-11
+  
+  let age = currentYear - birthYear;
+  
+  // If birthday hasn't occurred this year yet (current month is before birth month), subtract 1
+  if (currentMonth < birthMonth) {
+    age--;
+  }
+  
+  return age;
+};
 
 export default function AddChildrenScreen({ onComplete, asModal = false }: AddChildrenScreenProps) {
   const [children, setChildren] = useState<ChildForm[]>([
-    { id: generateId(), name: '', age: null },
+    { id: generateId(), name: '', birthMonth: null, birthYear: null },
   ]);
   const [saving, setSaving] = useState(false);
+  const yearOptions = getYearOptions();
 
   function generateId(): string {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   const handleAddChild = () => {
-    setChildren([...children, { id: generateId(), name: '', age: null }]);
+    setChildren([...children, { id: generateId(), name: '', birthMonth: null, birthYear: null }]);
   };
 
   const handleRemoveChild = (id: string) => {
@@ -43,19 +84,27 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
     );
   };
 
-  const handleAgeChange = (id: string, age: number) => {
+  const handleBirthMonthChange = (id: string, month: number) => {
     setChildren(
-      children.map((child) => (child.id === id ? { ...child, age } : child))
+      children.map((child) => (child.id === id ? { ...child, birthMonth: month } : child))
+    );
+  };
+
+  const handleBirthYearChange = (id: string, year: number) => {
+    setChildren(
+      children.map((child) => (child.id === id ? { ...child, birthYear: year } : child))
     );
   };
 
   const canContinue = () => {
-    return children.some((child) => child.name.trim() && child.age !== null);
+    return children.some((child) => 
+      child.name.trim() && child.birthMonth !== null && child.birthYear !== null
+    );
   };
 
   const handleContinue = async () => {
     if (!canContinue()) {
-      Alert.alert('Error', 'Please add at least one child with a name and age');
+      Alert.alert('Error', 'Please add at least one child with a name, birth month, and birth year');
       return;
     }
 
@@ -65,15 +114,18 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
       // Use a default parent_id since we're not using auth anymore
       const defaultParentId = 'default-parent';
       const validChildren = children.filter(
-        (child) => child.name.trim() && child.age !== null
+        (child) => child.name.trim() && child.birthMonth !== null && child.birthYear !== null
       );
 
       for (const childForm of validChildren) {
+        // Calculate age from birth month and year
+        const age = calculateAge(childForm.birthMonth!, childForm.birthYear!);
+        
         const child: Child = {
           id: generateId(),
           parent_id: defaultParentId,
           name: childForm.name.trim(),
-          age: childForm.age!,
+          age: age,
           created_at: new Date().toISOString(),
           current_level: 1,
           total_cards_completed: 0,
@@ -131,28 +183,57 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
             autoCapitalize="words"
           />
 
-          <Text style={styles.ageLabel}>Age</Text>
-          <View style={styles.ageContainer}>
-            {AGE_OPTIONS.map((age) => (
+          <Text style={styles.birthLabel}>Birth Month</Text>
+          <View style={styles.monthContainer}>
+            {MONTHS.map((month) => (
               <TouchableOpacity
-                key={age}
+                key={month.value}
                 style={[
-                  styles.ageButton,
-                  child.age === age && styles.ageButtonSelected,
+                  styles.monthButton,
+                  child.birthMonth === month.value && styles.monthButtonSelected,
                 ]}
-                onPress={() => handleAgeChange(child.id, age)}
+                onPress={() => handleBirthMonthChange(child.id, month.value)}
               >
                 <Text
                   style={[
-                    styles.ageButtonText,
-                    child.age === age && styles.ageButtonTextSelected,
+                    styles.monthButtonText,
+                    child.birthMonth === month.value && styles.monthButtonTextSelected,
                   ]}
                 >
-                  {age}
+                  {month.label}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
+
+          <Text style={styles.birthLabel}>Birth Year</Text>
+          <View style={styles.yearContainer}>
+            {yearOptions.map((year) => (
+              <TouchableOpacity
+                key={year}
+                style={[
+                  styles.yearButton,
+                  child.birthYear === year && styles.yearButtonSelected,
+                ]}
+                onPress={() => handleBirthYearChange(child.id, year)}
+              >
+                <Text
+                  style={[
+                    styles.yearButtonText,
+                    child.birthYear === year && styles.yearButtonTextSelected,
+                  ]}
+                >
+                  {year}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          
+          {child.birthMonth !== null && child.birthYear !== null && (
+            <Text style={styles.calculatedAge}>
+              Age: {calculateAge(child.birthMonth, child.birthYear)} years old
+            </Text>
+          )}
         </View>
       ))}
 
@@ -278,38 +359,72 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#fff',
   },
-  ageLabel: {
+  birthLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
+    marginTop: 8,
   },
-  ageContainer: {
+  monthContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  ageButton: {
-    minWidth: 50,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+  monthButton: {
+    minWidth: 80,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     backgroundColor: '#fff',
     alignItems: 'center',
   },
-  ageButtonSelected: {
+  monthButtonSelected: {
     backgroundColor: '#007AFF',
     borderColor: '#007AFF',
   },
-  ageButtonText: {
+  monthButtonText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
+  monthButtonTextSelected: {
+    color: '#fff',
+  },
+  yearContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  yearButton: {
+    minWidth: 70,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+  },
+  yearButtonSelected: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  yearButtonText: {
     fontSize: 16,
     color: '#333',
     fontWeight: '600',
   },
-  ageButtonTextSelected: {
+  yearButtonTextSelected: {
     color: '#fff',
+  },
+  calculatedAge: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   addButton: {
     padding: 16,
