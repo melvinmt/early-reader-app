@@ -1,83 +1,47 @@
 # Early Reader
 
-Copyright (C) 2026 Instalabs, LLC
+A mobile app implementing the **DISTAR-based methodology** from *"Teach Your Child to Read in 100 Easy Lessons"* by Siegfried Engelmann, combined with **spaced repetition** learning algorithms and a touch of AI.
 
-A mobile app implementing the DISTAR-based methodology from "Teach Your Child to Read in 100 Easy Lessons" by Siegfried Engelmann.
+## ✨ What Makes This Special
 
-## Prerequisites
+This isn't just another flashcard app. Early Reader is built on decades of research:
 
-- **Node.js** 18+ 
+- **DISTAR Phonics**: A systematic, phonics-first approach developed by Siegfried Engelmann that has been proven effective for teaching children to read
+- **Spaced Repetition (SM-2)**: The same algorithm used by Anki and SuperMemo, optimized for long-term retention
+- **AI-Powered Cards**: Contextual word generation and imagery that adapts to your child's learning journey
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** 18+
+- **Git LFS** (for large assets like images and audio files)
 - **Expo CLI** (`npm install -g expo-cli`)
-- **Supabase CLI** (`npm install -g supabase`)
 - **iOS Simulator** (macOS) or **Android Emulator**
-- Accounts for:
-  - [Supabase](https://supabase.com) - Authentication & Edge Functions
-  - [Google AI Studio](https://aistudio.google.com) - Gemini API for word/image generation
-  - [RevenueCat](https://revenuecat.com) - Subscription management
 
-## Installation
+### Installation
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd earlyreader
+git clone https://github.com/melvinmt/early-reader-app.git
+cd early-reader-app
+
+# Install Git LFS (if not already installed)
+# macOS
+brew install git-lfs
+
+# Ubuntu/Debian
+sudo apt install git-lfs
+
+# Initialize Git LFS
+git lfs install
+git lfs pull
 
 # Install dependencies
 npm install
 ```
 
-## Environment Setup
-
-### 1. Client Environment Variables
-
-Create a `.env` file in the project root:
-
-```bash
-# Supabase Configuration
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-
-# RevenueCat (for subscriptions)
-EXPO_PUBLIC_REVENUECAT_API_KEY=your-revenuecat-api-key
-```
-
-**Where to get these values:**
-
-| Variable | Where to find it |
-|----------|------------------|
-| `EXPO_PUBLIC_SUPABASE_URL` | Supabase Dashboard → Settings → API → Project URL |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase Dashboard → Settings → API → `anon` `public` key |
-| `EXPO_PUBLIC_REVENUECAT_API_KEY` | RevenueCat Dashboard → Project Settings → API Keys → Public App-Specific API Key |
-
-### 2. Supabase Edge Function Secrets
-
-The Edge Functions need their own secrets configured. Set these via the Supabase CLI or Dashboard:
-
-```bash
-# Using Supabase CLI
-supabase secrets set GEMINI_API_KEY=your-gemini-api-key
-```
-
-Or via the Supabase Dashboard:
-1. Go to **Edge Functions** → **Secrets**
-2. Add `GEMINI_API_KEY` with your Google AI Studio API key
-
-**Where to get the Gemini API key:**
-- Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
-- Create a new API key or use an existing one
-
-### 3. Supabase Project Setup
-
-```bash
-# Link to your Supabase project
-supabase link --project-ref your-project-ref
-
-# Deploy Edge Functions
-supabase functions deploy generate-word
-supabase functions deploy generate-image
-```
-
-## Running the App
+### Running the App
 
 ```bash
 # Start the development server
@@ -92,10 +56,10 @@ Then:
 - Press `a` for Android Emulator
 - Scan QR code with Expo Go app on physical device
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-earlyreader/
+early-reader-app/
 ├── app/                    # Expo Router screens
 │   ├── auth/              # Authentication screens
 │   ├── onboarding/        # Onboarding flow
@@ -103,73 +67,55 @@ earlyreader/
 ├── src/
 │   ├── components/        # Reusable UI components
 │   ├── services/          # API and storage services
-│   │   ├── ai/           # AI generation (Edge Functions)
-│   │   ├── supabase/     # Supabase client
 │   │   └── storage/      # SQLite database
 │   ├── stores/           # Zustand state stores
 │   └── types/            # TypeScript types
-├── supabase/
-│   └── functions/        # Edge Functions (Deno)
-│       ├── generate-word/
-│       └── generate-image/
-├── .env                  # Local environment variables (create this)
+├── scripts/              # Build and generation scripts
 ├── features.json         # Feature tracking
 └── claude-progress.txt   # Development progress log
 ```
 
-## Environment Variables Summary
-
-### Client (.env file)
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `EXPO_PUBLIC_SUPABASE_URL` | ✅ | Your Supabase project URL |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anonymous/public key |
-| `EXPO_PUBLIC_REVENUECAT_API_KEY` | ✅ | RevenueCat public API key |
-
-### Supabase Edge Functions (Secrets)
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GEMINI_API_KEY` | ✅ | Google Gemini API key for word/image generation |
-
-## Development Workflow
-
-1. Read `claude-progress.txt` and `features.json` to understand current state
-2. Work on one feature at a time
-3. Commit frequently with descriptive messages
-4. Update progress documentation before ending session
-
-## Tech Stack
+## 🛠 Tech Stack
 
 - **Framework**: React Native + Expo
 - **Navigation**: Expo Router
 - **State Management**: Zustand
 - **Database**: SQLite (local-first)
-- **Auth**: Supabase Auth (email OTP)
-- **AI Services**: Google Gemini (via Supabase Edge Functions)
-- **Payments**: RevenueCat
 - **Animations**: React Native Reanimated + Lottie
 
-## License & Contributing
+## 📚 The DISTAR Method
 
-This project is dual-licensed to support both open research and sustainable development.
+DISTAR (Direct Instruction System for Teaching Arithmetic and Reading) was developed by Siegfried Engelmann in the 1960s. Key principles include:
 
-* **Community Use:** The source code is available under the **GNU Affero General Public License v3.0 (AGPLv3)**. This ensures that the research and educational methodology remain open for everyone to learn from and improve.
-* **Commercial Use:** The official builds on the Apple App Store and Google Play are published by **Instalabs, LLC** under a standard commercial license.
+1. **Explicit phonics instruction** - Teaching letter-sound relationships directly
+2. **Carefully sequenced lessons** - Building skills progressively
+3. **Immediate feedback** - Correcting errors right away
+4. **High engagement** - Keeping children actively involved
 
-**Contributing**
-We welcome pull requests! However, because this project has a commercial release, all contributors must sign a **Contributor License Agreement (CLA)**. This grants **Instalabs, LLC** the right to include your code in our app store releases while keeping your contribution open source for the community.
+Combined with spaced repetition, this approach maximizes retention while minimizing study time.
 
+## 🤝 Contributing
 
+We welcome contributions! Here's how to get involved:
 
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
+### Contributor License Agreement
 
+Because this project has a commercial release on the App Store and Google Play, all contributors must sign a **Contributor License Agreement (CLA)**. This grants Instalabs, LLC the right to include your code in our app store releases while keeping your contribution open source for the community.
 
+## 📄 License
 
+This project is dual-licensed to support both open research and sustainable development:
 
+- **Community Use**: The source code is available under the **GNU Affero General Public License v3.0 (AGPLv3)**. This ensures that the research and educational methodology remain open for everyone to learn from and improve.
 
+- **Commercial Use**: The official builds on the Apple App Store and Google Play are published by Instalabs, LLC under a standard commercial license.
 
+---
 
-
-
+Copyright © 2025 Instalabs, LLC
