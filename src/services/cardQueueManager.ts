@@ -167,11 +167,19 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
 /**
  * Generate a new learning card from pre-generated DISTAR cards
  * Uses curriculum-aware selection: only shows unlocked cards
+ * Also introduces new phonemes for the current lesson when needed
  */
 async function generateNewCardFromStatic(
   childId: string,
   level: number
 ): Promise<LearningCard | null> {
+  // Get child info to determine current lesson
+  const child = await getChild(childId);
+  if (!child) {
+    return null;
+  }
+  const currentLesson = child.current_level;
+  
   // Get all words this child has already seen
   const database = await initDatabase();
   const existingWords = await database.getAllAsync<{ word: string }>(
@@ -181,10 +189,19 @@ async function generateNewCardFromStatic(
   const seenWords = new Set(existingWords.map(w => w.word));
   
   // Get introduced phonemes to determine unlocked cards
-  const introducedPhonemes = await getIntroducedPhonemes(childId);
+  let introducedPhonemes = await getIntroducedPhonemes(childId);
   
   // Get all static cards
   const allCards = getAllStaticCards();
+  
+  // Check for unintroduced phonemes for current lesson - introduce them to unlock more cards
+  const unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, currentLesson);
+  if (unintroducedPhonemes.length > 0) {
+    // Introduce the first unintroduced phoneme to unlock more cards
+    const phonemeToIntroduce = unintroducedPhonemes[0];
+    await markPhonemeAsIntroduced(childId, phonemeToIntroduce);
+    introducedPhonemes = [...introducedPhonemes, phonemeToIntroduce.toLowerCase()];
+  }
   
   // Filter to unlocked cards only
   const unlockedCards = getUnlockedCards(allCards, introducedPhonemes);
