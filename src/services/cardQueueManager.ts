@@ -122,23 +122,34 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     // Keep introducing phonemes until we have enough available cards
     // For brand new children, we may need to introduce phonemes from multiple lessons
     let attempts = 0;
-    const maxAttempts = 20; // Safety limit
+    const maxAttempts = 30; // Safety limit - increased for lesson 100
     let currentLessonToCheck = currentLevel;
     
     while (unlockedCards.filter(c => !seenWords.has(c.plainText)).length < cardsNeeded && attempts < maxAttempts) {
       // Try current lesson first
       let unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, currentLessonToCheck);
       
-      // If no phonemes in current lesson, try next lessons
+      // If no phonemes in current lesson, try previous and next lessons
       if (unintroducedPhonemes.length === 0) {
-        // Try next few lessons to find phonemes
+        // Try previous lessons first (they should be available)
         let foundPhonemes = false;
-        for (let lesson = currentLessonToCheck + 1; lesson <= Math.min(currentLevel + 10, 100); lesson++) {
+        for (let lesson = currentLessonToCheck - 1; lesson >= Math.max(1, currentLevel - 20); lesson--) {
           unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, lesson);
           if (unintroducedPhonemes.length > 0) {
             currentLessonToCheck = lesson;
             foundPhonemes = true;
             break;
+          }
+        }
+        // If still no phonemes, try next lessons
+        if (!foundPhonemes) {
+          for (let lesson = currentLessonToCheck + 1; lesson <= Math.min(currentLevel + 20, 100); lesson++) {
+            unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, lesson);
+            if (unintroducedPhonemes.length > 0) {
+              currentLessonToCheck = lesson;
+              foundPhonemes = true;
+              break;
+            }
           }
         }
         if (!foundPhonemes) {
