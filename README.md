@@ -12,7 +12,7 @@ I built this app for my 4-year-old daughter to help her learn to read before sta
 - 🏠 Homeschooling families
 - 👩‍🏫 Tutors and educators using phonics-based instruction
 
-![Early Reader App Screenshot](./assets/screenshot.webp)
+![Early Reader App Screenshot](./assets/screenshot.png)
 
 ## ✨ What Makes This Special
 
