@@ -310,17 +310,13 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
     return (
       <Modal
         visible={true}
-        transparent
         animationType="slide"
+        presentationStyle="pageSheet"
         onRequestClose={() => onComplete?.()}
       >
-        <View style={styles.modalOverlay}>
-          <SafeAreaView style={styles.modalSafeArea} edges={['top', 'bottom']}>
-            <View style={styles.modalContent}>
-              {scrollContent}
-            </View>
-          </SafeAreaView>
-        </View>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          {scrollContent}
+        </SafeAreaView>
       </Modal>
     );
   }
