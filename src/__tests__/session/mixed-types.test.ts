@@ -1,8 +1,13 @@
 /**
- * Mixed Card Types Tests
+ * Mixed Card Types Tests - STATIC DATA ONLY
  * REQ-SESSION-003
  * 
- * Validates that sessions contain a mix of card types when available
+ * ⚠️ WARNING: These tests only validate STATIC curriculum data, NOT runtime behavior!
+ * 
+ * These tests check that the curriculum HAS mixed card types available, but they
+ * DO NOT test that getCardQueue() actually returns a mix of types at runtime.
+ * 
+ * For runtime validation, runtime tests need to be added.
  */
 
 import { describe, it, expect } from 'vitest';

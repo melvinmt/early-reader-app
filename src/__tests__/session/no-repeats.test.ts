@@ -1,8 +1,17 @@
 /**
- * No Consecutive Repeats Tests
+ * No Consecutive Repeats Tests - STATIC DATA ONLY
  * REQ-SESSION-002
  * 
- * Validates that the same card never appears twice in a row
+ * ⚠️ WARNING: These tests only validate STATIC curriculum data, NOT runtime behavior!
+ * 
+ * These tests check that the curriculum HAS unique cards, but they
+ * DO NOT test that getNextCard() or getCardQueue() actually prevents
+ * consecutive cards at runtime.
+ * 
+ * For runtime validation, see:
+ * - consecutive-cards.test.ts (tests actual exclusion logic)
+ * 
+ * ⚠️ This test is REDUNDANT - consecutive-cards.test.ts covers runtime behavior
  */
 
 import { describe, it, expect } from 'vitest';

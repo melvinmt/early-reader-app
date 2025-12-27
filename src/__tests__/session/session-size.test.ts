@@ -1,17 +1,24 @@
 /**
- * Session Size Tests
+ * Session Size Tests - STATIC DATA ONLY
  * REQ-SESSION-001, REQ-SESSION-004
  * 
- * ⚠️ WARNING: These tests only validate STATIC curriculum data, NOT runtime behavior!
+ * ⚠️⚠️⚠️ CRITICAL WARNING ⚠️⚠️⚠️
  * 
- * These tests check that the curriculum has enough cards available, but they
- * DO NOT test that getCardQueue() or getNextCard() actually generate 10 cards.
+ * These tests ONLY validate STATIC curriculum data, NOT runtime behavior!
  * 
- * To test actual runtime behavior, see:
+ * These tests check that the curriculum HAS cards available, but they
+ * DO NOT test that getCardQueue() actually GENERATES 10 cards at runtime.
+ * 
+ * THE BUG WHERE ONLY 1 CARD WAS GENERATED WOULD NOT BE CAUGHT BY THESE TESTS!
+ * 
+ * For runtime validation, see:
+ * - getCardQueue-runtime.test.ts (tests actual getCardQueue() function)
+ * - consecutive-cards.test.ts (tests getNextCard exclusion logic)
  * - session-size-integration.md (documentation of required integration tests)
- * - The bug where only 1 card was generated would NOT be caught by these tests
  * 
- * TODO: Add real integration tests that validate getCardQueue/getNextCard runtime behavior
+ * ⚠️ DO NOT TRUST THESE TESTS FOR RUNTIME BEHAVIOR ⚠️
+ * 
+ * These tests validate curriculum structure, not code execution.
  */
 
 import { describe, it, expect } from 'vitest';
