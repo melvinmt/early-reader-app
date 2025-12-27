@@ -12,6 +12,7 @@ export default function ChildSelectionScreen() {
   const [loading, setLoading] = useState(true);
   const [showParentalGate, setShowParentalGate] = useState(false);
   const [showAddChild, setShowAddChild] = useState(false);
+  const [gatePassed, setGatePassed] = useState(false);
 
   useEffect(() => {
     loadChildren();
@@ -21,9 +22,18 @@ export default function ChildSelectionScreen() {
   useEffect(() => {
     const unsubscribe = router.addListener?.('focus', () => {
       loadChildren();
+      // Reset gate when screen comes into focus (so it shows again)
+      setGatePassed(false);
     });
     return unsubscribe;
   }, [router]);
+
+  // Show parental gate when screen loads if there are children (not on first signup)
+  useEffect(() => {
+    if (!loading && children.length > 0 && !gatePassed) {
+      setShowParentalGate(true);
+    }
+  }, [loading, children.length, gatePassed]);
 
   const loadChildren = async () => {
     try {
@@ -45,18 +55,13 @@ export default function ChildSelectionScreen() {
   };
 
   const handleAddChild = () => {
-    // Show parental gate only if there are already children (2nd+ child)
-    if (children.length > 0) {
-      setShowParentalGate(true);
-    } else {
-      // First child - no gate needed
-      setShowAddChild(true);
-    }
+    // No parental gate - always allow adding children
+    setShowAddChild(true);
   };
 
   const handleGateSuccess = () => {
     setShowParentalGate(false);
-    setShowAddChild(true);
+    setGatePassed(true);
   };
 
   const handleAddChildComplete = () => {
@@ -72,9 +77,22 @@ export default function ChildSelectionScreen() {
     );
   }
 
-  // Show add child screen if no children
+  // Show add child screen if no children (first signup - no gate needed)
   if (showAddChild && children.length === 0) {
     return <AddChildrenScreen onComplete={handleAddChildComplete} />;
+  }
+
+  // Show parental gate if there are children and gate hasn't been passed
+  if (children.length > 0 && !gatePassed) {
+    return (
+      <View style={styles.container}>
+        <ParentalGate
+          visible={showParentalGate}
+          onSuccess={handleGateSuccess}
+          onCancel={() => router.back()}
+        />
+      </View>
+    );
   }
 
   return (
@@ -110,12 +128,6 @@ export default function ChildSelectionScreen() {
       {showAddChild && children.length > 0 && (
         <AddChildrenScreen onComplete={handleAddChildComplete} asModal={true} />
       )}
-
-      <ParentalGate
-        visible={showParentalGate}
-        onSuccess={handleGateSuccess}
-        onCancel={() => setShowParentalGate(false)}
-      />
     </View>
   );
 }

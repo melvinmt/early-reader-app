@@ -10,7 +10,6 @@ import WordSwipeDetector from '@/components/lesson/WordSwipeDetector';
 import ConfettiCelebration from '@/components/ui/ConfettiCelebration';
 import { createSession, updateSession } from '@/services/storage/database';
 import { isTablet, responsiveFontSize, responsiveSpacing } from '@/utils/responsive';
-import ParentalGate from '@/components/parent/ParentalGate';
 
 type LearningState = 'loading' | 'ready' | 'revealing';
 
@@ -31,7 +30,6 @@ export default function LearningScreen() {
   const [cardsCompleted, setCardsCompleted] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [showExitGate, setShowExitGate] = useState(false);
 
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const cardQueueRef = useRef<LearningCard[]>([]);
@@ -274,12 +272,7 @@ export default function LearningScreen() {
     }
   };
 
-  const handleExit = () => {
-    setShowExitGate(true);
-  };
-
-  const handleExitSuccess = async () => {
-    setShowExitGate(false);
+  const handleExit = async () => {
     await cleanup();
     router.back();
   };
@@ -373,11 +366,6 @@ export default function LearningScreen() {
 
       <ConfettiCelebration visible={showConfetti} onComplete={() => setShowConfetti(false)} />
       
-      <ParentalGate
-        visible={showExitGate}
-        onSuccess={handleExitSuccess}
-        onCancel={() => setShowExitGate(false)}
-      />
     </View>
   );
 }
