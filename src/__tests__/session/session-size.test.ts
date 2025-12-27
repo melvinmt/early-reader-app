@@ -2,7 +2,16 @@
  * Session Size Tests
  * REQ-SESSION-001, REQ-SESSION-004
  * 
- * Validates minimum session size and unlimited daily practice
+ * ⚠️ WARNING: These tests only validate STATIC curriculum data, NOT runtime behavior!
+ * 
+ * These tests check that the curriculum has enough cards available, but they
+ * DO NOT test that getCardQueue() or getNextCard() actually generate 10 cards.
+ * 
+ * To test actual runtime behavior, see:
+ * - session-size-integration.md (documentation of required integration tests)
+ * - The bug where only 1 card was generated would NOT be caught by these tests
+ * 
+ * TODO: Add real integration tests that validate getCardQueue/getNextCard runtime behavior
  */
 
 import { describe, it, expect } from 'vitest';
