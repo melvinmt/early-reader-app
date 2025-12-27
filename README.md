@@ -12,6 +12,8 @@ I built this app for my 4-year-old daughter to help her learn to read before sta
 - 🏠 Homeschooling families
 - 👩‍🏫 Tutors and educators using phonics-based instruction
 
+![Early Reader App Screenshot](./assets/screenshot.webp)
+
 ## ✨ What Makes This Special
 
 This isn't just another flashcard app. Early Reader is built on decades of research:
