@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getCardsUpToLesson } from '@/data/distarCards.en-US';
+import { DISTAR_CARDS, getCardsUpToLesson } from '@/data/distarCards.en-US';
 
 describe('REQ-SESSION-001: Minimum Session Size', () => {
 
@@ -65,6 +65,7 @@ describe('REQ-SESSION-004: Unlimited Daily Practice', () => {
     expect(totalCards).toBeGreaterThan(100); // Sufficient cards for reviews
   });
 });
+
 
 
 
