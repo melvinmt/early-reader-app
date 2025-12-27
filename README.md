@@ -1,6 +1,6 @@
 # Early Reader
 
-A mobile app implementing the **DISTAR-based methodology** from *"Teach Your Child to Read in 100 Easy Lessons"* by Siegfried Engelmann, combined with **spaced repetition** learning algorithms and a touch of AI.
+A mobile app implementing the **DISTAR phonics methodology** pioneered by Siegfried Engelmann, combined with **spaced repetition** learning algorithms and a touch of AI.
 
 ## ✨ What Makes This Special
 
