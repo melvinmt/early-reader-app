@@ -122,14 +122,19 @@ describe('REQ-SESSION-001: getCardQueue Integration Tests', () => {
   });
 
   describe('New Child Scenario', () => {
-    it('generates cards for brand new child with no progress', async () => {
+    it('CRITICAL: Brand new child with ZERO phonemes gets 10 cards', async () => {
+      // This is the ACTUAL bug scenario - brand new child with NO phonemes
+      // DO NOT introduce phonemes - test the real scenario
       const child = await testHelper.createChild({ current_level: 1 });
-      await testHelper.introducePhonemes(child.id, ['m', 's', 'a', 'e']); // Introduce some phonemes
+      // NO phonemes introduced - this is the bug!
       
       const result = await getCardQueue(child.id);
       
-      // Should return cards (even if < 10 for new child)
-      expect(result.cards.length).toBeGreaterThan(0);
+      // CRITICAL: Should return 10 cards, not 3
+      expect(
+        result.cards.length,
+        `Brand new child should get ${CARDS_PER_SESSION} cards, got ${result.cards.length}. This is the bug!`
+      ).toBe(CARDS_PER_SESSION);
       expect(result.currentLevel).toBe(1);
       
       // All cards should be valid
@@ -140,16 +145,19 @@ describe('REQ-SESSION-001: getCardQueue Integration Tests', () => {
       });
     });
 
-    it('generates 10 cards when enough unlocked cards available', async () => {
+    it('generates 10 cards when phonemes are introduced automatically', async () => {
       const child = await testHelper.createChild({ current_level: 1 });
-      // Introduce many phonemes to unlock many cards
-      await testHelper.introducePhonemes(child.id, ['m', 's', 'a', 'e', 'i', 'o', 'u', 't', 'n', 'l', 'r']);
+      // NO phonemes pre-introduced - system should introduce them
       
       const result = await getCardQueue(child.id);
       
       // CRITICAL: Should return 10 cards when available
-      // This would catch the "only 1 card" bug
+      // System should introduce phonemes automatically to unlock cards
       expect(result.cards.length).toBe(CARDS_PER_SESSION);
+      
+      // Verify phonemes were introduced
+      const introduced = await testHelper.db.getIntroducedPhonemes(child.id);
+      expect(introduced.length).toBeGreaterThan(0);
     });
   });
 
