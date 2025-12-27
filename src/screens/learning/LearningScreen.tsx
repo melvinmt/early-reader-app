@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { recordCardCompletion, getNextCard, LearningCard } from '@/services/cardQueueManager';
+import { recordCardCompletion, getCardQueue, LearningCard } from '@/services/cardQueueManager';
 import { audioPlayer } from '@/services/audio/audioPlayer';
 import WordDisplay from '@/components/lesson/WordDisplay';
 import BlurredImageReveal from '@/components/lesson/BlurredImageReveal';
@@ -32,8 +32,8 @@ export default function LearningScreen() {
   const [showConfetti, setShowConfetti] = useState(false);
 
   const uiOpacity = useRef(new Animated.Value(1)).current;
-  const nextCardRef = useRef<LearningCard | null>(null);
-  const isLoadingNextRef = useRef(false);
+  const cardQueueRef = useRef<LearningCard[]>([]);
+  const isLoadingQueueRef = useRef(false);
 
   useEffect(() => {
     if (!childId) {
@@ -43,7 +43,8 @@ export default function LearningScreen() {
     }
 
     initializeSession();
-    loadNextCard();
+    // Load initial card queue, then load first card
+    loadCardQueue().then(() => loadNextCard());
 
     return () => {
       cleanup();
@@ -110,28 +111,44 @@ export default function LearningScreen() {
     }
   };
 
-  const preloadNextCard = async (excludeWord?: string) => {
-    if (isLoadingNextRef.current) return;
+  const loadCardQueue = async (excludeWord?: string) => {
+    if (isLoadingQueueRef.current) return;
     
     try {
-      isLoadingNextRef.current = true;
-      // Use provided excludeWord or fall back to currentCard state (for initial load)
-      const wordToExclude = excludeWord || currentCard?.word;
-      const card = await getNextCard(childId, wordToExclude);
+      isLoadingQueueRef.current = true;
+      const result = await getCardQueue(childId);
       
-      if (card) {
-        if (!card.phonemes || card.phonemes.length === 0) {
-          card.phonemes = card.word.split('');
+      // Filter out excluded word to prevent consecutive repeats
+      const filteredCards = excludeWord
+        ? result.cards.filter(card => card.word !== excludeWord)
+        : result.cards;
+      
+      // Add filtered cards to queue
+      cardQueueRef.current = [...cardQueueRef.current, ...filteredCards];
+      
+      // Ensure we have at least 10 cards in the queue (excluding the current card)
+      while (cardQueueRef.current.length < 10 && result.hasMore) {
+        // Load more cards
+        const additionalResult = await getCardQueue(childId);
+        const additionalFiltered = excludeWord
+          ? additionalResult.cards.filter(card => card.word !== excludeWord && !cardQueueRef.current.some(c => c.word === card.word))
+          : additionalResult.cards.filter(card => !cardQueueRef.current.some(c => c.word === card.word));
+        
+        if (additionalFiltered.length === 0) {
+          // No more unique cards available, break to avoid infinite loop
+          break;
         }
-        nextCardRef.current = card;
-      } else {
-        nextCardRef.current = null;
+        
+        cardQueueRef.current = [...cardQueueRef.current, ...additionalFiltered];
+        
+        if (!additionalResult.hasMore) {
+          break;
+        }
       }
     } catch (error) {
-      console.error('Error pre-loading next card:', error);
-      nextCardRef.current = null;
+      console.error('Error loading card queue:', error);
     } finally {
-      isLoadingNextRef.current = false;
+      isLoadingQueueRef.current = false;
     }
   };
 
@@ -139,36 +156,57 @@ export default function LearningScreen() {
     try {
       uiOpacity.setValue(1);
       
-      if (nextCardRef.current) {
-        const preloadedCard = nextCardRef.current;
-        nextCardRef.current = null;
+      // If queue is low, reload it (exclude current card)
+      if (cardQueueRef.current.length < 3) {
+        await loadCardQueue(currentCard?.word);
+      }
+      
+      // Get next card from queue, ensuring it's not the same as current
+      let card = cardQueueRef.current.shift();
+      const currentWord = currentCard?.word;
+      
+      // Skip consecutive cards if they somehow made it into the queue
+      while (card && card.word === currentWord && cardQueueRef.current.length > 0) {
+        card = cardQueueRef.current.shift();
+      }
+      
+      if (!card) {
+        // Try to load queue if empty (exclude current card)
+        await loadCardQueue(currentCard?.word);
+        let retryCard = cardQueueRef.current.shift();
         
-        setCurrentCard(preloadedCard);
+        // Skip consecutive cards
+        while (retryCard && retryCard.word === currentWord && cardQueueRef.current.length > 0) {
+          retryCard = cardQueueRef.current.shift();
+        }
+        
+        if (!retryCard) {
+          Alert.alert(
+            'Welcome!', 
+            'Let\'s start learning! Your first cards will be ready soon.',
+            [{ text: 'OK', onPress: () => router.back() }]
+          );
+          return;
+        }
+        
+        // Use the retry card
+        setState('loading');
+        if (!retryCard.phonemes || retryCard.phonemes.length === 0) {
+          retryCard.phonemes = retryCard.word.split('');
+        }
+        setCurrentCard(retryCard);
         setIsImageRevealed(false);
         setAttempts(0);
         setNeededHelp(false);
         setState('ready');
+        playPromptAudio(retryCard);
         
-        playPromptAudio(preloadedCard);
-        preloadNextCard(preloadedCard.word);
-        return;
-      }
-      
-      setState('loading');
-      const excludeWord = currentCard?.word; // Prevent consecutive repeats
-      const card = await getNextCard(childId, excludeWord);
-      
-      if (!card) {
-        // Only show message if child has literally no cards (brand new)
-        // Otherwise, getNextCard should always return a practice card
-        Alert.alert(
-          'Welcome!', 
-          'Let\'s start learning! Your first cards will be ready soon.',
-          [{ text: 'OK', onPress: () => router.back() }]
-        );
+        // Preload next batch in background
+        loadCardQueue();
         return;
       }
 
+      setState('loading');
       if (!card.phonemes || card.phonemes.length === 0) {
         card.phonemes = card.word.split('');
       }
@@ -180,7 +218,11 @@ export default function LearningScreen() {
       setState('ready');
 
       playPromptAudio(card);
-      preloadNextCard(card.word);
+      
+      // Preload next batch in background if queue is getting low (exclude the card we just showed)
+      if (cardQueueRef.current.length < 5) {
+        loadCardQueue(card.word);
+      }
     } catch (error) {
       console.error('Error loading card:', error);
       Alert.alert('Error', 'Failed to load card. Please try again.');
