@@ -23,7 +23,6 @@ This plan outlines the development of **Early Reader**, a mobile/tablet applicat
 9. [Progress Tracking & Analytics](#progress-tracking--analytics)
 10. [Technical Stack Recommendations](#technical-stack-recommendations)
 11. [Development Phases](#development-phases)
-12. [Monetization Strategy](#monetization-strategy)
 
 ---
 
@@ -54,9 +53,9 @@ Based on research from the 1960s and validated by Project Follow-Through, this m
 
 ### High-Level System Design
 
-**Architecture Philosophy: Local-First with Cloud LLM Proxy**
+**Architecture Philosophy: Local-First**
 
-All user data is stored locally in SQLite on the device. The only cloud interactions are with AI/LLM services, which are proxied through Supabase Edge Functions for security (API keys never exposed to client).
+All user data is stored locally in SQLite on the device. All features work offline with local data storage.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -72,12 +71,12 @@ All user data is stored locally in SQLite on the device. The only cloud interact
 │  │  • Session history and analytics                            │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  ONBOARDING (3 Screens) - All Data Stored Locally                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐   │
-│  │ 1. Parent    │  │ 2. Add       │  │ 3. Subscription          │   │
-│  │    Email     │─▶│    Children  │─▶│    $99/mo (3-day trial) │   │
-│  │   (SQLite)   │  │    (SQLite)  │  │    (RevenueCat)          │   │
-│  └──────────────┘  └──────────────┘  └──────────────────────────┘   │
+│  ONBOARDING (1 Screen) - All Data Stored Locally                    │
+│  ┌──────────────┐                                                   │
+│  │ 1. Add       │                                                   │
+│  │    Children  │                                                   │
+│  │    (SQLite)  │                                                   │
+│  └──────────────┘                                                   │
 │                                                                      │
 │  MAIN APP (Endless Learning Loop)                                    │
 │  ┌─────────────────────────────────────────────────────────────┐    │
@@ -86,7 +85,7 @@ All user data is stored locally in SQLite on the device. The only cloud interact
 │  │  ┌─────────────┐    ┌─────────────┐    ┌─────────────────┐  │    │
 │  │  │   Current   │───▶│   AI Card   │───▶│   Display Card  │  │    │
 │  │  │   Level     │    │   Generator │    │   + Voice       │  │    │
-│  │  │  (SQLite)   │    │ (Edge Func) │    │                 │  │    │
+│  │  │  (SQLite)   │    │ (Local)     │    │                 │  │    │
 │  │  └─────────────┘    └─────────────┘    └────────┬────────┘  │    │
 │  │         ▲                                        │           │    │
 │  │         │           ┌────────────────────────────┘           │    │
@@ -99,22 +98,11 @@ All user data is stored locally in SQLite on the device. The only cloud interact
 │  │  └─────────────────────────────────────────────────────┘    │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  CLOUD SERVICES (via Supabase Edge Functions only)                   │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                 SUPABASE EDGE FUNCTIONS                       │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐                     │   │
-│  │  │ OpenAI   │ │ Gemini   │ │ Nano     │                     │   │
-│  │  │ Realtime │ │ 3 Flash  │ │ Banana   │                     │   │
-│  │  │ (Voice + │ │ (Text)   │ │ (Images) │                     │   │
-│  │  │  TTS)    │ │          │ │          │                     │   │
-│  │  └──────────┘ └──────────┘ └──────────┘                     │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                                                                      │
 │  LOCAL SERVICES                                                      │
-│  ┌──────────┐ ┌──────────────┐ ┌──────────────┐                     │
-│  │ SQLite   │ │ RevenueCat   │ │ Local File   │                     │
-│  │ Database │ │ (Purchases)  │ │ System Cache │                     │
-│  └──────────┘ └──────────────┘ └──────────────┘                     │
+│  ┌──────────┐ ┌──────────────┐                                     │
+│  │ SQLite   │ │ Local File   │                                     │
+│  │ Database │ │ System Cache │                                     │
+│  └──────────┘ └──────────────┘                                     │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -126,25 +114,25 @@ All user data is stored locally in SQLite on the device. The only cloud interact
 │                      LOCAL-FIRST DATA FLOW                           │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  DEVICE (Offline-Capable)                 CLOUD (LLM Only)          │
-│  ┌─────────────────────────────┐         ┌─────────────────────┐    │
-│  │                             │         │  Supabase Edge      │    │
-│  │  ┌───────────────────────┐  │  HTTPS  │  Functions          │    │
-│  │  │      SQLite DB        │  │◄───────►│  ┌───────────────┐  │    │
-│  │  │  ┌─────────────────┐  │  │         │  │ generate-word │  │    │
-│  │  │  │ parents         │  │  │         │  │ generate-image│  │    │
-│  │  │  │ children        │  │  │         │  │ voice-session │  │    │
-│  │  │  │ card_progress   │  │  │         │  │ (handles TTS) │  │    │
-│  │  │  │ content_cache   │  │  │         │  └───────────────┘  │    │
-│  │  │  │ sessions        │  │  │         │         │           │    │
-│  │  │  └─────────────────┘  │  │         │         ▼           │    │
-│  │  └───────────────────────┘  │         │  ┌───────────────┐  │    │
-│  │                             │         │  │ External APIs │  │    │
-│  │  ┌───────────────────────┐  │         │  │ • OpenAI      │  │    │
-│  │  │   File System Cache   │  │         │  │ • Gemini 3    │  │    │
-│  │  │  ┌─────────────────┐  │  │         │  │ • Nano Banana │  │    │
-│  │  │  │ images/         │  │  │         │  └───────────────┘  │    │
-│  │  │  │ audio/          │  │  │         └─────────────────────┘    │
+│  DEVICE (Offline-Capable)                                           │
+│  ┌─────────────────────────────┐                                    │
+│  │                             │                                    │
+│  │  ┌───────────────────────┐  │                                    │
+│  │  │      SQLite DB        │  │                                    │
+│  │  │  ┌─────────────────┐  │  │                                    │
+│  │  │  │ parents         │  │  │                                    │
+│  │  │  │ children        │  │  │                                    │
+│  │  │  │ card_progress   │  │  │                                    │
+│  │  │  │ content_cache   │  │  │                                    │
+│  │  │  │ sessions        │  │  │                                    │
+│  │  │  └─────────────────┘  │  │                                    │
+│  │  └───────────────────────┘  │                                    │
+│  │                             │                                    │
+│  │  ┌───────────────────────┐  │                                    │
+│  │  │   File System Cache   │  │                                    │
+│  │  │  ┌─────────────────┐  │  │                                    │
+│  │  │  │ images/         │  │  │                                    │
+│  │  │  │ audio/          │  │  │                                    │
 │  │  │  └─────────────────┘  │  │                                    │
 │  │  └───────────────────────┘  │                                    │
 │  └─────────────────────────────┘                                    │
@@ -157,9 +145,7 @@ All user data is stored locally in SQLite on the device. The only cloud interact
 The app is intentionally minimal with only one settings screen (guarded by parental gate):
 
 1. **Onboarding** (one-time, all stored locally)
-   - Parent email → stored in SQLite (for account identification only)
    - Add children (name + age) → stored in SQLite
-   - Subscribe ($99/mo, 3-day trial) → RevenueCat handles purchase
 
 2. **Daily Use**
    - Select child profile (from local SQLite)
@@ -173,18 +159,17 @@ That's it. No dashboards, no complexity - just a protected settings screen. **Al
 
 ## Onboarding Flow
 
-### Screen 1: Parent Email (Supabase Auth)
-
-Parent authentication via Supabase Auth (email OTP). After authentication, parent email and user ID are stored locally in SQLite for account identification and RevenueCat association.
+### Add Children Screen
 
 **Requirements:**
-- Simple email input field with validation
-- On submit, initiate Supabase Auth email OTP flow
-- Show "Check your email" screen with OTP input
-- On successful authentication, create parent record in local SQLite database with Supabase user ID
-- Store parent ID in session storage for subsequent screens
-- Navigate to Add Children screen after successful authentication
-- Display terms and privacy policy link
+- Allow adding one or more children with name and age
+- Age selector with options: 3, 4, 5, 6, 7, 8 years old
+- Ability to add additional children (button to add more)
+- Ability to remove children if more than one is added
+- Save all children to local SQLite database
+- Each child initialized with current_level = 1 and total_cards_completed = 0
+- Continue button disabled until at least one child has a valid name
+- Navigate to main app after successful save
 
 ### SQLite Database Schema
 
@@ -192,11 +177,10 @@ All data is stored locally in SQLite. The database is initialized on app startup
 
 **Database Tables:**
 
-1. **parents** - Parent account information
-   - id (TEXT PRIMARY KEY) - Supabase Auth user ID
-   - email (TEXT NOT NULL)
+1. **parents** - Parent account information (optional, for future use)
+   - id (TEXT PRIMARY KEY)
+   - email (TEXT)
    - created_at (TEXT NOT NULL)
-   - subscription_status (TEXT DEFAULT 'none') - Values: 'none', 'trial', 'active', 'cancelled', 'expired'
    - settings (TEXT DEFAULT '{}') - JSON string for app preferences
 
 2. **children** - Child profiles
@@ -244,67 +228,6 @@ All data is stored locally in SQLite. The database is initialized on app startup
 - idx_sessions_child on sessions(child_id)
 - idx_content_cache_type on content_cache(content_type, content_key)
 
-### Supabase Services
-
-**Supabase Auth:**
-- Parent authentication via email OTP
-- User session management
-- Secure token storage
-
-**Supabase Edge Functions (LLM Proxy Only):**
-- Used ONLY for proxying LLM API calls
-- No user data is sent to Edge Functions beyond what's necessary for LLM requests
-
-**Architecture:**
-- All LLM API calls (Gemini 3 Flash, OpenAI, Nano Banana) are proxied through Supabase Edge Functions
-- API keys are stored server-side in Edge Functions, never exposed to the client
-- Client makes HTTPS requests to Edge Function endpoints with only the necessary parameters
-
-**Required Edge Functions:**
-
-1. **generate-word** - Calls Gemini 3 Flash to generate appropriate words
-   - Input: targetSounds, knownSounds, difficulty
-   - Output: word, phonemes array, imagePrompt
-
-2. **generate-image** - Calls Nano Banana to generate word images
-   - Input: imagePrompt
-   - Output: imageBase64
-
-3. **voice-session** - Manages OpenAI Realtime Voice API sessions
-   - Input: session parameters
-   - Output: WebSocket connection details or session ID
-
-### Screen 2: Add Children
-
-**Requirements:**
-- Allow adding one or more children with name and age
-- Age selector with options: 3, 4, 5, 6, 7, 8 years old
-- Ability to add additional children (button to add more)
-- Ability to remove children if more than one is added
-- Save all children to local SQLite database with parent_id foreign key
-- Each child initialized with current_level = 1 and total_cards_completed = 0
-- Continue button disabled until at least one child has a valid name
-- Navigate to Subscription screen after successful save
-
-### Screen 3: Subscription (RevenueCat)
-
-**Requirements:**
-- Display subscription pricing: 3 days free trial, then $99/month
-- Show feature list with checkmarks
-- Integrate with RevenueCat for in-app purchase handling
-- On successful purchase, update parent's subscription_status in local SQLite to 'active'
-- Navigate to main app after successful subscription
-- Display legal text about payment and auto-renewal
-- Handle purchase cancellation and errors gracefully
-
-### RevenueCat Setup
-
-**Requirements:**
-- Initialize RevenueCat SDK with platform-specific API keys (iOS/Android)
-- Associate purchases with parent user ID
-- Check subscription status via RevenueCat entitlements
-- Handle subscription state changes and updates
-
 ---
 
 ## Parental Gate
@@ -330,7 +253,7 @@ The settings screen (for managing children) is protected by a parental gate to p
 - List all children with name, age, and current level
 - Allow editing child information
 - Allow adding additional children
-- Account section with subscription management and sign out options
+- Account section with settings options
 - Accessible via gear icon on child selection screen
 
 ---
@@ -382,8 +305,7 @@ The app uses a modified SM-2 algorithm (SuperMemo 2) to determine when to resurf
 
 2. **New Cards (Lower Priority)**
    - Generate 10 new cards appropriate for child's current level
-   - Use Supabase Edge Function to call Gemini 3 Flash for word generation
-   - Use Supabase Edge Function to call Nano Banana for image generation
+   - Use local card generation script (generate-cards.ts) for word generation
    - Cache word data and images locally in SQLite and file system
    - Exclude words already seen by this child
    - Priority: 10+ (incremented by index)
@@ -393,8 +315,7 @@ The app uses a modified SM-2 algorithm (SuperMemo 2) to determine when to resurf
    - Review cards always shown before new cards
 
 **Card Generation:**
-- Generate words via LLM proxy (Gemini 3 Flash) based on level configuration
-- Generate images via LLM proxy (Nano Banana) using word's image prompt
+- Generate words via local script (generate-cards.ts) based on level configuration
 - Store word metadata in content_cache table
 - Save images to local file system
 - Track file paths in content_cache for retrieval
@@ -714,15 +635,14 @@ The app leverages AI to dynamically generate educational content, ensuring unlim
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Google Gemini 3 Flash Integration
+#### Word Generation
 
 **Word Generation Requirements:**
-- Call Gemini 3 Flash via Supabase Edge Function (LLM proxy)
-- Generate decodable words based on child's known sounds and current level
+- Generate decodable words based on child's known sounds and current level using local scripts
 - Input parameters: knownSounds array, targetPattern, count, difficulty, excludeWords
 - Output: Array of words with phonemes, syllables, pattern, difficulty, and imagePrompt
-- Prompt engineering: Ensure words use only known sounds, are age-appropriate, real English words
-- Return structured JSON response
+- Words use only known sounds, are age-appropriate, real English words
+- Generated via local generate-cards.ts script with predefined word lists
 
 **Story Generation Requirements:**
 - Generate simple stories using only words the child has learned
@@ -790,31 +710,17 @@ The app leverages AI to dynamically generate educational content, ensuring unlim
 - Add context if provided
 - Append style requirements to ensure consistency
 
-#### Google Nano Banana Integration
+#### Image Generation
 
 **Image Generation Requirements:**
-- Call Nano Banana (via Gemini API) via Supabase Edge Function (LLM proxy)
-- Use model: `gemini-2.5-flash-image` (Nano Banana) or `gemini-3-pro-image-preview` (Nano Banana Pro) for higher quality
 - Generate images based on word and imagePrompt from word generation
+- Images are pre-generated using local scripts (generate-cards.ts)
 - Input parameters: word, imagePrompt (optional), style, aspectRatio
 - Apply base style prompt for consistency (friendly children's book illustration style)
-- Support for text-to-image generation, image editing, and multi-image blending
-- High-fidelity text rendering capabilities
-- Output: base64 encoded image data or inline image data
-- Batch generation support for pre-loading multiple images with rate limiting
+- Output: local image file paths stored in content_cache
+- Images are pre-generated and cached locally
 
-#### Nano Banana Advantages for This Use Case
-
-| Feature | Benefit |
-|---------|---------|
-| **Integrated with Gemini API** | Single API for both text and image generation |
-| **Fast Generation** | Nano Banana optimized for speed and efficiency (low latency) |
-| **High-Fidelity Text** | Can render legible text in images (useful for word cards) |
-| **Consistent Style** | Better prompt following for uniform look |
-| **Cost Effective** | Competitive pricing for educational apps |
-| **Image Editing** | Can edit existing images if needed |
-
-#### Pre-Generation Strategy (Look-Ahead Caching)
+#### Pre-Generation Strategy
 
 Since image generation takes several seconds, implement aggressive pre-generation:
 
@@ -1063,13 +969,12 @@ The app uses OpenAI's Realtime Voice API as the core interaction layer, enabling
 #### Realtime API Implementation
 
 **Service Requirements:**
-- Connect to OpenAI Realtime API via Supabase Edge Function (LLM proxy)
-- Initialize RealtimeClient with appropriate model
-- Set up tool calling for app control: validate_pronunciation, reveal_image, advance_to_next_word, record_attempt, play_phoneme
-- Inject lesson context so AI knows expected word and phonemes
-- Configure AI persona: warm, patient, encouraging teacher voice
-- Handle conversation updates and errors
-- Support connection/disconnection lifecycle
+- Use local pronunciation validation and feedback
+- Set up interaction handlers for app control: validate_pronunciation, reveal_image, advance_to_next_word, record_attempt, play_phoneme
+- Track lesson context including expected word and phonemes
+- Configure warm, patient, encouraging feedback voice
+- Handle interaction updates and errors
+- Support session lifecycle
 
 **Tool Definitions:**
 - validate_pronunciation: Check if child said word correctly, return confidence and correctness
@@ -1969,24 +1874,15 @@ assets/
 │  ├── expo-av (Audio Playback for pre-recorded phonemes)              │
 │  └── OpenAI Realtime API (Speech Recognition + Text-to-Speech)       │
 │                                                                      │
-│  AI SERVICES (via Supabase Edge Functions - ONLY cloud interaction) │
-│  ├── Google Gemini 3 Flash (Word generation, lesson content)        │
-│  ├── Google Nano Banana (Image generation via Gemini API)           │
-│  ├── OpenAI Realtime Voice API (Interactive voice + pronunciation)  │
-│  └── OpenAI Realtime Tool Calling (Dynamic lesson control)          │
-│                                                                      │
-│  CLOUD SERVICES                                                      │
-│  ├── Supabase Auth (Parent authentication via email OTP)           │
-│  └── Supabase Edge Functions (API key protection for LLM calls)     │
-│                                                                      │
-│  LOCAL DATA STORAGE (All user data on device)                        │
+│  LOCAL DATA STORAGE (All data on device)                             │
 │  ├── expo-sqlite (SQLite database - all app data)                   │
 │  ├── react-native-mmkv (Fast key-value for session state)           │
 │  ├── react-native-fs (File system for cached images/audio)          │
 │  └── AsyncStorage (Simple preferences)                               │
 │                                                                      │
-│  IN-APP PURCHASES                                                    │
-│  └── RevenueCat (Subscription management)                            │
+│  LOCAL CONTENT GENERATION                                            │
+│  ├── generate-cards.ts (Word and card generation script)            │
+│  └── Pre-generated content assets (images, audio)                   │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -2020,37 +1916,7 @@ assets/
 - react-native-mmkv 2.x (Fast key-value storage)
 - react-native-fs 2.x (File system access)
 
-**Authentication:**
-- @supabase/supabase-js (Supabase Auth client)
-
-**In-App Purchases:**
-- react-native-purchases (RevenueCat)
-
-**Note:** AI service SDKs are NOT included in client dependencies. All AI calls go through Supabase Edge Functions (LLM proxy).
-
-### Environment Variables
-
-**Client-Side (.env):**
-- SUPABASE_URL - Supabase project URL
-- SUPABASE_ANON_KEY - Supabase anonymous key (for Supabase Auth and Edge Function calls)
-
-**Server-Side (Supabase Edge Functions):**
-- GEMINI_API_KEY - Google Gemini API key (for both Gemini 3 Flash and Nano Banana)
-- OPENAI_API_KEY - OpenAI API key
-
-### AI Service Cost Estimates
-
-| Service | Usage | Estimated Cost |
-|---------|-------|----------------|
-| **Gemini 3 Flash** | Word generation, stories | $0.50 per million input tokens, $3.00 per million output tokens |
-| **Nano Banana** | Image generation | Pricing via Gemini API (check current rates) |
-| **OpenAI Realtime** | Voice interaction | ~$0.06/min audio input, $0.24/min audio output |
-
-**Monthly estimate for active user (1 lesson/day):**
-- Gemini 3 Flash: ~$0.50-1.00/month (word generation)
-- Nano Banana: ~$5-10/month (with pre-generation caching)
-- OpenAI Realtime: ~$15-20/month (20 min voice/day)
-- **Total: ~$20-30/user/month** (can be optimized with caching)
+**Note:** All content is pre-generated locally using the generate-cards.ts script. No cloud services or API keys are required.
 
 ### React Native Swipe Component Implementation
 
@@ -2190,7 +2056,6 @@ Duration: ~6-8 weeks
 │  ├── [ ] Initialize React Native project with TypeScript            │
 │  ├── [ ] Configure React Navigation                                  │
 │  ├── [ ] Set up Zustand state management                            │
-│  └── [ ] Configure Supabase Auth (Parent authentication)              │
 │                                                                      │
 │  CORE FEATURES                                                       │
 │  ├── [ ] Custom orthography rendering with React Native Skia        │
@@ -2230,10 +2095,9 @@ Duration: ~8-10 weeks
 │  ├── [ ] Retry system via AI (max 3 attempts per word)             │
 │  └── [ ] Parent override controls                                   │
 │                                                                      │
-│  AI CONTENT GENERATION                                               │
-│  ├── [ ] Google Gemini 3 Flash for word/story generation          │
-│  ├── [ ] Google Nano Banana image generation                       │
-│  ├── [ ] OpenAI Realtime API for voice interaction                  │
+│  CONTENT GENERATION                                                  │
+│  ├── [ ] Local word/story generation script (generate-cards.ts)      │
+│  ├── [ ] Pre-generated image assets                                  │
 │  └── [ ] Word validation engine (decodability check)                │
 │                                                                      │
 │  PRE-GENERATION SYSTEM                                               │
@@ -2279,10 +2143,9 @@ Duration: ~8-10 weeks
 │  └── [ ] Celebration animations (Lottie)                            │
 │                                                                      │
 │  INFRASTRUCTURE                                                      │
-│  ├── [ ] Cloud sync for progress                                    │
-│  ├── [ ] Offline mode (WatermelonDB)                                │
+│  ├── [ ] Local data persistence (SQLite)                            │
 │  ├── [ ] Error reporting (Sentry/Crashlytics)                       │
-│  └── [ ] Analytics events (Local tracking, optional Supabase Analytics) │
+│  └── [ ] Analytics events (Local tracking)                             │
 │                                                                      │
 │  QUALITY                                                             │
 │  ├── [ ] Accessibility audit (VoiceOver/TalkBack)                   │
@@ -2340,34 +2203,6 @@ Duration: Ongoing
 | **Phase 4** | Ongoing | Launch + continuous improvement |
 
 ---
-
-## Monetization Strategy
-
-### Options
-
-| Model | Description | Considerations |
-|-------|-------------|----------------|
-| **Freemium** | Lessons 1-20 free, unlock rest | Good conversion, proven model |
-| **Subscription** | Monthly/annual access | Recurring revenue, higher LTV |
-| **One-time Purchase** | Full unlock for fixed price | Simple, matches book purchase |
-| **Tiered** | Basic (free), Plus (lessons), Premium (analytics) | Flexibility |
-
-### Recommended Approach
-
-```
-FREE TIER (Lessons 1-10)
-├── Full lesson experience
-├── Basic progress tracking
-└── Limited sounds library
-
-PREMIUM ($49.99 one-time OR $7.99/month)
-├── All lessons
-├── Full progress analytics
-├── Speech recognition features
-├── Offline mode
-├── Multiple child profiles
-└── Cloud sync
-```
 
 ---
 
