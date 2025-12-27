@@ -2,6 +2,16 @@
 
 A mobile app implementing the **DISTAR phonics methodology** pioneered by Siegfried Engelmann, combined with **spaced repetition** learning algorithms and a touch of AI.
 
+## 👨‍👧 Who Is This For?
+
+I built this app for my 4-year-old daughter to help her learn to read before starting first grade. As a parent, I wanted something based on proven research rather than gamified edutainment—and I'm sharing it with other parents who feel the same way.
+
+**Early Reader is designed for:**
+- 💒 Pre-schoolers (ages 3-6) learning to read
+- 👪 Parents who want a research-backed approach
+- 🏠 Homeschooling families
+- 👩‍🏫 Tutors and educators using phonics-based instruction
+
 ## ✨ What Makes This Special
 
 This isn't just another flashcard app. Early Reader is built on decades of research:
