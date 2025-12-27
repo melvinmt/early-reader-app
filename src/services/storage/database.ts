@@ -122,6 +122,30 @@ async function createTables(database: SQLite.SQLiteDatabase) {
       console.warn('Error adding hint_used column (may already exist):', error.message);
     }
   }
+
+  // Migrate existing card_progress table to add learning_step column if it doesn't exist
+  try {
+    await database.execAsync(`
+      ALTER TABLE card_progress ADD COLUMN learning_step INTEGER DEFAULT 3;
+    `);
+  } catch (error: any) {
+    // Column already exists, ignore error
+    if (!error.message?.includes('duplicate column')) {
+      console.warn('Error adding learning_step column (may already exist):', error.message);
+    }
+  }
+
+  // Migrate existing card_progress table to add cards_since_last_seen column if it doesn't exist
+  try {
+    await database.execAsync(`
+      ALTER TABLE card_progress ADD COLUMN cards_since_last_seen INTEGER DEFAULT 0;
+    `);
+  } catch (error: any) {
+    // Column already exists, ignore error
+    if (!error.message?.includes('duplicate column')) {
+      console.warn('Error adding cards_since_last_seen column (may already exist):', error.message);
+    }
+  }
 }
 
 /**
@@ -246,8 +270,8 @@ export async function createOrUpdateCardProgress(progress: CardProgress): Promis
   const database = await initDatabase();
   await database.runAsync(
     `INSERT INTO card_progress 
-     (id, child_id, word, ease_factor, interval_days, next_review_at, attempts, successes, last_seen_at, hint_used)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     (id, child_id, word, ease_factor, interval_days, next_review_at, attempts, successes, last_seen_at, hint_used, learning_step, cards_since_last_seen)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(child_id, word) DO UPDATE SET
        ease_factor = excluded.ease_factor,
        interval_days = excluded.interval_days,
@@ -255,7 +279,9 @@ export async function createOrUpdateCardProgress(progress: CardProgress): Promis
        attempts = excluded.attempts,
        successes = excluded.successes,
        last_seen_at = excluded.last_seen_at,
-       hint_used = excluded.hint_used`,
+       hint_used = excluded.hint_used,
+       learning_step = excluded.learning_step,
+       cards_since_last_seen = excluded.cards_since_last_seen`,
     [
       progress.id,
       progress.child_id,
@@ -267,6 +293,8 @@ export async function createOrUpdateCardProgress(progress: CardProgress): Promis
       progress.successes,
       progress.last_seen_at,
       progress.hint_used ?? 0,
+      progress.learning_step ?? 3, // Default to graduated (3) for existing cards
+      progress.cards_since_last_seen ?? 0,
     ]
   );
 }
@@ -328,6 +356,56 @@ export async function getDueReviewCardsByPriority(
   
   const result = await database.getAllAsync<CardProgress>(query, params);
   return result;
+}
+
+/**
+ * Get learning cards (cards in learning phase, step 0-2)
+ * These cards need to be shown again within the session with appropriate spacing
+ */
+export async function getLearningCards(
+  childId: string,
+  limit: number = 10
+): Promise<CardProgress[]> {
+  const database = await initDatabase();
+  const result = await database.getAllAsync<CardProgress>(
+    `SELECT * FROM card_progress 
+     WHERE child_id = ? AND (learning_step IS NULL OR learning_step < 3)
+     ORDER BY 
+       learning_step ASC,
+       cards_since_last_seen ASC,
+       last_seen_at ASC
+     LIMIT ?`,
+    [childId, limit]
+  );
+  return result;
+}
+
+/**
+ * Increment cards_since_last_seen for all learning cards
+ * Called after each card is shown to track spacing
+ */
+export async function incrementCardsSinceLastSeen(childId: string): Promise<void> {
+  const database = await initDatabase();
+  await database.runAsync(
+    `UPDATE card_progress 
+     SET cards_since_last_seen = COALESCE(cards_since_last_seen, 0) + 1
+     WHERE child_id = ? AND (learning_step IS NULL OR learning_step < 3)`,
+    [childId]
+  );
+}
+
+/**
+ * Reset cards_since_last_seen for a specific card
+ * Called when a learning card is shown
+ */
+export async function resetCardsSinceLastSeen(childId: string, word: string): Promise<void> {
+  const database = await initDatabase();
+  await database.runAsync(
+    `UPDATE card_progress 
+     SET cards_since_last_seen = 0
+     WHERE child_id = ? AND word = ?`,
+    [childId, word]
+  );
 }
 
 /**

@@ -16,6 +16,9 @@ import {
   getContentCache,
   initDatabase,
   getIntroducedPhonemes,
+  getLearningCards,
+  incrementCardsSinceLastSeen,
+  resetCardsSinceLastSeen,
 } from './storage/database';
 import { CardProgress, Child } from '@/types/database';
 import { getLevel, getPhonemesUpToLevel, LEVELS } from '@/data/levels';
@@ -75,7 +78,9 @@ export interface CardQueueResult {
   currentLevel: number;
 }
 
-const CARDS_PER_SESSION = 10;
+const CARDS_PER_SESSION = 8; // Optimized for 4.5 year olds (research: 5-7 cards)
+const MAX_NEW_CARDS_PER_SESSION = 2; // Limit completely new items per session
+const MAX_LEARNING_CARDS = 4; // Cards still in learning phase (steps 0-2)
 const MIN_CARDS_FOR_LEVEL_UP = 20;
 
 /**
@@ -313,13 +318,12 @@ async function createLearningCardFromDistar(
   let progress = await getCardProgress(childId, distarCard.plainText);
   
   if (!progress) {
-    // Create initial progress entry
-    // Set next_review_at to 1 day from now so it doesn't immediately become "due"
-    // This prevents the same card from appearing twice in a row
+    // Create initial progress entry for a NEW card
+    // Set learning_step = 0 to enter learning phase
     const progressId = `${childId}-${distarCard.plainText}-${Date.now()}`;
     const now = new Date();
     const nextReview = new Date(now);
-    nextReview.setDate(nextReview.getDate() + 1); // 1 day from now
+    nextReview.setDate(nextReview.getDate() + 1); // 1 day from now (fallback if not shown in learning phase)
     
     progress = {
       id: progressId,
@@ -332,12 +336,14 @@ async function createLearningCardFromDistar(
       successes: 0,
       last_seen_at: null,
       hint_used: 0,
+      learning_step: 0, // Start in learning phase
+      cards_since_last_seen: 0, // No cards shown yet
     };
 
-    console.log(`📝 Creating NEW progress for "${distarCard.plainText}": next_review_at = ${progress.next_review_at}`);
+    console.log(`📝 Creating NEW progress for "${distarCard.plainText}": learning_step = 0 (learning phase)`);
     await createOrUpdateCardProgress(progress);
   } else {
-    console.log(`📝 Using EXISTING progress for "${distarCard.plainText}": next_review_at = ${progress.next_review_at}, attempts = ${progress.attempts}, successes = ${progress.successes}`);
+    console.log(`📝 Using EXISTING progress for "${distarCard.plainText}": learning_step = ${progress.learning_step ?? 3}, attempts = ${progress.attempts}, successes = ${progress.successes}`);
   }
 
   return {
@@ -385,6 +391,8 @@ export async function recordCardCompletion(
       successes: 0,
       last_seen_at: null,
       hint_used: 0,
+      learning_step: 0, // Start in learning phase
+      cards_since_last_seen: 0,
     };
     await createOrUpdateCardProgress(progress);
   }
@@ -396,20 +404,69 @@ export async function recordCardCompletion(
     result.neededHelp
   );
 
-  // Calculate new progress using SM-2
-  const sm2Result = calculateSM2({
-    quality,
-    easeFactor: progress.ease_factor,
-    intervalDays: progress.interval_days,
-    repetitions: progress.attempts,
-  });
+  // Handle learning step progression
+  const currentLearningStep = progress.learning_step ?? 3; // Default to graduated (3) for existing cards
+  let nextLearningStep = currentLearningStep;
+  let nextReviewDate: string;
+  let nextIntervalDays: number;
+  let nextEaseFactor: number;
+
+  if (currentLearningStep < 3) {
+    // Card is in learning phase (step 0-2)
+    if (result.success && quality >= 3) {
+      // Successfully completed this learning step - advance to next step
+      nextLearningStep = currentLearningStep + 1;
+      console.log(`📚 Learning step progression for "${word}": ${currentLearningStep} → ${nextLearningStep}`);
+      
+      if (nextLearningStep >= 3) {
+        // Graduated to SM-2! Use standard spaced repetition
+        const sm2Result = calculateSM2({
+          quality,
+          easeFactor: progress.ease_factor,
+          intervalDays: 1, // Start with 1 day interval after graduation
+          repetitions: 0, // Reset repetitions for SM-2
+        });
+        nextEaseFactor = sm2Result.nextEaseFactor;
+        nextIntervalDays = sm2Result.nextInterval;
+        nextReviewDate = sm2Result.nextReviewDate;
+        console.log(`🎓 Card "${word}" graduated to SM-2! next_review_at = ${nextReviewDate}`);
+      } else {
+        // Still in learning phase - set next_review_at to now so it can be shown again in this session
+        // The spacing logic in getNextCard will handle when to show it
+        const now = new Date();
+        nextReviewDate = now.toISOString();
+        nextIntervalDays = 1;
+        nextEaseFactor = progress.ease_factor;
+      }
+    } else {
+      // Failed or poor quality - stay at current step, will be shown again
+      // Set next_review_at to now so it can be retried
+      const now = new Date();
+      nextReviewDate = now.toISOString();
+      nextIntervalDays = 1;
+      nextEaseFactor = progress.ease_factor;
+    }
+  } else {
+    // Card is graduated (step 3+) - use standard SM-2
+    const sm2Result = calculateSM2({
+      quality,
+      easeFactor: progress.ease_factor,
+      intervalDays: progress.interval_days,
+      repetitions: progress.attempts,
+    });
+    nextEaseFactor = sm2Result.nextEaseFactor;
+    nextIntervalDays = sm2Result.nextInterval;
+    nextReviewDate = sm2Result.nextReviewDate;
+  }
 
   // Update progress
   const updatedProgress: CardProgress = {
     ...progress,
-    ease_factor: sm2Result.nextEaseFactor,
-    interval_days: sm2Result.nextInterval,
-    next_review_at: sm2Result.nextReviewDate,
+    ease_factor: nextEaseFactor,
+    interval_days: nextIntervalDays,
+    next_review_at: nextReviewDate,
+    learning_step: nextLearningStep,
+    cards_since_last_seen: 0, // Reset when card is shown
     attempts: progress.attempts + 1,
     successes: result.success ? progress.successes + 1 : progress.successes,
     last_seen_at: new Date().toISOString(),
@@ -479,127 +536,212 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
     const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
     if (matchingCard) {
       console.log(`✅ Selected: [HIGH] ${progress.word}`);
+      // Increment spacing counter for all learning cards
+      await incrementCardsSinceLastSeen(childId);
       const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
       console.log(`=== getNextCard END ===\n`);
       return card;
     }
   }
   
-  // 2. Get new phonemes for current lesson
-  const unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, currentLesson);
-  console.log(`[2] Unintroduced phonemes for lesson ${currentLesson}: ${unintroducedPhonemes.join(', ')}`);
-  if (unintroducedPhonemes.length > 0) {
-    const phonemeSymbol = unintroducedPhonemes[0];
-    const phonemeCard = allStaticCards.find(
-      c => (c.type === 'letter' || c.type === 'digraph') && c.plainText.toLowerCase() === phonemeSymbol.toLowerCase()
-    );
-    if (phonemeCard && (!excludeWord || phonemeCard.plainText !== excludeWord)) {
-      console.log(`✅ Selected: [NEW PHONEME] ${phonemeCard.plainText}`);
-      // Mark as introduced when we show it
-      await markPhonemeAsIntroduced(childId, phonemeSymbol);
-      const card = await createLearningCardFromDistar(childId, currentLesson, phonemeCard);
+  // 2. Get LEARNING cards (step 0-2) with spacing check
+  const learningCards = await getLearningCards(childId, 10);
+  console.log(`[2] Learning cards: ${learningCards.map(p => `${p.word} (step=${p.learning_step ?? 3}, since=${p.cards_since_last_seen ?? 0})`).join(', ')}`);
+  
+  // Filter by spacing requirements and exclude word
+  const learningCardsFiltered = learningCards.filter(progress => {
+    if (excludeWord && progress.word === excludeWord) {
+      return false;
+    }
+    
+    const step = progress.learning_step ?? 3;
+    const cardsSince = progress.cards_since_last_seen ?? 0;
+    
+    // Check if card is ready based on learning step and spacing
+    if (step === 0) {
+      return cardsSince >= 2; // Step 0: show after 2 cards
+    } else if (step === 1) {
+      return cardsSince >= 2; // Step 1: show after 2-3 cards (use 2 as minimum)
+    } else if (step === 2) {
+      return cardsSince >= 3; // Step 2: show after 3 cards
+    }
+    return false; // Step 3+ should not be in learning cards
+  });
+  
+  console.log(`[2] Learning cards ready (spacing met): ${learningCardsFiltered.map(p => p.word).join(', ')}`);
+  
+  if (learningCardsFiltered.length > 0) {
+    // Prioritize by step (lower step = higher priority) and then by cards_since_last_seen
+    learningCardsFiltered.sort((a, b) => {
+      const stepA = a.learning_step ?? 3;
+      const stepB = b.learning_step ?? 3;
+      if (stepA !== stepB) {
+        return stepA - stepB;
+      }
+      const sinceA = a.cards_since_last_seen ?? 0;
+      const sinceB = b.cards_since_last_seen ?? 0;
+      return sinceB - sinceA; // Higher cards_since_last_seen = more ready
+    });
+    
+    const progress = learningCardsFiltered[0];
+    const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
+    if (matchingCard) {
+      console.log(`✅ Selected: [LEARNING] ${progress.word} (step=${progress.learning_step})`);
+      // Increment spacing counter for all learning cards (including this one)
+      // The counter will be reset to 0 in recordCardCompletion when the card is completed
+      await incrementCardsSinceLastSeen(childId);
+      const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
       console.log(`=== getNextCard END ===\n`);
       return card;
-    } else if (phonemeCard && excludeWord === phonemeCard.plainText) {
-      console.log(`[2] Skipped phoneme ${phonemeCard.plainText} (excluded)`);
     }
   }
   
-  // 3. Get MEDIUM priority due review cards (hint used)
+  // 3. Get new phonemes for current lesson
+  // Check if we've already introduced MAX_NEW_CARDS_PER_SESSION new cards in this session
+  const database = await initDatabase();
+  const sessionNewCards = await database.getAllAsync<{ word: string }>(
+    `SELECT word FROM card_progress 
+     WHERE child_id = ? AND learning_step = 0 AND last_seen_at >= datetime('now', '-1 hour')
+     ORDER BY last_seen_at DESC
+     LIMIT ?`,
+    [childId, MAX_NEW_CARDS_PER_SESSION]
+  );
+  
+  const canIntroduceNewCard = sessionNewCards.length < MAX_NEW_CARDS_PER_SESSION;
+  console.log(`[3] New cards this session: ${sessionNewCards.length}/${MAX_NEW_CARDS_PER_SESSION}, can introduce: ${canIntroduceNewCard}`);
+  
+  if (canIntroduceNewCard) {
+    const unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, currentLesson);
+    console.log(`[3] Unintroduced phonemes for lesson ${currentLesson}: ${unintroducedPhonemes.join(', ')}`);
+    if (unintroducedPhonemes.length > 0) {
+      const phonemeSymbol = unintroducedPhonemes[0];
+      const phonemeCard = allStaticCards.find(
+        c => (c.type === 'letter' || c.type === 'digraph') && c.plainText.toLowerCase() === phonemeSymbol.toLowerCase()
+      );
+      if (phonemeCard && (!excludeWord || phonemeCard.plainText !== excludeWord)) {
+        console.log(`✅ Selected: [NEW PHONEME] ${phonemeCard.plainText}`);
+        // Mark as introduced when we show it
+        await markPhonemeAsIntroduced(childId, phonemeSymbol);
+        // Increment spacing counter for all learning cards
+        await incrementCardsSinceLastSeen(childId);
+        const card = await createLearningCardFromDistar(childId, currentLesson, phonemeCard);
+        console.log(`=== getNextCard END ===\n`);
+        return card;
+      } else if (phonemeCard && excludeWord === phonemeCard.plainText) {
+        console.log(`[3] Skipped phoneme ${phonemeCard.plainText} (excluded)`);
+      }
+    }
+  } else {
+    console.log(`[3] Skipping new phonemes - already at max new cards per session`);
+  }
+  
+  // 4. Get MEDIUM priority due review cards (hint used)
   const mediumPriorityDue = await getDueReviewCardsByPriority(childId, 'medium', 5);
-  console.log(`[3] MEDIUM priority due cards: ${mediumPriorityDue.map(p => p.word).join(', ')}`);
+  console.log(`[4] MEDIUM priority due cards: ${mediumPriorityDue.map(p => p.word).join(', ')}`);
   const mediumPriorityFiltered = excludeWord 
     ? mediumPriorityDue.filter(p => p.word !== excludeWord)
     : mediumPriorityDue;
-  console.log(`[3] MEDIUM priority after exclude: ${mediumPriorityFiltered.map(p => p.word).join(', ')}`);
+  console.log(`[4] MEDIUM priority after exclude: ${mediumPriorityFiltered.map(p => p.word).join(', ')}`);
   if (mediumPriorityFiltered.length > 0) {
     const progress = mediumPriorityFiltered[0];
     const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
     if (matchingCard) {
       console.log(`✅ Selected: [MEDIUM] ${progress.word}`);
+      // Increment spacing counter for all learning cards
+      await incrementCardsSinceLastSeen(childId);
       const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
       console.log(`=== getNextCard END ===\n`);
       return card;
     }
   }
   
-  // 4. Get unlocked word cards (all phonemes introduced)
-  const database = await initDatabase();
-  const seenWords = await database.getAllAsync<{ word: string }>(
-    `SELECT DISTINCT word FROM card_progress WHERE child_id = ?`,
-    [childId]
-  );
-  const seenWordsSet = new Set(seenWords.map(w => w.word));
-  console.log(`[4] Already seen words: ${Array.from(seenWordsSet).join(', ')}`);
-  
-  // Get introduced phonemes
-  const introducedPhonemes = await getIntroducedPhonemes(childId);
-  console.log(`[4] Introduced phonemes: ${introducedPhonemes.join(', ')}`);
-  
-  // Get unlocked cards
-  const unlockedCards = getUnlockedCards(allStaticCards, introducedPhonemes);
-  console.log(`[4] All unlocked cards: ${unlockedCards.map(c => c.plainText).join(', ')}`);
-  
-  // Filter to words/sentences that haven't been seen
-  const newUnlockedCards = unlockedCards.filter(
-    card => card.type !== 'letter' && card.type !== 'digraph' && !seenWordsSet.has(card.plainText) && (!excludeWord || card.plainText !== excludeWord)
-  );
-  console.log(`[4] New unlocked cards (not seen, not excluded): ${newUnlockedCards.map(c => c.plainText).join(', ')}`);
-  
-  if (newUnlockedCards.length > 0) {
-    // Prioritize words over sentences
-    const wordCards = newUnlockedCards.filter(c => c.type === 'word');
-    const targetCard = wordCards.length > 0 ? wordCards[0] : newUnlockedCards[0];
-    console.log(`✅ Selected: [UNLOCKED] ${targetCard.plainText} (${targetCard.type})`);
-    const card = await createLearningCardFromDistar(childId, currentLesson, targetCard);
-    console.log(`=== getNextCard END ===\n`);
-    return card;
+  // 5. Get unlocked word cards (all phonemes introduced)
+  // Check if we can still introduce new cards
+  if (canIntroduceNewCard) {
+    const seenWords = await database.getAllAsync<{ word: string }>(
+      `SELECT DISTINCT word FROM card_progress WHERE child_id = ?`,
+      [childId]
+    );
+    const seenWordsSet = new Set(seenWords.map(w => w.word));
+    console.log(`[5] Already seen words: ${Array.from(seenWordsSet).join(', ')}`);
+    
+    // Get introduced phonemes
+    const introducedPhonemes = await getIntroducedPhonemes(childId);
+    console.log(`[5] Introduced phonemes: ${introducedPhonemes.join(', ')}`);
+    
+    // Get unlocked cards
+    const unlockedCards = getUnlockedCards(allStaticCards, introducedPhonemes);
+    console.log(`[5] All unlocked cards: ${unlockedCards.map(c => c.plainText).join(', ')}`);
+    
+    // Filter to words/sentences that haven't been seen
+    const newUnlockedCards = unlockedCards.filter(
+      card => card.type !== 'letter' && card.type !== 'digraph' && !seenWordsSet.has(card.plainText) && (!excludeWord || card.plainText !== excludeWord)
+    );
+    console.log(`[5] New unlocked cards (not seen, not excluded): ${newUnlockedCards.map(c => c.plainText).join(', ')}`);
+    
+    if (newUnlockedCards.length > 0) {
+      // Prioritize words over sentences
+      const wordCards = newUnlockedCards.filter(c => c.type === 'word');
+      const targetCard = wordCards.length > 0 ? wordCards[0] : newUnlockedCards[0];
+      console.log(`✅ Selected: [UNLOCKED] ${targetCard.plainText} (${targetCard.type})`);
+      // Increment spacing counter for all learning cards
+      await incrementCardsSinceLastSeen(childId);
+      const card = await createLearningCardFromDistar(childId, currentLesson, targetCard);
+      console.log(`=== getNextCard END ===\n`);
+      return card;
+    }
+  } else {
+    console.log(`[5] Skipping unlocked cards - already at max new cards per session`);
   }
   
-  // 5. Get LOW priority due review cards (fluent)
+  // 6. Get LOW priority due review cards (fluent)
   const lowPriorityDue = await getDueReviewCardsByPriority(childId, 'low', 5);
-  console.log(`[5] LOW priority due cards: ${lowPriorityDue.map(p => p.word).join(', ')}`);
+  console.log(`[6] LOW priority due cards: ${lowPriorityDue.map(p => p.word).join(', ')}`);
   const lowPriorityFiltered = excludeWord 
     ? lowPriorityDue.filter(p => p.word !== excludeWord)
     : lowPriorityDue;
-  console.log(`[5] LOW priority after exclude: ${lowPriorityFiltered.map(p => p.word).join(', ')}`);
+  console.log(`[6] LOW priority after exclude: ${lowPriorityFiltered.map(p => p.word).join(', ')}`);
   if (lowPriorityFiltered.length > 0) {
     const progress = lowPriorityFiltered[0];
     const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
     if (matchingCard) {
       console.log(`✅ Selected: [LOW] ${progress.word}`);
+      // Increment spacing counter for all learning cards
+      await incrementCardsSinceLastSeen(childId);
       const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
       console.log(`=== getNextCard END ===\n`);
       return card;
     }
   }
   
-  // 6. If we've exhausted all priority options, try to get any due card as fallback
+  // 7. If we've exhausted all priority options, try to get any due card as fallback
   const fallbackDue = await getDueReviewCards(childId, 10);
-  console.log(`[6] Fallback due cards: ${fallbackDue.map(p => p.word).join(', ')}`);
+  console.log(`[7] Fallback due cards: ${fallbackDue.map(p => p.word).join(', ')}`);
   const fallbackFiltered = excludeWord 
     ? fallbackDue.filter(p => p.word !== excludeWord)
     : fallbackDue;
-  console.log(`[6] Fallback after exclude: ${fallbackFiltered.map(p => p.word).join(', ')}`);
+  console.log(`[7] Fallback after exclude: ${fallbackFiltered.map(p => p.word).join(', ')}`);
   if (fallbackFiltered.length > 0) {
     const progress = fallbackFiltered[0];
     const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
     if (matchingCard) {
       console.log(`✅ Selected: [FALLBACK] ${progress.word}`);
+      // Increment spacing counter for all learning cards
+      await incrementCardsSinceLastSeen(childId);
       const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
       console.log(`=== getNextCard END ===\n`);
       return card;
     }
   }
   
-  // 7. Last resort: Get ANY card the child has seen before (allow continuous practice)
+  // 8. Last resort: Get ANY card the child has seen before (allow continuous practice)
   // This ensures children can always keep practicing, even if no new cards or due cards available
   const allProgressCards = await getAllCardsForChild(childId);
-  console.log(`[7] All progress cards: ${allProgressCards.map(p => `${p.word} (successes: ${p.successes}, next_review: ${p.next_review_at})`).join(', ')}`);
+  console.log(`[8] All progress cards: ${allProgressCards.map(p => `${p.word} (successes: ${p.successes}, next_review: ${p.next_review_at})`).join(', ')}`);
   const allProgressFiltered = excludeWord 
     ? allProgressCards.filter(p => p.word !== excludeWord)
     : allProgressCards;
-  console.log(`[7] Progress cards after exclude: ${allProgressFiltered.map(p => p.word).join(', ')}`);
+  console.log(`[8] Progress cards after exclude: ${allProgressFiltered.map(p => p.word).join(', ')}`);
   
   if (allProgressFiltered.length > 0) {
     // Prioritize cards with fewer successes (cards that need more practice)
@@ -617,11 +759,13 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
       return 0;
     });
     
-    console.log(`[7] Sorted progress cards: ${sortedProgress.map(p => `${p.word} (successes: ${p.successes})`).join(', ')}`);
+    console.log(`[8] Sorted progress cards: ${sortedProgress.map(p => `${p.word} (successes: ${p.successes})`).join(', ')}`);
     const progress = sortedProgress[0];
     const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
     if (matchingCard) {
       console.log(`✅ Selected: [PRACTICE] ${progress.word}`);
+      // Increment spacing counter for all learning cards
+      await incrementCardsSinceLastSeen(childId);
       const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
       console.log(`=== getNextCard END ===\n`);
       return card;

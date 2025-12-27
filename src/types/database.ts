@@ -29,6 +29,8 @@ export interface CardProgress {
   successes: number;
   last_seen_at: string | null;
   hint_used?: number; // 1 if hint was used, 0 otherwise (for priority weighting)
+  learning_step?: number; // 0-2: in learning phase, 3+: graduated to SM-2
+  cards_since_last_seen?: number; // Track intervening cards for learning phase spacing
 }
 
 export interface IntroducedPhoneme {
