@@ -1,6 +1,6 @@
 # Early Reader
 
-Copyright (C) 2024 Instalabs, LLC
+Copyright (C) 2026 Instalabs, LLC
 
 A mobile app implementing the DISTAR-based methodology from "Teach Your Child to Read in 100 Easy Lessons" by Siegfried Engelmann.
 
