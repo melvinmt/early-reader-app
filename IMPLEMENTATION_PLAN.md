@@ -355,7 +355,7 @@ Each level introduces new sounds and patterns systematically, following the DIST
 ### Quality Rating from Voice Interaction
 
 **Mapping Logic:**
-Map OpenAI Realtime API results to SM-2 quality ratings (0-5):
+Map pronunciation validation results to SM-2 quality ratings (0-5):
 
 - **Failed attempts:**
   - Needed help: Quality = 1 (Major struggle)
@@ -374,7 +374,6 @@ Map OpenAI Realtime API results to SM-2 quality ratings (0-5):
 
 **Requirements:**
 - Initialize card queue manager for the selected child
-- Connect to OpenAI Realtime Voice API
 - Display current card with blurred image and word
 - Handle card progression: load next card from queue
 - Pre-generate next few cards in background for smooth experience
@@ -407,7 +406,7 @@ Map OpenAI Realtime API results to SM-2 quality ratings (0-5):
 │  ┌─────────────────────────────────────────────────────────────┐    │
 │  │                 CHILD SWIPES & SPEAKS                        │    │
 │  │                                                              │    │
-│  │    OpenAI Realtime API listens...                           │    │
+│  │    Local pronunciation validation...                         │    │
 │  │                                                              │    │
 │  │    Correct? ─────────────────────────────────────────────┐  │    │
 │  │         │                                                 │  │    │
@@ -906,133 +905,9 @@ class _BlurredImageRevealState extends State<BlurredImageReveal>
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3. OpenAI Realtime Voice API Integration
+### 3. Pronunciation Validation
 
-The app uses OpenAI's Realtime Voice API as the core interaction layer, enabling natural voice conversations with tool calling for lesson control and dynamic context ingestion.
-
-#### Why OpenAI Realtime API?
-
-| Feature | Benefit for Reading App |
-|---------|------------------------|
-| **Real-time Voice** | Natural, low-latency interaction with children |
-| **Tool Calling** | Control lesson flow, reveal images, track progress |
-| **Context Ingestion** | Dynamically provide current word, lesson context |
-| **Voice Detection** | Automatic speech detection, no button needed |
-| **Natural Responses** | Warm, encouraging teacher-like feedback |
-
-#### Realtime API Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│              OPENAI REALTIME VOICE API INTEGRATION                   │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                     REACT NATIVE APP                         │    │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │    │
-│  │  │  Microphone │  │   Speaker   │  │   Lesson State      │  │    │
-│  │  │   Input     │  │   Output    │  │   Manager           │  │    │
-│  │  └──────┬──────┘  └──────▲──────┘  └──────────┬──────────┘  │    │
-│  │         │                │                     │             │    │
-│  └─────────┼────────────────┼─────────────────────┼─────────────┘    │
-│            │                │                     │                  │
-│            ▼                │                     ▼                  │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │              WEBSOCKET CONNECTION (wss://)                   │    │
-│  │                                                              │    │
-│  │   Audio Stream ──────▶  OPENAI REALTIME API  ──────▶ Audio   │    │
-│  │   (PCM 16-bit)          - Speech Recognition      (PCM 16-bit)   │
-│  │                         - GPT-4o Processing                  │    │
-│  │   Tool Results ◀──────  - Voice Synthesis    ◀────── Tools   │    │
-│  │                         - Tool Calling                       │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                                    │                                 │
-│                                    ▼                                 │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                    AVAILABLE TOOLS                           │    │
-│  │                                                              │    │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │    │
-│  │  │ validate_    │  │ reveal_      │  │ advance_to_      │   │    │
-│  │  │ pronunciation│  │ image        │  │ next_word        │   │    │
-│  │  └──────────────┘  └──────────────┘  └──────────────────┘   │    │
-│  │                                                              │    │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │    │
-│  │  │ record_      │  │ play_        │  │ get_lesson_      │   │    │
-│  │  │ attempt      │  │ phoneme      │  │ context          │   │    │
-│  │  └──────────────┘  └──────────────┘  └──────────────────┘   │    │
-│  │                                                              │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-#### Realtime API Implementation
-
-**Service Requirements:**
-- Use local pronunciation validation and feedback
-- Set up interaction handlers for app control: validate_pronunciation, reveal_image, advance_to_next_word, record_attempt, play_phoneme
-- Track lesson context including expected word and phonemes
-- Configure warm, patient, encouraging feedback voice
-- Handle interaction updates and errors
-- Support session lifecycle
-
-**Tool Definitions:**
-- validate_pronunciation: Check if child said word correctly, return confidence and correctness
-- reveal_image: Reveal blurred image after correct pronunciation, with celebration level
-- advance_to_next_word: Move to next word, mark current as completed/needs review
-- record_attempt: Track pronunciation attempts for analytics
-- play_phoneme: Play specific phoneme sound to help child
-
-**AI Persona Configuration:**
-- Voice: Warm, friendly (e.g., 'shimmer')
-- Turn detection: Server-side VAD with appropriate thresholds
-- Instructions: Guide child through reading, celebrate successes, encourage retries (max 3 attempts), keep responses short (1-2 sentences)
-
-#### React Native Integration
-
-**Hook Requirements:**
-- Create useRealtimeVoice hook to manage voice service lifecycle
-- Initialize RealtimeVoiceService on mount, cleanup on unmount
-- Handle tool calls from AI: validate_pronunciation, reveal_image, advance_to_next_word, play_phoneme, record_attempt
-- Connect to voice service and manage connection state
-- Inject lesson context when word changes
-- Start/stop listening for child's voice
-- Return connection state and control functions
-
-#### Audio Streaming Setup (React Native)
-
-**Requirements:**
-- Configure audio session for recording and playback
-- Set up audio recording with appropriate format (WAV, 24kHz, mono, 16-bit PCM)
-- Stream audio chunks to Realtime API in real-time
-- Handle audio playback from Realtime API responses
-- Manage audio session interruptions and background behavior
-- Support both iOS and Android audio configurations
-        }
-      },
-      100 // Update interval in ms
-    );
-
-    this.recording = recording;
-  }
-
-  async stopRecording() {
-    if (this.recording) {
-      await this.recording.stopAndUnloadAsync();
-      this.recording = null;
-    }
-  }
-
-  async playAudioChunk(base64Audio: string) {
-    const { sound } = await Audio.Sound.createAsync({
-      uri: `data:audio/wav;base64,${base64Audio}`,
-    });
-    await sound.playAsync();
-  }
-}
-```
-
-#### Pronunciation Validation Implementation
+#### Local Pronunciation Validation
 
 **Validation Requirements:**
 - Compare child's pronunciation (transcript + phonemes) to expected word
@@ -1149,24 +1024,18 @@ The app uses OpenAI's Realtime Voice API as the core interaction layer, enabling
 };
 ```
 
-### 4. AI Audio/Speech Generation
+### 4. Audio/Speech Generation
 
-#### Voice Synthesis via OpenAI Realtime API
+#### Pre-Recorded Audio
 
-The OpenAI Realtime API handles all voice synthesis (text-to-speech), eliminating the need for separate TTS services:
+The app uses pre-recorded audio files for all voice synthesis and phoneme sounds:
 
-| Capability | OpenAI Realtime Implementation |
-|------------|-------------------------------|
-| **Instructor Voice** | Built-in voice selection (shimmer, alloy, echo, etc.) |
-| **Natural Responses** | GPT-4o generates contextual, encouraging feedback |
-| **Low Latency** | Real-time streaming, <300ms response time |
-| **Pronunciation Modeling** | AI can "say" the word to model correct pronunciation |
-| **Dynamic Responses** | No pre-recorded audio needed - generates on the fly |
-
-**Voice Options for Children's App:**
-- `shimmer` - Warm, friendly, recommended for teaching
-- `alloy` - Neutral, clear
-- `nova` - Energetic, encouraging
+| Capability | Implementation |
+|------------|----------------|
+| **Instructor Voice** | Pre-recorded audio files for prompts and feedback |
+| **Phoneme Sounds** | Pre-recorded audio for each phoneme (short and stretched versions) |
+| **Word Pronunciation** | Pre-recorded audio for word modeling |
+| **Encouragement** | Pre-recorded audio for success and retry prompts |
 
 #### Phoneme Audio Requirements
 
@@ -1192,13 +1061,13 @@ PHONEME_AUDIO_SPECS = {
 }
 ```
 
-#### AI Voice via OpenAI Realtime API
+#### Audio File Management
 
-**Voice Configuration:**
-- OpenAI Realtime API provides built-in voice selection (shimmer, alloy, echo, etc.)
-- No separate voice cloning service needed
-- Consistent instructor voice achieved through API voice selection and prompt engineering
-- Voice parameters (tone, speed, emotion) controlled via API instructions
+**Audio Configuration:**
+- All audio files are pre-recorded and stored locally
+- Consistent instructor voice achieved through professional voice recording
+- Audio files organized by type: phonemes, words, prompts, feedback
+- Files cached locally for offline playback
 
 ### 4. AI-Powered Content Pipeline
 
@@ -1872,7 +1741,7 @@ assets/
 │                                                                      │
 │  AUDIO & SPEECH                                                      │
 │  ├── expo-av (Audio Playback for pre-recorded phonemes)              │
-│  └── OpenAI Realtime API (Speech Recognition + Text-to-Speech)       │
+│  └── react-native-voice (Optional speech recognition)                │
 │                                                                      │
 │  LOCAL DATA STORAGE (All data on device)                             │
 │  ├── expo-sqlite (SQLite database - all app data)                   │
@@ -2087,12 +1956,10 @@ Duration: ~8-10 weeks
 │                    PHASE 2: AI & SPEECH                              │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  OPENAI REALTIME VOICE API                                           │
-│  ├── [ ] WebSocket connection to OpenAI Realtime API                │
-│  ├── [ ] Audio streaming (PCM 16-bit, 24kHz)                        │
-│  ├── [ ] Tool definitions for lesson control                        │
-│  ├── [ ] Context ingestion for current word/lesson                  │
-│  ├── [ ] Retry system via AI (max 3 attempts per word)             │
+│  PRONUNCIATION VALIDATION                                           │
+│  ├── [ ] Local pronunciation validation logic                       │
+│  ├── [ ] Speech recognition integration (optional)                  │
+│  ├── [ ] Retry system (max 3 attempts per word)                    │
 │  └── [ ] Parent override controls                                   │
 │                                                                      │
 │  CONTENT GENERATION                                                  │
