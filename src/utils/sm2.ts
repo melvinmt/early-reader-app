@@ -96,6 +96,44 @@ export function mapPronunciationToQuality(
   return 2; // Minor struggle
 }
 
+/**
+ * Card priority for spaced repetition scheduling
+ * Determines the order in which cards should be reviewed
+ */
+export type CardPriority = 'high' | 'medium' | 'low';
+
+/**
+ * Calculate card priority based on hint usage and performance
+ * 
+ * Priority levels:
+ * - High: New cards, failed cards, overdue cards (needs attention)
+ * - Medium: Hint was used, minor struggles (needs more practice)
+ * - Low: Correct & fluent, long intervals (mastered)
+ * 
+ * @param hintUsed Whether the child used a hint
+ * @param quality SM-2 quality rating (0-5)
+ * @param intervalDays Current interval in days
+ */
+export function calculateCardPriority(
+  hintUsed: boolean,
+  quality: number,
+  intervalDays: number
+): CardPriority {
+  // Hint used → medium priority (needs more practice)
+  if (hintUsed || quality <= 2) {
+    return 'medium';
+  }
+  
+  // Correct & fluent → lowest priority (mastered)
+  if (quality >= 4 && intervalDays >= 3) {
+    return 'low';
+  }
+  
+  // Default → high priority (needs attention)
+  return 'high';
+}
+
+
 
 
 

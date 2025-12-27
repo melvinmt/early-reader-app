@@ -5,6 +5,7 @@
 
 import {
   getDueReviewCards,
+  getDueReviewCardsByPriority,
   getAllCardsForChild,
   getCardProgress,
   createOrUpdateCardProgress,
@@ -14,13 +15,22 @@ import {
   createOrUpdateContentCache,
   getContentCache,
   initDatabase,
+  getIntroducedPhonemes,
 } from './storage/database';
 import { CardProgress, Child } from '@/types/database';
 import { getLevel, getPhonemesUpToLevel, LEVELS } from '@/data/levels';
-import { calculateSM2, mapPronunciationToQuality } from '@/utils/sm2';
+import { calculateSM2, mapPronunciationToQuality, calculateCardPriority } from '@/utils/sm2';
 import { validatePronunciation } from '@/utils/pronunciation';
 import { getLocale } from '@/config/locale';
 import type { DistarCard } from '@/data/distarCards';
+import {
+  getUnintroducedPhonemesForLesson,
+  isCardUnlocked,
+  markPhonemeAsIntroduced,
+  getUnlockedCards,
+  advanceLessonIfReady,
+  segmentWordIntoPhonemes,
+} from './curriculum/curriculumService';
 // Static imports for each supported locale (Metro bundler doesn't support dynamic template imports)
 import * as distarCardsEnUS from '@/data/distarCards.en-US';
 import * as distarCardsDefault from '@/data/distarCards';
@@ -156,7 +166,7 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
 
 /**
  * Generate a new learning card from pre-generated DISTAR cards
- * Uses ALL available static cards (no lesson-based filtering for now)
+ * Uses curriculum-aware selection: only shows unlocked cards
  */
 async function generateNewCardFromStatic(
   childId: string,
@@ -170,31 +180,41 @@ async function generateNewCardFromStatic(
   );
   const seenWords = new Set(existingWords.map(w => w.word));
   
-  // Get ALL static cards (not filtered by lesson for now since we have limited cards)
+  // Get introduced phonemes to determine unlocked cards
+  const introducedPhonemes = await getIntroducedPhonemes(childId);
+  
+  // Get all static cards
   const allCards = getAllStaticCards();
-  console.log(`Total static cards available: ${allCards.length}`);
+  
+  // Filter to unlocked cards only
+  const unlockedCards = getUnlockedCards(allCards, introducedPhonemes);
   
   // Filter out cards the child has already seen
-  const availableCards = allCards.filter(
+  const availableCards = unlockedCards.filter(
     card => !seenWords.has(card.plainText)
   );
   
-  console.log(`Cards not yet seen by child: ${availableCards.length}`);
-  
   if (availableCards.length === 0) {
-    console.warn('No unseen static cards available - child has seen all cards');
-    // All cards have been seen - return a random one for review
-    if (allCards.length > 0) {
-      const randomCard = allCards[Math.floor(Math.random() * allCards.length)];
-      console.log('Returning random card for review:', randomCard.plainText);
-      return createLearningCardFromDistar(childId, level, randomCard);
-    }
+    // No new unlocked cards - return null to let priority system handle reviews
     return null;
   }
   
-  // Select a random unseen card
-  const distarCard = availableCards[Math.floor(Math.random() * availableCards.length)];
-  console.log('Selected new card:', distarCard.plainText);
+  // Prioritize phonemes first, then words, then sentences
+  const phonemeCards = availableCards.filter(c => c.type === 'letter' || c.type === 'digraph');
+  const wordCards = availableCards.filter(c => c.type === 'word');
+  const sentenceCards = availableCards.filter(c => c.type === 'sentence');
+  
+  // Select first available card type in priority order
+  const targetCards = phonemeCards.length > 0 ? phonemeCards : 
+                      wordCards.length > 0 ? wordCards : 
+                      sentenceCards;
+  
+  if (targetCards.length === 0) {
+    return null;
+  }
+  
+  // Select a random card from the priority group
+  const distarCard = targetCards[Math.floor(Math.random() * targetCards.length)];
   
   return createLearningCardFromDistar(childId, level, distarCard);
 }
@@ -207,22 +227,36 @@ async function createLearningCardFromDistar(
   level: number,
   distarCard: DistarCard
 ): Promise<LearningCard> {
-  // Create initial progress entry
-  const progressId = `${childId}-${distarCard.plainText}-${Date.now()}`;
-  const now = new Date().toISOString();
-  const progress: CardProgress = {
-    id: progressId,
-    child_id: childId,
-    word: distarCard.plainText,
-    ease_factor: 2.5, // Default SM-2 ease factor
-    interval_days: 0, // Show immediately
-    next_review_at: now,
-    attempts: 0,
-    successes: 0,
-    last_seen_at: null,
-  };
+  // Check if progress already exists
+  let progress = await getCardProgress(childId, distarCard.plainText);
+  
+  if (!progress) {
+    // Create initial progress entry
+    // Set next_review_at to 1 day from now so it doesn't immediately become "due"
+    // This prevents the same card from appearing twice in a row
+    const progressId = `${childId}-${distarCard.plainText}-${Date.now()}`;
+    const now = new Date();
+    const nextReview = new Date(now);
+    nextReview.setDate(nextReview.getDate() + 1); // 1 day from now
+    
+    progress = {
+      id: progressId,
+      child_id: childId,
+      word: distarCard.plainText,
+      ease_factor: 2.5, // Default SM-2 ease factor
+      interval_days: 1, // 1 day interval for new cards
+      next_review_at: nextReview.toISOString(),
+      attempts: 0,
+      successes: 0,
+      last_seen_at: null,
+      hint_used: 0,
+    };
 
-  await createOrUpdateCardProgress(progress);
+    console.log(`📝 Creating NEW progress for "${distarCard.plainText}": next_review_at = ${progress.next_review_at}`);
+    await createOrUpdateCardProgress(progress);
+  } else {
+    console.log(`📝 Using EXISTING progress for "${distarCard.plainText}": next_review_at = ${progress.next_review_at}, attempts = ${progress.attempts}, successes = ${progress.successes}`);
+  }
 
   return {
     word: distarCard.plainText,
@@ -250,21 +284,25 @@ export async function recordCardCompletion(
   // Get current progress
   let progress = await getCardProgress(childId, word);
 
-  // If progress doesn't exist, create it (can happen if card was just generated)
+  // If progress doesn't exist, create it (shouldn't happen but handle it gracefully)
   if (!progress) {
     console.warn('Card progress not found, creating new progress entry for:', word);
     const progressId = `${childId}-${word}-${Date.now()}`;
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nextReview = new Date(now);
+    nextReview.setDate(nextReview.getDate() + 1);
+    
     progress = {
       id: progressId,
       child_id: childId,
       word: word,
       ease_factor: 2.5, // Default SM-2 ease factor
-      interval_days: 0,
-      next_review_at: now,
+      interval_days: 1,
+      next_review_at: nextReview.toISOString(),
       attempts: 0,
       successes: 0,
       last_seen_at: null,
+      hint_used: 0,
     };
     await createOrUpdateCardProgress(progress);
   }
@@ -293,8 +331,10 @@ export async function recordCardCompletion(
     attempts: progress.attempts + 1,
     successes: result.success ? progress.successes + 1 : progress.successes,
     last_seen_at: new Date().toISOString(),
+    hint_used: result.neededHelp ? 1 : (progress.hint_used ?? 0), // Track hint usage (persist if previously used)
   };
 
+  console.log(`💾 Saving progress for "${word}": success=${result.success}, quality=${quality}, next_review_at=${updatedProgress.next_review_at}, attempts=${updatedProgress.attempts}, successes=${updatedProgress.successes}`);
   await createOrUpdateCardProgress(updatedProgress);
 
   // Increment child's total cards completed if successful
@@ -308,52 +348,36 @@ export async function recordCardCompletion(
 
 /**
  * Check if child should level up
+ * Uses curriculum service to check if current lesson is complete
  */
 async function checkLevelProgression(childId: string): Promise<void> {
-  const child = await getChild(childId);
-  if (!child) return;
-
-  const currentLevel = child.current_level;
-  const levelData = getLevel(currentLevel);
-
-  if (!levelData) return;
-
-  // Check if child has completed enough cards at current level
-  // Get all cards for current level
-  const dueCards = await getDueReviewCards(childId, 1000); // Get all cards
-  const levelCards = dueCards.filter((card) => {
-    // This is simplified - in production, track level per card
-    return card.successes > 0;
-  });
-
-  // If child has completed minimum cards and all are mastered, level up
-  if (
-    child.total_cards_completed >= MIN_CARDS_FOR_LEVEL_UP &&
-    levelCards.length >= levelData.minWordsToComplete &&
-    currentLevel < LEVELS.length
-  ) {
-    // Level up
-    await updateChildLevel(childId, currentLevel + 1);
-  }
+  await advanceLessonIfReady(childId);
 }
 
-// Track current card index for simple cycling through all cards
-let currentCardIndex = 0;
-
 /**
- * Get next card from queue
- * Simplified for testing: cycles through all static cards in order
+ * Get next card from queue using curriculum-aware priority-based selection
+ * Priority order:
+ * 1. HIGH priority due review cards (new/failed/overdue)
+ * 2. New phonemes for current lesson
+ * 3. MEDIUM priority due review cards (hint used)
+ * 4. Unlocked word cards (all phonemes introduced)
+ * 5. LOW priority due review cards (fluent)
+ * 6. Check for lesson advancement
+ * 
+ * @param childId - The child's ID
+ * @param excludeWord - Optional word to exclude (prevents consecutive repeats)
  */
-export async function getNextCard(childId: string): Promise<LearningCard | null> {
+export async function getNextCard(childId: string, excludeWord?: string): Promise<LearningCard | null> {
+  console.log(`\n=== getNextCard START (excludeWord: ${excludeWord || 'none'}) ===`);
+  
   // Get child info first
   const child = await getChild(childId);
   if (!child) {
     throw new Error('Child not found');
   }
   
-  const currentLevel = child.current_level;
-  
-  // Get all static cards
+  const currentLesson = child.current_level;
+  console.log(`Current lesson: ${currentLesson}`);
   const allStaticCards = getAllStaticCards();
   
   if (allStaticCards.length === 0) {
@@ -361,28 +385,191 @@ export async function getNextCard(childId: string): Promise<LearningCard | null>
     return null;
   }
   
-  // Get the current card and advance the index
-  const distarCard = allStaticCards[currentCardIndex];
-  currentCardIndex = (currentCardIndex + 1) % allStaticCards.length;
+  // 1. Get HIGH priority due review cards first
+  const highPriorityDue = await getDueReviewCardsByPriority(childId, 'high', 5);
+  console.log(`[1] HIGH priority due cards: ${highPriorityDue.map(p => p.word).join(', ')}`);
+  const highPriorityFiltered = excludeWord 
+    ? highPriorityDue.filter(p => p.word !== excludeWord)
+    : highPriorityDue;
+  console.log(`[1] HIGH priority after exclude: ${highPriorityFiltered.map(p => p.word).join(', ')}`);
+  if (highPriorityFiltered.length > 0) {
+    const progress = highPriorityFiltered[0];
+    const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
+    if (matchingCard) {
+      console.log(`✅ Selected: [HIGH] ${progress.word}`);
+      const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
+      console.log(`=== getNextCard END ===\n`);
+      return card;
+    }
+  }
   
-  console.log(`Showing card ${currentCardIndex}/${allStaticCards.length}: ${distarCard.plainText} (${distarCard.id})`);
+  // 2. Get new phonemes for current lesson
+  const unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, currentLesson);
+  console.log(`[2] Unintroduced phonemes for lesson ${currentLesson}: ${unintroducedPhonemes.join(', ')}`);
+  if (unintroducedPhonemes.length > 0) {
+    const phonemeSymbol = unintroducedPhonemes[0];
+    const phonemeCard = allStaticCards.find(
+      c => (c.type === 'letter' || c.type === 'digraph') && c.plainText.toLowerCase() === phonemeSymbol.toLowerCase()
+    );
+    if (phonemeCard && (!excludeWord || phonemeCard.plainText !== excludeWord)) {
+      console.log(`✅ Selected: [NEW PHONEME] ${phonemeCard.plainText}`);
+      // Mark as introduced when we show it
+      await markPhonemeAsIntroduced(childId, phonemeSymbol);
+      const card = await createLearningCardFromDistar(childId, currentLesson, phonemeCard);
+      console.log(`=== getNextCard END ===\n`);
+      return card;
+    } else if (phonemeCard && excludeWord === phonemeCard.plainText) {
+      console.log(`[2] Skipped phoneme ${phonemeCard.plainText} (excluded)`);
+    }
+  }
   
-  // Create a learning card from the static card
-  return {
-    word: distarCard.plainText,
-    phonemes: distarCard.phonemes,
-    imageUrl: distarCard.imagePath,
-    progress: null, // No progress tracking for now
-    level: currentLevel,
-    distarCard,
-  };
+  // 3. Get MEDIUM priority due review cards (hint used)
+  const mediumPriorityDue = await getDueReviewCardsByPriority(childId, 'medium', 5);
+  console.log(`[3] MEDIUM priority due cards: ${mediumPriorityDue.map(p => p.word).join(', ')}`);
+  const mediumPriorityFiltered = excludeWord 
+    ? mediumPriorityDue.filter(p => p.word !== excludeWord)
+    : mediumPriorityDue;
+  console.log(`[3] MEDIUM priority after exclude: ${mediumPriorityFiltered.map(p => p.word).join(', ')}`);
+  if (mediumPriorityFiltered.length > 0) {
+    const progress = mediumPriorityFiltered[0];
+    const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
+    if (matchingCard) {
+      console.log(`✅ Selected: [MEDIUM] ${progress.word}`);
+      const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
+      console.log(`=== getNextCard END ===\n`);
+      return card;
+    }
+  }
+  
+  // 4. Get unlocked word cards (all phonemes introduced)
+  const database = await initDatabase();
+  const seenWords = await database.getAllAsync<{ word: string }>(
+    `SELECT DISTINCT word FROM card_progress WHERE child_id = ?`,
+    [childId]
+  );
+  const seenWordsSet = new Set(seenWords.map(w => w.word));
+  console.log(`[4] Already seen words: ${Array.from(seenWordsSet).join(', ')}`);
+  
+  // Get introduced phonemes
+  const introducedPhonemes = await getIntroducedPhonemes(childId);
+  console.log(`[4] Introduced phonemes: ${introducedPhonemes.join(', ')}`);
+  
+  // Get unlocked cards
+  const unlockedCards = getUnlockedCards(allStaticCards, introducedPhonemes);
+  console.log(`[4] All unlocked cards: ${unlockedCards.map(c => c.plainText).join(', ')}`);
+  
+  // Filter to words/sentences that haven't been seen
+  const newUnlockedCards = unlockedCards.filter(
+    card => card.type !== 'letter' && card.type !== 'digraph' && !seenWordsSet.has(card.plainText) && (!excludeWord || card.plainText !== excludeWord)
+  );
+  console.log(`[4] New unlocked cards (not seen, not excluded): ${newUnlockedCards.map(c => c.plainText).join(', ')}`);
+  
+  if (newUnlockedCards.length > 0) {
+    // Prioritize words over sentences
+    const wordCards = newUnlockedCards.filter(c => c.type === 'word');
+    const targetCard = wordCards.length > 0 ? wordCards[0] : newUnlockedCards[0];
+    console.log(`✅ Selected: [UNLOCKED] ${targetCard.plainText} (${targetCard.type})`);
+    const card = await createLearningCardFromDistar(childId, currentLesson, targetCard);
+    console.log(`=== getNextCard END ===\n`);
+    return card;
+  }
+  
+  // 5. Get LOW priority due review cards (fluent)
+  const lowPriorityDue = await getDueReviewCardsByPriority(childId, 'low', 5);
+  console.log(`[5] LOW priority due cards: ${lowPriorityDue.map(p => p.word).join(', ')}`);
+  const lowPriorityFiltered = excludeWord 
+    ? lowPriorityDue.filter(p => p.word !== excludeWord)
+    : lowPriorityDue;
+  console.log(`[5] LOW priority after exclude: ${lowPriorityFiltered.map(p => p.word).join(', ')}`);
+  if (lowPriorityFiltered.length > 0) {
+    const progress = lowPriorityFiltered[0];
+    const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
+    if (matchingCard) {
+      console.log(`✅ Selected: [LOW] ${progress.word}`);
+      const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
+      console.log(`=== getNextCard END ===\n`);
+      return card;
+    }
+  }
+  
+  // 6. If we've exhausted all priority options, try to get any due card as fallback
+  const fallbackDue = await getDueReviewCards(childId, 10);
+  console.log(`[6] Fallback due cards: ${fallbackDue.map(p => p.word).join(', ')}`);
+  const fallbackFiltered = excludeWord 
+    ? fallbackDue.filter(p => p.word !== excludeWord)
+    : fallbackDue;
+  console.log(`[6] Fallback after exclude: ${fallbackFiltered.map(p => p.word).join(', ')}`);
+  if (fallbackFiltered.length > 0) {
+    const progress = fallbackFiltered[0];
+    const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
+    if (matchingCard) {
+      console.log(`✅ Selected: [FALLBACK] ${progress.word}`);
+      const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
+      console.log(`=== getNextCard END ===\n`);
+      return card;
+    }
+  }
+  
+  // 7. Last resort: Get ANY card the child has seen before (allow continuous practice)
+  // This ensures children can always keep practicing, even if no new cards or due cards available
+  const allProgressCards = await getAllCardsForChild(childId);
+  console.log(`[7] All progress cards: ${allProgressCards.map(p => `${p.word} (successes: ${p.successes}, next_review: ${p.next_review_at})`).join(', ')}`);
+  const allProgressFiltered = excludeWord 
+    ? allProgressCards.filter(p => p.word !== excludeWord)
+    : allProgressCards;
+  console.log(`[7] Progress cards after exclude: ${allProgressFiltered.map(p => p.word).join(', ')}`);
+  
+  if (allProgressFiltered.length > 0) {
+    // Prioritize cards with fewer successes (cards that need more practice)
+    const sortedProgress = allProgressFiltered.sort((a, b) => {
+      // First by successes (fewer successes = more practice needed)
+      if (a.successes !== b.successes) {
+        return a.successes - b.successes;
+      }
+      // Then by last seen (older = prioritize)
+      if (a.last_seen_at && b.last_seen_at) {
+        return new Date(a.last_seen_at).getTime() - new Date(b.last_seen_at).getTime();
+      }
+      if (!a.last_seen_at) return -1;
+      if (!b.last_seen_at) return 1;
+      return 0;
+    });
+    
+    console.log(`[7] Sorted progress cards: ${sortedProgress.map(p => `${p.word} (successes: ${p.successes})`).join(', ')}`);
+    const progress = sortedProgress[0];
+    const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
+    if (matchingCard) {
+      console.log(`✅ Selected: [PRACTICE] ${progress.word}`);
+      const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
+      console.log(`=== getNextCard END ===\n`);
+      return card;
+    }
+  }
+  
+  // Only return null if child has literally never seen any card (brand new child)
+  console.log(`❌ No cards available - child has no progress yet`);
+  console.log(`=== getNextCard END ===\n`);
+  return null;
 }
 
 /**
- * Reset card index to start from the beginning
+ * Create a LearningCard from existing CardProgress
  */
-export function resetCardIndex(): void {
-  currentCardIndex = 0;
+async function createLearningCardFromProgress(
+  childId: string,
+  level: number,
+  progress: CardProgress,
+  distarCard: DistarCard
+): Promise<LearningCard> {
+  console.log(`📋 Creating card from EXISTING progress "${progress.word}": next_review_at=${progress.next_review_at}, attempts=${progress.attempts}, successes=${progress.successes}`);
+  return {
+    word: progress.word,
+    phonemes: distarCard.phonemes,
+    imageUrl: distarCard.imagePath,
+    progress,
+    level,
+    distarCard,
+  };
 }
 
 

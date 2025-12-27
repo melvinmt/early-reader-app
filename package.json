@@ -12,7 +12,10 @@
     "web": "expo start --web",
     "generate-cards": "tsx scripts/generate-cards.ts",
     "generate-cards:full": "tsx scripts/generate-cards.ts --full",
-    "sync-assets": "tsx scripts/generate-cards.ts --sync-assets"
+    "sync-assets": "tsx scripts/generate-cards.ts --sync-assets",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -46,13 +49,15 @@
     "@babel/core": "^7.25.0",
     "@types/node": "^20.0.0",
     "@types/react": "~19.1.10",
+    "@vitest/coverage-v8": "^4.0.16",
     "axios": "^1.6.0",
     "babel-preset-expo": "^54.0.9",
     "dotenv": "^16.4.0",
     "sharp": "^0.34.5",
     "ts-node": "^10.9.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vitest": "^4.0.16"
   },
   "private": true
 }

@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Parent, Child, CardProgress, ContentCache, Session } from '@/types/database';
+import { Parent, Child, CardProgress, ContentCache, Session, IntroducedPhoneme } from '@/types/database';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -57,8 +57,21 @@ async function createTables(database: SQLite.SQLiteDatabase) {
       attempts INTEGER DEFAULT 0,
       successes INTEGER DEFAULT 0,
       last_seen_at TEXT,
+      hint_used INTEGER DEFAULT 0,
       FOREIGN KEY (child_id) REFERENCES children(id),
       UNIQUE(child_id, word)
+    );
+  `);
+
+  // Introduced phonemes table
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS introduced_phonemes (
+      id TEXT PRIMARY KEY,
+      child_id TEXT NOT NULL,
+      phoneme_symbol TEXT NOT NULL,
+      introduced_at TEXT NOT NULL,
+      FOREIGN KEY (child_id) REFERENCES children(id),
+      UNIQUE(child_id, phoneme_symbol)
     );
   `);
 
@@ -95,7 +108,20 @@ async function createTables(database: SQLite.SQLiteDatabase) {
     CREATE INDEX IF NOT EXISTS idx_card_progress_review ON card_progress(next_review_at);
     CREATE INDEX IF NOT EXISTS idx_sessions_child ON sessions(child_id);
     CREATE INDEX IF NOT EXISTS idx_content_cache_type ON content_cache(content_type, content_key);
+    CREATE INDEX IF NOT EXISTS idx_introduced_phonemes_child ON introduced_phonemes(child_id);
   `);
+
+  // Migrate existing card_progress table to add hint_used column if it doesn't exist
+  try {
+    await database.execAsync(`
+      ALTER TABLE card_progress ADD COLUMN hint_used INTEGER DEFAULT 0;
+    `);
+  } catch (error: any) {
+    // Column already exists, ignore error
+    if (!error.message?.includes('duplicate column')) {
+      console.warn('Error adding hint_used column (may already exist):', error.message);
+    }
+  }
 }
 
 /**
@@ -220,15 +246,16 @@ export async function createOrUpdateCardProgress(progress: CardProgress): Promis
   const database = await initDatabase();
   await database.runAsync(
     `INSERT INTO card_progress 
-     (id, child_id, word, ease_factor, interval_days, next_review_at, attempts, successes, last_seen_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     (id, child_id, word, ease_factor, interval_days, next_review_at, attempts, successes, last_seen_at, hint_used)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(child_id, word) DO UPDATE SET
        ease_factor = excluded.ease_factor,
        interval_days = excluded.interval_days,
        next_review_at = excluded.next_review_at,
        attempts = excluded.attempts,
        successes = excluded.successes,
-       last_seen_at = excluded.last_seen_at`,
+       last_seen_at = excluded.last_seen_at,
+       hint_used = excluded.hint_used`,
     [
       progress.id,
       progress.child_id,
@@ -239,6 +266,7 @@ export async function createOrUpdateCardProgress(progress: CardProgress): Promis
       progress.attempts,
       progress.successes,
       progress.last_seen_at,
+      progress.hint_used ?? 0,
     ]
   );
 }
@@ -253,6 +281,52 @@ export async function getDueReviewCards(childId: string, limit: number = 5): Pro
      LIMIT ?`,
     [childId, now, limit]
   );
+  return result;
+}
+
+/**
+ * Get due review cards by priority
+ * Priority: 'high' (new/overdue), 'medium' (hint used), 'low' (fluent)
+ */
+export async function getDueReviewCardsByPriority(
+  childId: string,
+  priority: 'high' | 'medium' | 'low',
+  limit: number = 10
+): Promise<CardProgress[]> {
+  const database = await initDatabase();
+  const now = new Date().toISOString();
+  
+  let query = '';
+  let params: any[] = [];
+  
+  if (priority === 'high') {
+    // High: overdue or low ease factor (struggling)
+    // Order by overdue first (next_review_at < now), then by attempts
+    query = `SELECT * FROM card_progress 
+     WHERE child_id = ? AND next_review_at <= ? AND (hint_used = 0 OR hint_used IS NULL) AND ease_factor < 2.3
+     ORDER BY 
+       CASE WHEN next_review_at < ? THEN 0 ELSE 1 END ASC,
+       attempts ASC,
+       next_review_at ASC
+     LIMIT ?`;
+    params = [childId, now, now, limit];
+  } else if (priority === 'medium') {
+    // Medium: hint was used
+    query = `SELECT * FROM card_progress 
+     WHERE child_id = ? AND next_review_at <= ? AND hint_used = 1
+     ORDER BY next_review_at ASC
+     LIMIT ?`;
+    params = [childId, now, limit];
+  } else {
+    // Low: fluent cards (high ease factor, long intervals)
+    query = `SELECT * FROM card_progress 
+     WHERE child_id = ? AND next_review_at <= ? AND (hint_used = 0 OR hint_used IS NULL) AND ease_factor >= 2.3 AND interval_days >= 3
+     ORDER BY next_review_at ASC
+     LIMIT ?`;
+    params = [childId, now, limit];
+  }
+  
+  const result = await database.getAllAsync<CardProgress>(query, params);
   return result;
 }
 
@@ -357,6 +431,37 @@ export async function getSessionsByChildId(childId: string): Promise<Session[]> 
     [childId]
   );
   return result;
+}
+
+// Introduced phonemes operations
+export async function markPhonemeIntroduced(childId: string, phonemeSymbol: string): Promise<void> {
+  const database = await initDatabase();
+  const id = `${childId}-${phonemeSymbol}-${Date.now()}`;
+  const now = new Date().toISOString();
+  
+  await database.runAsync(
+    `INSERT OR IGNORE INTO introduced_phonemes (id, child_id, phoneme_symbol, introduced_at)
+     VALUES (?, ?, ?, ?)`,
+    [id, childId, phonemeSymbol, now]
+  );
+}
+
+export async function getIntroducedPhonemes(childId: string): Promise<string[]> {
+  const database = await initDatabase();
+  const result = await database.getAllAsync<{ phoneme_symbol: string }>(
+    `SELECT phoneme_symbol FROM introduced_phonemes WHERE child_id = ?`,
+    [childId]
+  );
+  return result.map(r => r.phoneme_symbol);
+}
+
+export async function isPhonemeIntroduced(childId: string, phonemeSymbol: string): Promise<boolean> {
+  const database = await initDatabase();
+  const result = await database.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM introduced_phonemes WHERE child_id = ? AND phoneme_symbol = ?`,
+    [childId, phonemeSymbol]
+  );
+  return (result?.count ?? 0) > 0;
 }
 
 

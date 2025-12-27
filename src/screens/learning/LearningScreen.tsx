@@ -115,7 +115,8 @@ export default function LearningScreen() {
     
     try {
       isLoadingNextRef.current = true;
-      const card = await getNextCard(childId);
+      const excludeWord = currentCard?.word; // Prevent consecutive repeats
+      const card = await getNextCard(childId, excludeWord);
       
       if (card) {
         if (!card.phonemes || card.phonemes.length === 0) {
@@ -153,11 +154,17 @@ export default function LearningScreen() {
       }
       
       setState('loading');
-      const card = await getNextCard(childId);
+      const excludeWord = currentCard?.word; // Prevent consecutive repeats
+      const card = await getNextCard(childId, excludeWord);
       
       if (!card) {
-        Alert.alert('Great job!', 'You\'ve completed all available cards for today.');
-        router.back();
+        // Only show message if child has literally no cards (brand new)
+        // Otherwise, getNextCard should always return a practice card
+        Alert.alert(
+          'Welcome!', 
+          'Let\'s start learning! Your first cards will be ready soon.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
         return;
       }
 

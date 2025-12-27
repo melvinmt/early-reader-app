@@ -28,6 +28,14 @@ export interface CardProgress {
   attempts: number;
   successes: number;
   last_seen_at: string | null;
+  hint_used?: number; // 1 if hint was used, 0 otherwise (for priority weighting)
+}
+
+export interface IntroducedPhoneme {
+  id: string;
+  child_id: string;
+  phoneme_symbol: string;
+  introduced_at: string; // ISO timestamp
 }
 
 export interface ContentCache {
@@ -48,6 +56,7 @@ export interface Session {
   cards_completed: number;
   duration_seconds: number;
 }
+
 
 
 
