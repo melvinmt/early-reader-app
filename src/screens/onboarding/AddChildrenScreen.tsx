@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
-import { createChild } from '@/services/storage';
-import { Child } from '@/types/database';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, FlatList, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { createChild, createParent, getParent } from '@/services/storage';
+import { Child, Parent } from '@/types/database';
 import Button from '@/components/ui/Button';
 
 interface ChildForm {
@@ -32,11 +33,11 @@ const MONTHS = [
 ];
 
 // Generate year options (current year back to 10 years ago)
-const getYearOptions = () => {
+const getYearOptions = (): { value: number; label: string }[] => {
   const currentYear = new Date().getFullYear();
   const years = [];
   for (let i = 0; i <= 10; i++) {
-    years.push(currentYear - i);
+    years.push({ value: currentYear - i, label: (currentYear - i).toString() });
   }
   return years;
 };
@@ -56,6 +57,74 @@ const calculateAge = (birthMonth: number, birthYear: number): number => {
   
   return age;
 };
+
+// Dropdown component for month/year selection
+interface DropdownProps {
+  value: number | null;
+  options: { value: number; label: string }[];
+  placeholder: string;
+  onSelect: (value: number) => void;
+}
+
+function Dropdown({ value, options, placeholder, onSelect }: DropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedOption = options.find(opt => opt.value === value);
+
+  return (
+    <>
+      <TouchableOpacity
+        style={styles.dropdownButton}
+        onPress={() => setIsOpen(true)}
+      >
+        <Text style={[styles.dropdownButtonText, !value && styles.dropdownPlaceholder]}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </Text>
+        <Text style={styles.dropdownArrow}>▼</Text>
+      </TouchableOpacity>
+
+      <Modal
+        visible={isOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setIsOpen(false)}
+        >
+          <View style={styles.dropdownModal}>
+            <FlatList
+              data={options}
+              keyExtractor={(item) => item.value.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.dropdownItem,
+                    value === item.value && styles.dropdownItemSelected,
+                  ]}
+                  onPress={() => {
+                    onSelect(item.value);
+                    setIsOpen(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownItemText,
+                      value === item.value && styles.dropdownItemTextSelected,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
+  );
+}
 
 export default function AddChildrenScreen({ onComplete, asModal = false }: AddChildrenScreenProps) {
   const [children, setChildren] = useState<ChildForm[]>([
@@ -110,9 +179,21 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
 
     setSaving(true);
     try {
-      // Save all children with valid names
-      // Use a default parent_id since we're not using auth anymore
+      // Ensure default parent exists before creating children
       const defaultParentId = 'default-parent';
+      const existingParent = await getParent(defaultParentId);
+      
+      if (!existingParent) {
+        const defaultParent: Parent = {
+          id: defaultParentId,
+          email: 'default@earlyreader.app',
+          created_at: new Date().toISOString(),
+          subscription_status: 'none',
+          settings: '{}',
+        };
+        await createParent(defaultParent);
+      }
+
       const validChildren = children.filter(
         (child) => child.name.trim() && child.birthMonth !== null && child.birthYear !== null
       );
@@ -147,7 +228,8 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
   };
 
   const content = (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>Add Your Children</Text>
         {asModal && (
@@ -184,50 +266,20 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
           />
 
           <Text style={styles.birthLabel}>Birth Month</Text>
-          <View style={styles.monthContainer}>
-            {MONTHS.map((month) => (
-              <TouchableOpacity
-                key={month.value}
-                style={[
-                  styles.monthButton,
-                  child.birthMonth === month.value && styles.monthButtonSelected,
-                ]}
-                onPress={() => handleBirthMonthChange(child.id, month.value)}
-              >
-                <Text
-                  style={[
-                    styles.monthButtonText,
-                    child.birthMonth === month.value && styles.monthButtonTextSelected,
-                  ]}
-                >
-                  {month.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Dropdown
+            value={child.birthMonth}
+            options={MONTHS}
+            placeholder="Select month"
+            onSelect={(month) => handleBirthMonthChange(child.id, month)}
+          />
 
           <Text style={styles.birthLabel}>Birth Year</Text>
-          <View style={styles.yearContainer}>
-            {yearOptions.map((year) => (
-              <TouchableOpacity
-                key={year}
-                style={[
-                  styles.yearButton,
-                  child.birthYear === year && styles.yearButtonSelected,
-                ]}
-                onPress={() => handleBirthYearChange(child.id, year)}
-              >
-                <Text
-                  style={[
-                    styles.yearButtonText,
-                    child.birthYear === year && styles.yearButtonTextSelected,
-                  ]}
-                >
-                  {year}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Dropdown
+            value={child.birthYear}
+            options={yearOptions}
+            placeholder="Select year"
+            onSelect={(year) => handleBirthYearChange(child.id, year)}
+          />
           
           {child.birthMonth !== null && child.birthYear !== null && (
             <Text style={styles.calculatedAge}>
@@ -248,7 +300,8 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
         style={styles.continueButton}
         disabled={!canContinue() || saving}
       />
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 
   if (asModal) {
@@ -272,6 +325,10 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -366,59 +423,66 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 8,
   },
-  monthContainer: {
+  dropdownButton: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  monthButton: {
-    minWidth: 80,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
+    padding: 16,
     backgroundColor: '#fff',
-    alignItems: 'center',
+    marginBottom: 16,
   },
-  monthButtonSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  monthButtonText: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '600',
-  },
-  monthButtonTextSelected: {
-    color: '#fff',
-  },
-  yearContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  yearButton: {
-    minWidth: 70,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-  },
-  yearButtonSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  yearButtonText: {
+  dropdownButtonText: {
     fontSize: 16,
     color: '#333',
-    fontWeight: '600',
   },
-  yearButtonTextSelected: {
-    color: '#fff',
+  dropdownPlaceholder: {
+    color: '#999',
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: '#666',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownModal: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    width: '80%',
+    maxHeight: '60%',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+  dropdownItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#f0f8ff',
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  dropdownItemTextSelected: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
   calculatedAge: {
     fontSize: 14,
