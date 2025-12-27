@@ -1,6 +1,6 @@
-# Early Reader: 100 Easy Lessons App Implementation Plan
+# Early Reader: Implementation Plan
 
-An app implementation of the DISTAR-based methodology from "Teach Your Child to Read in 100 Easy Lessons" by Siegfried Engelmann, Phyllis Haddox, and Elaine Bruner.
+An app implementation of the DISTAR phonics methodology pioneered by Siegfried Engelmann, combined with spaced repetition learning algorithms.
 
 ---
 
@@ -667,7 +667,7 @@ Based on the book's correction procedure:
 #### Lesson Completion Tracking
 - Star ratings per lesson (based on accuracy)
 - Streak counters for daily practice
-- Visual map showing journey through 100 lessons
+- Visual map showing journey through all lessons
 
 #### Reward System
 - Unlockable characters/themes
@@ -1902,7 +1902,7 @@ assets/
 │  [CHILD NAME]'S PROGRESS                                    │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  Overall Progress: ████████░░░░░░░░░░░░ 42/100 lessons     │
+│  Overall Progress: ████████░░░░░░░░░░░░ 42% complete        │
 │                                                             │
 │  This Week:                                                 │
 │  ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┐               │
@@ -2336,7 +2336,7 @@ Duration: Ongoing
 |-------|----------|-----------------|
 | **Phase 1** | 6-8 weeks | Working MVP with swipe-to-read for lessons 1-10 |
 | **Phase 2** | 8-10 weeks | AI content generation + pronunciation detection |
-| **Phase 3** | 8-10 weeks | Full 100 lessons, production-ready |
+| **Phase 3** | 8-10 weeks | Full curriculum, production-ready |
 | **Phase 4** | Ongoing | Launch + continuous improvement |
 
 ---
@@ -2361,7 +2361,7 @@ FREE TIER (Lessons 1-10)
 └── Limited sounds library
 
 PREMIUM ($49.99 one-time OR $7.99/month)
-├── All 100 lessons
+├── All lessons
 ├── Full progress analytics
 ├── Speech recognition features
 ├── Offline mode
@@ -2415,7 +2415,7 @@ PREMIUM ($49.99 one-time OR $7.99/month)
 |--------|--------|-------------|
 | Lesson completion rate | >80% start lesson 2 after lesson 1 | Analytics |
 | Daily active users | 5 days/week average | Usage data |
-| Program completion | >60% finish all 100 lessons | Progress tracking |
+| Program completion | >60% finish full curriculum | Progress tracking |
 | Reading improvement | 1+ grade level in 6 months | Pre/post assessment |
 | Parent satisfaction | >4.5 stars | App store reviews |
 | Child engagement | <10% drop-off per lesson | Session analytics |
@@ -2459,7 +2459,6 @@ PREMIUM ($49.99 one-time OR $7.99/month)
 
 ## References & Resources
 
-- [Teach Your Child to Read in 100 Easy Lessons - Amazon](https://www.amazon.com/Teach-Your-Child-Read-Lessons/dp/0671631985)
 - [NIFDI - National Institute for Direct Instruction](https://www.nifdi.org/)
 - [Reading Rockets - Direct Instruction](https://www.readingrockets.org/topics/curriculum-and-instruction/articles/direct-instruction-di-reading-intervention-program)
 - [What Works Clearinghouse - Direct Instruction Report](https://ies.ed.gov/ncee/wwc/Docs/InterventionReports/WWC_Direct_Instruction_052107.pdf)
@@ -2469,4 +2468,4 @@ PREMIUM ($49.99 one-time OR $7.99/month)
 
 *Document Version: 1.0*
 *Created: December 2024*
-*Based on: "Teach Your Child to Read in 100 Easy Lessons" methodology analysis*
+*Based on: DISTAR phonics methodology analysis*

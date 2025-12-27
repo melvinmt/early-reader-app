@@ -119,7 +119,7 @@ These tests use realistic database interactions to validate behavior.
   - 📋 Guide for ultimate end-to-end test
   
 - **WHAT IT SHOULD VALIDATE (when implemented):**
-  - ✅ Complete child journey through 100 lessons
+  - ✅ Complete child journey through all lessons
   - ✅ Session generation at every milestone
   - ✅ All edge cases throughout journey
   - ✅ System stability over 100+ sessions

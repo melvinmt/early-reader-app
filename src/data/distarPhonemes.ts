@@ -1,7 +1,7 @@
 /**
  * DISTAR Phoneme Definitions
- * Based on "Teach Your Child to Read in 100 Easy Lessons" pronunciation guide
- * All 44 phonemes with their phonetic pronunciations for ElevenLabs TTS
+ * Based on the DISTAR phonics methodology pioneered by Siegfried Engelmann
+ * All 44 phonemes with their phonetic pronunciations for TTS
  * 
  * Pronunciations are optimized for ElevenLabs TTS to correctly produce the sounds:
  * - Single consonants need vowel sounds added (e.g., "t" → "tuh") to avoid letter names

@@ -1,7 +1,7 @@
 /**
  * Level definitions for Early Reader
- * Based on "Teach Your Child to Read in 100 Easy Lessons"
- * Each level introduces new phonemes and words following DISTAR methodology
+ * Based on the DISTAR phonics methodology pioneered by Siegfried Engelmann
+ * Each level introduces new phonemes and words following a systematic progression
  */
 
 export interface Level {

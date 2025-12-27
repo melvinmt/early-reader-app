@@ -2,7 +2,7 @@
 
 ## Goal
 
-Create a comprehensive integration test that simulates a child progressing through all 100 lessons, validating that the system works correctly at every stage.
+Create a comprehensive integration test that simulates a child progressing through all lessons, validating that the system works correctly at every stage.
 
 ## What This Test Must Validate
 
@@ -141,7 +141,7 @@ describe('Full Child Journey Simulation', () => {
 ## Success Criteria
 
 Test passes when:
-1. ✅ Child can progress through all 100 lessons
+1. ✅ Child can progress through all lessons
 2. ✅ Every session has >= 10 cards (or max available)
 3. ✅ No consecutive cards ever appear
 4. ✅ All edge cases handled gracefully
@@ -155,7 +155,7 @@ To implement:
 1. Set up database mocking/integration
 2. Create simulation framework
 3. Implement validation logic
-4. Run against all 100 lessons
+4. Run against all lessons
 5. Validate edge cases
 
 ## This Test Would Have Caught

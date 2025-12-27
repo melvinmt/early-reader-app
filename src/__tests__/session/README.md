@@ -55,7 +55,7 @@
 1. ✅ **getCardQueue() returns 10 cards** - Currently documented but not implemented
 2. ✅ **Queue-based approach prevents consecutive cards** - Currently documented
 3. ⚠️ **Edge case: Limited cards available** - Needs implementation
-4. ⚠️ **Full journey simulation (all 100 lessons)** - Framework created, needs implementation
+4. ⚠️ **Full journey simulation (all lessons)** - Framework created, needs implementation
    - See: full-journey-simulation.test.ts
    - See: full-journey-implementation.md
 
@@ -82,7 +82,7 @@
 **Recommendation**: 
 1. Implement getCardQueue-runtime.test.ts with proper mocks
 2. Implement full-journey-simulation.test.ts (THE comprehensive test)
-3. Run full journey test through all 100 lessons before trusting system
+3. Run full journey test through all lessons before trusting system
 
 **The full journey simulation is THE test that would ensure we can trust the system with "the life of our mothers"** 🚀
 

@@ -36,7 +36,7 @@ describe('REQ-SIM-001: Complete Curriculum Coverage', () => {
     expect(types.has('sentence')).toBe(true);
   });
 
-  it('curriculum spans all 100 lessons', () => {
+  it('curriculum spans all lessons', () => {
     const maxLesson = Math.max(...DISTAR_CARDS.map(c => c.lesson));
     expect(maxLesson).toBeGreaterThanOrEqual(89); // Based on DISTAR phonemes
   });

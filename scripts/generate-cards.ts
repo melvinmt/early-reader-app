@@ -496,7 +496,7 @@ async function generateWordCards(): Promise<any[]> {
   const cards: any[] = [];
   
   // Full DISTAR word list organized by lesson range
-  // Based on "Teach Your Child to Read in 100 Easy Lessons" progression
+  // Based on DISTAR phonics methodology progression
   // Words use only phonemes introduced up to that lesson
   const wordLists: { [lessonRange: string]: string[] } = {
     // Lessons 1-10: m, s, a, ē, t, r (first sounds)
