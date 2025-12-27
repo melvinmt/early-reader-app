@@ -228,7 +228,11 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
   };
 
   const scrollContent = (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView 
+      style={asModal ? styles.modalContainer : styles.container} 
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={true}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Add Your Children</Text>
         {asModal && (
@@ -310,11 +314,13 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
         animationType="slide"
         onRequestClose={() => onComplete?.()}
       >
-        <SafeAreaView style={styles.modalOverlay} edges={['top', 'bottom']}>
-          <View style={styles.modalContent}>
-            {scrollContent}
-          </View>
-        </SafeAreaView>
+        <View style={styles.modalOverlay}>
+          <SafeAreaView style={styles.modalSafeArea} edges={['top', 'bottom']}>
+            <View style={styles.modalContent}>
+              {scrollContent}
+            </View>
+          </SafeAreaView>
+        </View>
       </Modal>
     );
   }
@@ -332,6 +338,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  modalContainer: {
     flex: 1,
     backgroundColor: '#fff',
   },
@@ -369,12 +379,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  modalSafeArea: {
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: 16,
     width: '90%',
     maxHeight: '85%',
-    flex: 0,
+    overflow: 'hidden',
   },
   subtitle: {
     fontSize: 16,
