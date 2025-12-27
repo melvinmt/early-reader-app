@@ -514,10 +514,17 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   // This ensures children can always keep practicing, even if no new cards or due cards available
   const allProgressCards = await getAllCardsForChild(childId);
   console.log(`[7] All progress cards: ${allProgressCards.map(p => `${p.word} (successes: ${p.successes}, next_review: ${p.next_review_at})`).join(', ')}`);
-  const allProgressFiltered = excludeWord 
+  let allProgressFiltered = excludeWord 
     ? allProgressCards.filter(p => p.word !== excludeWord)
     : allProgressCards;
   console.log(`[7] Progress cards after exclude: ${allProgressFiltered.map(p => p.word).join(', ')}`);
+  
+  // If exclusion would leave no cards, allow the excluded word to ensure session can continue
+  // Exclusion is best-effort to avoid consecutive repeats, but shouldn't break sessions
+  if (allProgressFiltered.length === 0 && allProgressCards.length > 0) {
+    console.log(`[7] Exclusion would leave no cards - allowing excluded word to continue session`);
+    allProgressFiltered = allProgressCards;
+  }
   
   if (allProgressFiltered.length > 0) {
     // Prioritize cards with fewer successes (cards that need more practice)
