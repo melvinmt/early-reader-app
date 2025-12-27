@@ -1,21 +1,10 @@
 import { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect } from 'expo-router';
 
 export default function Index() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Start directly at children screen (no auth)
-    router.replace('/children');
-  }, [router]);
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Early Reader</Text>
-      <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
-    </View>
-  );
+  // Use Redirect component which handles timing automatically
+  return <Redirect href="/children" />;
 }
 
 const styles = StyleSheet.create({
