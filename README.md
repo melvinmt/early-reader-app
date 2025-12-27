@@ -128,4 +128,4 @@ This project is dual-licensed to support both open research and sustainable deve
 
 ---
 
-Copyright © 2025 Instalabs, LLC
+Copyright © 2025-2026 Instalabs, LLC
