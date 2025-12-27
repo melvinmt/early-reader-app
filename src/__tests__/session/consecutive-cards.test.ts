@@ -2,6 +2,20 @@
  * Consecutive Cards Prevention Tests
  * REQ-SESSION-002 (Runtime Behavior)
  * 
+ * ✅ FULLY IMPLEMENTED: These tests validate ACTUAL runtime behavior of getNextCard()
+ * 
+ * WHAT THIS TEST VALIDATES:
+ * ✅ getNextCard() never returns the same card twice in a row (excludeWord parameter works)
+ * ✅ Exclusion logic works across all priority levels (HIGH, MEDIUM, LOW, NEW_PHONEME, UNLOCKED_WORD)
+ * ✅ Edge cases where exclusion might fail
+ * ✅ System correctly skips excluded cards even when they're the only option in a priority level
+ * 
+ * WHAT THIS TEST DOES NOT VALIDATE:
+ * ❌ Full integration with real database (uses mocked database)
+ * ❌ getCardQueue() batch generation (see getCardQueue-runtime.test.ts)
+ * ❌ Complete session flow (see full-journey-simulation.test.ts)
+ * ❌ LearningScreen component behavior (that's UI/component testing)
+ * 
  * Validates that getNextCard never returns the same card twice in a row
  * Tests all priority levels and edge cases
  */

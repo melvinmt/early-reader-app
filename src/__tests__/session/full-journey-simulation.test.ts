@@ -2,19 +2,36 @@
  * Full Journey Simulation Test
  * REQ-SESSION-001, REQ-SESSION-002, REQ-SESSION-003
  * 
- * ⚠️ CRITICAL INTEGRATION TEST ⚠️
+ * ⚠️ PLACEHOLDER/DOCUMENTATION TEST ⚠️
  * 
- * This test simulates a complete child journey through all 100 lessons,
- * validating that the system works correctly at every stage with all edge cases.
+ * This test documents the requirements for a comprehensive end-to-end journey simulation.
+ * Currently contains placeholder tests that document what MUST be validated.
+ * 
+ * WHAT THIS TEST SHOULD VALIDATE (when implemented):
+ * ✅ Complete child journey through all 100 lessons
+ * ✅ Session generation at every milestone lesson (1, 5, 10, 25, 50, 75, 100)
+ * ✅ Session size consistency (always 10 cards when available)
+ * ✅ No consecutive duplicate cards across entire journey
+ * ✅ Edge cases at every stage (new child, limited cards, many reviews, etc.)
+ * ✅ System stability and performance over 100+ sessions
+ * ✅ Card quality and curriculum alignment throughout
+ * 
+ * WHAT THIS TEST DOES NOT VALIDATE (by design):
+ * ❌ Individual function behavior (see unit/runtime tests)
+ * ❌ Static curriculum data (see curriculum tests)
+ * ❌ Component behavior (see component tests)
+ * 
+ * STATUS: Documentation only - implementation required
+ * This would be the ultimate test that catches all bugs, but requires:
+ * - Comprehensive database mocking/integration setup
+ * - Simulation framework for tracking child progress
+ * - Session generation and validation logic
  * 
  * This is the test that WOULD HAVE CAUGHT:
- * - "Only 1 card generated" bug
- * - Consecutive card bugs
- * - Session size violations
- * - Edge case failures
- * 
- * IMPORTANT: This test requires proper database mocking or integration setup.
- * Currently documents the comprehensive requirements that MUST be tested.
+ * - "Only 1 card generated" bug ✅
+ * - Consecutive card bugs ✅
+ * - Session size violations ✅
+ * - Edge case failures ✅
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
