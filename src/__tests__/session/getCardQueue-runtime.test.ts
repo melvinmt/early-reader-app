@@ -63,15 +63,26 @@ describe('REQ-SESSION-001: getCardQueue Runtime Validation (CRITICAL)', () => {
   // Track seen words across test runs (for getAllAsync mock)
   let seenWordsSet: Set<string> = new Set();
   
+  // Track introduced phonemes across calls
+  let introducedPhonemesSet: Set<string> = new Set(['m', 's', 'a', 'e', 'i', 'o', 'u']); // Default phonemes
+
   beforeEach(() => {
     vi.clearAllMocks();
     seenWordsSet.clear(); // Reset seen words for each test
+    introducedPhonemesSet.clear();
+    introducedPhonemesSet.add('m');
+    introducedPhonemesSet.add('s');
+    introducedPhonemesSet.add('a');
+    introducedPhonemesSet.add('e');
+    introducedPhonemesSet.add('i');
+    introducedPhonemesSet.add('o');
+    introducedPhonemesSet.add('u');
     
     // Setup default mocks
     mockConfig.getLocale.mockReturnValue('en-US');
     mockDatabase.getChild.mockResolvedValue(mockChild);
     mockDatabase.getDueReviewCards.mockResolvedValue([]);
-    mockDatabase.getIntroducedPhonemes.mockResolvedValue(['m', 's', 'a', 'e', 'i', 'o', 'u']);
+    mockDatabase.getIntroducedPhonemes.mockImplementation(async () => Array.from(introducedPhonemesSet));
     
     // Mock initDatabase to track seen words across calls
     mockDatabase.initDatabase.mockResolvedValue({
@@ -94,6 +105,20 @@ describe('REQ-SESSION-001: getCardQueue Runtime Validation (CRITICAL)', () => {
       lesson: 1,
       mastery_threshold: 20,
     } as any);
+    
+    // Mock getUnintroducedPhonemesForLesson - return empty if phonemes already introduced
+    mockCurriculum.getUnintroducedPhonemesForLesson.mockImplementation(async (id: string, lesson: number) => {
+      if (lesson === 1) {
+        const lesson1Phonemes = ['m', 's', 'a', 'e', 'i', 'o', 'u'];
+        return lesson1Phonemes.filter(p => !introducedPhonemesSet.has(p.toLowerCase()));
+      }
+      return [];
+    });
+    
+    // Mock markPhonemeAsIntroduced to track introduced phonemes
+    mockCurriculum.markPhonemeAsIntroduced.mockImplementation(async (id: string, phoneme: string) => {
+      introducedPhonemesSet.add(phoneme.toLowerCase());
+    });
     
     // Mock getUnlockedCards to return cards based on introduced phonemes
     mockCurriculum.getUnlockedCards.mockImplementation((cards, phonemes) => {
@@ -301,6 +326,12 @@ describe('REQ-SESSION-001: getCardQueue Runtime Validation (CRITICAL)', () => {
       const lessons = [1, 5, 10, 25];
       
       for (const lesson of lessons) {
+        // Reset for each lesson
+        seenWordsSet.clear();
+        introducedPhonemesSet.clear();
+        // Add some phonemes for each lesson
+        ['m', 's', 'a', 'e', 'i', 'o', 'u'].forEach(p => introducedPhonemesSet.add(p.toLowerCase()));
+        
         mockDatabase.getChild.mockResolvedValue({
           ...mockChild,
           current_level: lesson,
@@ -309,6 +340,12 @@ describe('REQ-SESSION-001: getCardQueue Runtime Validation (CRITICAL)', () => {
           lesson,
           mastery_threshold: 20,
         } as any);
+        
+        // Mock getUnintroducedPhonemesForLesson for this lesson
+        mockCurriculum.getUnintroducedPhonemesForLesson.mockImplementation(async (id: string, l: number) => {
+          // Return empty for lessons where phonemes are already introduced
+          return [];
+        });
         
         const unlockedCards = getMockCards(20, lesson);
         mockCurriculum.getUnlockedCards.mockReturnValue(unlockedCards);
