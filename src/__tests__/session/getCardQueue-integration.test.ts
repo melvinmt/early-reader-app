@@ -86,6 +86,22 @@ describe('REQ-SESSION-001: getCardQueue Integration Tests', () => {
       mastery_threshold: 20,
     } as any);
     
+    // Mock getUnintroducedPhonemesForLesson - return phonemes not yet introduced
+    mockCurriculum.getUnintroducedPhonemesForLesson.mockImplementation(async (id: string, lesson: number) => {
+      const introduced = await testHelper.db.getIntroducedPhonemes(id);
+      const introducedSet = new Set(introduced.map(p => p.toLowerCase()));
+      if (lesson === 1) {
+        const lesson1Phonemes = ['m', 's', 'a', 'e', 'i', 'o', 'u'];
+        return lesson1Phonemes.filter(p => !introducedSet.has(p.toLowerCase()));
+      }
+      return [];
+    });
+    
+    // Mock markPhonemeAsIntroduced to actually mark phonemes in test database
+    mockCurriculum.markPhonemeAsIntroduced.mockImplementation(async (id: string, phoneme: string) => {
+      await testHelper.db.markPhonemeIntroduced(id, phoneme.toLowerCase());
+    });
+    
     // Mock getUnlockedCards to return cards based on introduced phonemes
     mockCurriculum.getUnlockedCards.mockImplementation((cards, phonemes) => {
       const phonemeSet = new Set(phonemes.map((p: string) => p.toLowerCase()));
