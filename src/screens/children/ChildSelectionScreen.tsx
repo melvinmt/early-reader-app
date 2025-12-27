@@ -1,30 +1,35 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '@/stores/authStore';
-import { getChildrenByParentId } from '@/services/storage';
+import { getAllChildren } from '@/services/storage';
 import { Child } from '@/types/database';
 import ParentalGate from '@/components/parent/ParentalGate';
+import AddChildrenScreen from '@/screens/onboarding/AddChildrenScreen';
 
 export default function ChildSelectionScreen() {
   const router = useRouter();
-  const { session } = useAuthStore();
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [showParentalGate, setShowParentalGate] = useState(false);
+  const [showAddChild, setShowAddChild] = useState(false);
 
   useEffect(() => {
     loadChildren();
-  }, [session]);
+  }, []);
+
+  // Reload when returning from add child screen
+  useEffect(() => {
+    const unsubscribe = router.addListener?.('focus', () => {
+      loadChildren();
+    });
+    return unsubscribe;
+  }, [router]);
 
   const loadChildren = async () => {
-    if (!session?.user) {
-      return;
-    }
-
     try {
-      const kids = await getChildrenByParentId(session.user.id);
+      const kids = await getAllChildren();
       setChildren(kids);
+      setShowAddChild(kids.length === 0);
     } catch (error) {
       console.error('Error loading children:', error);
     } finally {
@@ -39,13 +44,24 @@ export default function ChildSelectionScreen() {
     });
   };
 
-  const handleSettings = () => {
-    setShowParentalGate(true);
+  const handleAddChild = () => {
+    // Show parental gate only if there are already children (2nd+ child)
+    if (children.length > 0) {
+      setShowParentalGate(true);
+    } else {
+      // First child - no gate needed
+      setShowAddChild(true);
+    }
   };
 
   const handleGateSuccess = () => {
     setShowParentalGate(false);
-    router.push('/settings');
+    setShowAddChild(true);
+  };
+
+  const handleAddChildComplete = () => {
+    setShowAddChild(false);
+    loadChildren();
   };
 
   if (loading) {
@@ -56,42 +72,44 @@ export default function ChildSelectionScreen() {
     );
   }
 
+  // Show add child screen if no children
+  if (showAddChild && children.length === 0) {
+    return <AddChildrenScreen onComplete={handleAddChildComplete} />;
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Select a Child</Text>
-        <TouchableOpacity onPress={handleSettings} style={styles.settingsButton}>
-          <Text style={styles.settingsIcon}>⚙️</Text>
+        <TouchableOpacity onPress={handleAddChild} style={styles.addButton}>
+          <Text style={styles.addButtonText}>+</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {children.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No children added yet</Text>
-            <Text style={styles.emptySubtext}>Add a child to get started</Text>
-          </View>
-        ) : (
-          children.map((child) => (
-            <TouchableOpacity
-              key={child.id}
-              style={styles.childCard}
-              onPress={() => handleSelectChild(child)}
-            >
-              <View style={styles.childInfo}>
-                <Text style={styles.childName}>{child.name}</Text>
-                <Text style={styles.childDetails}>
-                  Age {child.age} • Level {child.current_level}
-                </Text>
-                <Text style={styles.childProgress}>
-                  {child.total_cards_completed} cards completed
-                </Text>
-              </View>
-              <Text style={styles.arrow}>→</Text>
-            </TouchableOpacity>
-          ))
-        )}
+        {children.map((child) => (
+          <TouchableOpacity
+            key={child.id}
+            style={styles.childCard}
+            onPress={() => handleSelectChild(child)}
+          >
+            <View style={styles.childInfo}>
+              <Text style={styles.childName}>{child.name}</Text>
+              <Text style={styles.childDetails}>
+                Age {child.age} • Level {child.current_level}
+              </Text>
+              <Text style={styles.childProgress}>
+                {child.total_cards_completed} cards completed
+              </Text>
+            </View>
+            <Text style={styles.arrow}>→</Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
+
+      {showAddChild && children.length > 0 && (
+        <AddChildrenScreen onComplete={handleAddChildComplete} asModal={true} />
+      )}
 
       <ParentalGate
         visible={showParentalGate}
@@ -118,11 +136,18 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
   },
-  settingsButton: {
-    padding: 8,
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  settingsIcon: {
-    fontSize: 24,
+  addButtonText: {
+    fontSize: 28,
+    color: '#fff',
+    fontWeight: '600',
   },
   content: {
     flex: 1,
@@ -178,6 +203,7 @@ const styles = StyleSheet.create({
     color: '#007AFF',
   },
 });
+
 
 
 

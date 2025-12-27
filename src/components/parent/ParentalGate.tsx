@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Modal, TextInput, TouchableOpacity } from 'react-native';
 import Button from '@/components/ui/Button';
 
 interface ParentalGateProps {
@@ -9,57 +9,36 @@ interface ParentalGateProps {
 }
 
 export default function ParentalGate({ visible, onSuccess, onCancel }: ParentalGateProps) {
-  const [num1, setNum1] = useState(0);
-  const [num2, setNum2] = useState(0);
-  const [correctAnswer, setCorrectAnswer] = useState(0);
-  const [options, setOptions] = useState<number[]>([]);
+  const [birthYear, setBirthYear] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (visible) {
-      generateProblem();
+      setBirthYear('');
+      setError('');
     }
   }, [visible]);
 
-  const generateProblem = () => {
-    // Generate two 2-digit numbers
-    const n1 = Math.floor(Math.random() * 90) + 10; // 10-99
-    const n2 = Math.floor(Math.random() * 90) + 10; // 10-99
-    const answer = n1 + n2;
+  const handleSubmit = () => {
+    const year = parseInt(birthYear, 10);
+    const currentYear = new Date().getFullYear();
+    const minYear = currentYear - 100; // Allow up to 100 years old
+    const maxYear = currentYear - 18; // Must be at least 18 years old
 
-    setNum1(n1);
-    setNum2(n2);
-    setCorrectAnswer(answer);
-
-    // Generate 3 wrong answers
-    const wrongAnswers = new Set<number>();
-    while (wrongAnswers.size < 3) {
-      const wrong = answer + Math.floor(Math.random() * 20) - 10; // ±10 from correct
-      if (wrong !== answer && wrong > 0) {
-        wrongAnswers.add(wrong);
-      }
+    if (!birthYear.trim()) {
+      setError('Please enter your birth year');
+      return;
     }
 
-    // Combine correct and wrong answers, then shuffle
-    const allOptions = [answer, ...Array.from(wrongAnswers)];
-    const shuffled = allOptions.sort(() => Math.random() - 0.5);
-    setOptions(shuffled);
-    setError('');
-  };
-
-  const handleAnswer = (selected: number) => {
-    if (selected === correctAnswer) {
-      // Brief delay before unlocking
-      setTimeout(() => {
-        onSuccess();
-      }, 300);
-    } else {
-      setError('Incorrect. Please try again.');
-      // Regenerate problem after a short delay
-      setTimeout(() => {
-        generateProblem();
-      }, 1000);
+    if (isNaN(year) || year < minYear || year > maxYear) {
+      setError('Please enter a valid birth year');
+      return;
     }
+
+    // If we get here, the birth year is valid
+    setTimeout(() => {
+      onSuccess();
+    }, 300);
   };
 
   return (
@@ -72,36 +51,40 @@ export default function ParentalGate({ visible, onSuccess, onCancel }: ParentalG
       <View style={styles.overlay}>
         <View style={styles.modal}>
           <Text style={styles.title}>Parental Gate</Text>
-          <Text style={styles.subtitle}>Please solve this to continue</Text>
+          <Text style={styles.subtitle}>Please enter your birth year to continue</Text>
 
-          <View style={styles.problemContainer}>
-            <Text style={styles.problem}>
-              {num1} + {num2} = ?
-            </Text>
-          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="YYYY"
+            placeholderTextColor="#999"
+            value={birthYear}
+            onChangeText={(text) => {
+              setBirthYear(text.replace(/\D/g, '').slice(0, 4));
+              setError('');
+            }}
+            keyboardType="numeric"
+            maxLength={4}
+            autoFocus
+          />
 
           {error ? (
             <Text style={styles.error}>{error}</Text>
           ) : null}
 
-          <View style={styles.optionsContainer}>
-            {options.map((option, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.optionButton}
-                onPress={() => handleAnswer(option)}
-              >
-                <Text style={styles.optionText}>{option}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.buttonContainer}>
+            <Button
+              title="Continue"
+              onPress={handleSubmit}
+              variant="primary"
+              style={styles.submitButton}
+            />
+            <Button
+              title="Cancel"
+              onPress={onCancel}
+              variant="outline"
+              style={styles.cancelButton}
+            />
           </View>
-
-          <Button
-            title="Cancel"
-            onPress={onCancel}
-            variant="outline"
-            style={styles.cancelButton}
-          />
         </View>
       </View>
     </Modal>
@@ -134,14 +117,16 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     textAlign: 'center',
   },
-  problemContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  problem: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#007AFF',
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 24,
+    textAlign: 'center',
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    fontWeight: '600',
   },
   error: {
     color: '#FF3B30',
@@ -149,32 +134,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontSize: 14,
   },
-  optionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 24,
+  buttonContainer: {
     gap: 12,
   },
-  optionButton: {
-    flex: 1,
-    minWidth: '45%',
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    backgroundColor: '#f0f8ff',
-  },
-  optionText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#007AFF',
+  submitButton: {
+    marginBottom: 0,
   },
   cancelButton: {
-    marginTop: 8,
+    marginTop: 0,
   },
 });
+
 
 
 

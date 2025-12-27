@@ -78,7 +78,7 @@ export interface CardQueueResult {
   currentLevel: number;
 }
 
-const CARDS_PER_SESSION = 8; // Optimized for 4.5 year olds (research: 5-7 cards)
+export const CARDS_PER_SESSION = 8; // Optimized for 4.5 year olds (research: 5-7 cards)
 const MAX_NEW_CARDS_PER_SESSION = 2; // Limit completely new items per session
 const MAX_LEARNING_CARDS = 4; // Cards still in learning phase (steps 0-2)
 const MIN_CARDS_FOR_LEVEL_UP = 20;

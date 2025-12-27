@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAuthStore } from '@/stores/authStore';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import { createChild } from '@/services/storage';
 import { Child } from '@/types/database';
 import Button from '@/components/ui/Button';
@@ -12,11 +10,14 @@ interface ChildForm {
   age: number | null;
 }
 
+interface AddChildrenScreenProps {
+  onComplete?: () => void;
+  asModal?: boolean;
+}
+
 const AGE_OPTIONS = [3, 4, 5, 6, 7, 8];
 
-export default function AddChildrenScreen() {
-  const router = useRouter();
-  const { session } = useAuthStore();
+export default function AddChildrenScreen({ onComplete, asModal = false }: AddChildrenScreenProps) {
   const [children, setChildren] = useState<ChildForm[]>([
     { id: generateId(), name: '', age: null },
   ]);
@@ -53,11 +54,6 @@ export default function AddChildrenScreen() {
   };
 
   const handleContinue = async () => {
-    if (!session?.user) {
-      Alert.alert('Error', 'Please sign in first');
-      return;
-    }
-
     if (!canContinue()) {
       Alert.alert('Error', 'Please add at least one child with a name and age');
       return;
@@ -66,6 +62,8 @@ export default function AddChildrenScreen() {
     setSaving(true);
     try {
       // Save all children with valid names
+      // Use a default parent_id since we're not using auth anymore
+      const defaultParentId = 'default-parent';
       const validChildren = children.filter(
         (child) => child.name.trim() && child.age !== null
       );
@@ -73,7 +71,7 @@ export default function AddChildrenScreen() {
       for (const childForm of validChildren) {
         const child: Child = {
           id: generateId(),
-          parent_id: session.user.id,
+          parent_id: defaultParentId,
           name: childForm.name.trim(),
           age: childForm.age!,
           created_at: new Date().toISOString(),
@@ -84,8 +82,10 @@ export default function AddChildrenScreen() {
         await createChild(child);
       }
 
-      // Navigate to subscription screen (or children screen if skipping subscription)
-      router.replace('/onboarding/subscription');
+      // Call onComplete callback if provided
+      if (onComplete) {
+        onComplete();
+      }
     } catch (error) {
       console.error('Error saving children:', error);
       Alert.alert('Error', 'Failed to save children. Please try again.');
@@ -94,9 +94,16 @@ export default function AddChildrenScreen() {
     }
   };
 
-  return (
+  const content = (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Add Your Children</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Add Your Children</Text>
+        {asModal && (
+          <TouchableOpacity onPress={() => onComplete?.()} style={styles.closeButton}>
+            <Text style={styles.closeButtonText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       <Text style={styles.subtitle}>
         Add one or more children to get started with InstaReader
       </Text>
@@ -162,6 +169,25 @@ export default function AddChildrenScreen() {
       />
     </ScrollView>
   );
+
+  if (asModal) {
+    return (
+      <Modal
+        visible={true}
+        transparent
+        animationType="slide"
+        onRequestClose={() => onComplete?.()}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {content}
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  return content;
 }
 
 const styles = StyleSheet.create({
@@ -172,11 +198,43 @@ const styles = StyleSheet.create({
   content: {
     padding: 24,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 8,
+    flex: 1,
     textAlign: 'center',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 20,
+    color: '#666',
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    width: '90%',
+    maxHeight: '90%',
+    overflow: 'hidden',
   },
   subtitle: {
     fontSize: 16,

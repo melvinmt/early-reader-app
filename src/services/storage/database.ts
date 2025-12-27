@@ -240,6 +240,14 @@ export async function getChildrenByParentId(parentId: string): Promise<Child[]> 
   return result;
 }
 
+export async function getAllChildren(): Promise<Child[]> {
+  const database = await initDatabase();
+  const result = await database.getAllAsync<Child>(
+    `SELECT * FROM children ORDER BY created_at ASC`
+  );
+  return result;
+}
+
 export async function getChild(id: string): Promise<Child | null> {
   const database = await initDatabase();
   const result = await database.getFirstAsync<Child>(

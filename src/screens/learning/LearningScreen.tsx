@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Pressable, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Pressable, useWindowDimensions, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { recordCardCompletion, getCardQueue, LearningCard } from '@/services/cardQueueManager';
+import { recordCardCompletion, getCardQueue, LearningCard, CARDS_PER_SESSION } from '@/services/cardQueueManager';
 import { audioPlayer } from '@/services/audio/audioPlayer';
 import WordDisplay from '@/components/lesson/WordDisplay';
 import BlurredImageReveal from '@/components/lesson/BlurredImageReveal';
@@ -10,6 +10,7 @@ import WordSwipeDetector from '@/components/lesson/WordSwipeDetector';
 import ConfettiCelebration from '@/components/ui/ConfettiCelebration';
 import { createSession, updateSession } from '@/services/storage/database';
 import { isTablet, responsiveFontSize, responsiveSpacing } from '@/utils/responsive';
+import ParentalGate from '@/components/parent/ParentalGate';
 
 type LearningState = 'loading' | 'ready' | 'revealing';
 
@@ -30,6 +31,7 @@ export default function LearningScreen() {
   const [cardsCompleted, setCardsCompleted] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showExitGate, setShowExitGate] = useState(false);
 
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const cardQueueRef = useRef<LearningCard[]>([]);
@@ -272,6 +274,16 @@ export default function LearningScreen() {
     }
   };
 
+  const handleExit = () => {
+    setShowExitGate(true);
+  };
+
+  const handleExitSuccess = async () => {
+    setShowExitGate(false);
+    await cleanup();
+    router.back();
+  };
+
   if (state === 'loading' || !currentCard) {
     return (
       <LinearGradient colors={['#667eea', '#764ba2']} style={dynamicStyles.container}>
@@ -314,12 +326,17 @@ export default function LearningScreen() {
       {/* Header */}
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.levelText}>Level {currentCard.level}</Text>
-        <Text style={dynamicStyles.progressText}>{cardsCompleted}/10</Text>
+        <View style={dynamicStyles.headerRight}>
+          <Text style={dynamicStyles.progressText}>{cardsCompleted}/{CARDS_PER_SESSION}</Text>
+          <TouchableOpacity onPress={handleExit} style={dynamicStyles.exitButton}>
+            <Text style={dynamicStyles.exitButtonText}>✕</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Progress dots */}
       <View style={dynamicStyles.progressDots}>
-        {[...Array(10)].map((_, i) => (
+        {[...Array(CARDS_PER_SESSION)].map((_, i) => (
           <View
             key={i}
             style={[
@@ -355,6 +372,12 @@ export default function LearningScreen() {
       </View>
 
       <ConfettiCelebration visible={showConfetti} onComplete={() => setShowConfetti(false)} />
+      
+      <ParentalGate
+        visible={showExitGate}
+        onSuccess={handleExitSuccess}
+        onCancel={() => setShowExitGate(false)}
+      />
     </View>
   );
 }
@@ -405,10 +428,28 @@ const createStyles = (isTabletDevice: boolean, screenWidth: number) => {
       fontWeight: '600',
       color: 'rgba(255, 255, 255, 0.9)',
     },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: responsiveSpacing(16),
+    },
     progressText: {
       fontSize: responsiveFontSize(16),
       fontWeight: '600',
       color: 'rgba(255, 255, 255, 0.9)',
+    },
+    exitButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    exitButtonText: {
+      fontSize: responsiveFontSize(18),
+      color: 'rgba(255, 255, 255, 0.9)',
+      fontWeight: '600',
     },
     progressDots: {
       flexDirection: 'row',
