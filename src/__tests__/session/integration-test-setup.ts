@@ -133,48 +133,49 @@ export class InMemoryTestDatabase implements TestDatabaseInterface {
 /**
  * Mock Database Setup Helper
  * 
- * Sets up vitest mocks for database module to use a test database.
+ * Note: This function should be called after importing the database module in the test file.
+ * The test file must mock '@/services/storage/database' before importing the function being tested.
+ * 
+ * This helper provides the mock implementations but doesn't set them up directly.
+ * Instead, return these implementations from vi.mock in the test file.
  */
-export function setupMockDatabase(testDb: TestDatabaseInterface) {
-  const databaseModule = require('@/services/storage/database');
-  
-  // Mock all database functions to use test database
-  vi.spyOn(databaseModule, 'getChild').mockImplementation((id: string) => testDb.getChild(id));
-  vi.spyOn(databaseModule, 'createChild').mockImplementation((child: Child) => testDb.createChild(child));
-  vi.spyOn(databaseModule, 'updateChildLevel').mockImplementation((childId: string, level: number) => 
-    testDb.updateChildLevel(childId, level)
-  );
-  vi.spyOn(databaseModule, 'getCardProgress').mockImplementation((childId: string, word: string) => 
-    testDb.getCardProgress(childId, word)
-  );
-  vi.spyOn(databaseModule, 'createOrUpdateCardProgress').mockImplementation((progress: CardProgress) => 
-    testDb.createOrUpdateCardProgress(progress)
-  );
-  vi.spyOn(databaseModule, 'getDueReviewCards').mockImplementation((childId: string, limit: number) => 
-    testDb.getDueReviewCards(childId, limit)
-  );
-  vi.spyOn(databaseModule, 'getAllCardsForChild').mockImplementation((childId: string) => 
-    testDb.getAllCardsForChild(childId)
-  );
-  vi.spyOn(databaseModule, 'getIntroducedPhonemes').mockImplementation((childId: string) => 
-    testDb.getIntroducedPhonemes(childId)
-  );
-  vi.spyOn(databaseModule, 'markPhonemeIntroduced').mockImplementation((childId: string, phoneme: string) => 
-    testDb.markPhonemeIntroduced(childId, phoneme)
-  );
-  
-  // Mock initDatabase to return a mock database object
-  vi.spyOn(databaseModule, 'initDatabase').mockResolvedValue({
-    getAllAsync: vi.fn().mockImplementation(async (sql: string, params: any[]) => {
-      // For "SELECT DISTINCT word FROM card_progress WHERE child_id = ?"
-      if (sql.includes('SELECT DISTINCT word')) {
-        const cards = await testDb.getAllCardsForChild(params[0]);
-        return cards.map(c => ({ word: c.word }));
-      }
-      return [];
+export function createDatabaseMockImplementations(testDb: TestDatabaseInterface) {
+  return {
+    getChild: vi.fn().mockImplementation((id: string) => testDb.getChild(id)),
+    createChild: vi.fn().mockImplementation((child: Child) => testDb.createChild(child)),
+    updateChildLevel: vi.fn().mockImplementation((childId: string, level: number) => 
+      testDb.updateChildLevel(childId, level)
+    ),
+    getCardProgress: vi.fn().mockImplementation((childId: string, word: string) => 
+      testDb.getCardProgress(childId, word)
+    ),
+    createOrUpdateCardProgress: vi.fn().mockImplementation((progress: CardProgress) => 
+      testDb.createOrUpdateCardProgress(progress)
+    ),
+    getDueReviewCards: vi.fn().mockImplementation((childId: string, limit: number) => 
+      testDb.getDueReviewCards(childId, limit)
+    ),
+    getAllCardsForChild: vi.fn().mockImplementation((childId: string) => 
+      testDb.getAllCardsForChild(childId)
+    ),
+    getIntroducedPhonemes: vi.fn().mockImplementation((childId: string) => 
+      testDb.getIntroducedPhonemes(childId)
+    ),
+    markPhonemeIntroduced: vi.fn().mockImplementation((childId: string, phoneme: string) => 
+      testDb.markPhonemeIntroduced(childId, phoneme)
+    ),
+    initDatabase: vi.fn().mockResolvedValue({
+      getAllAsync: vi.fn().mockImplementation(async (sql: string, params: any[]) => {
+        // For "SELECT DISTINCT word FROM card_progress WHERE child_id = ?"
+        if (sql.includes('SELECT DISTINCT word')) {
+          const cards = await testDb.getAllCardsForChild(params[0]);
+          return cards.map(c => ({ word: c.word }));
+        }
+        return [];
+      }),
+      runAsync: vi.fn().mockResolvedValue({}),
     }),
-    runAsync: vi.fn().mockResolvedValue({}),
-  });
+  };
 }
 
 /**
@@ -234,7 +235,8 @@ export class IntegrationTestHelper {
   }
 
   async setup() {
-    setupMockDatabase(this.db);
+    // Note: Database mocking must be done in the test file using vi.mock
+    // This helper just prepares the test database state
   }
 
   async teardown() {
