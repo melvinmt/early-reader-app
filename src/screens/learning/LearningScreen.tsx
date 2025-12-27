@@ -110,13 +110,14 @@ export default function LearningScreen() {
     }
   };
 
-  const preloadNextCard = async () => {
+  const preloadNextCard = async (excludeWord?: string) => {
     if (isLoadingNextRef.current) return;
     
     try {
       isLoadingNextRef.current = true;
-      const excludeWord = currentCard?.word; // Prevent consecutive repeats
-      const card = await getNextCard(childId, excludeWord);
+      // Use provided excludeWord or fall back to currentCard state (for initial load)
+      const wordToExclude = excludeWord || currentCard?.word;
+      const card = await getNextCard(childId, wordToExclude);
       
       if (card) {
         if (!card.phonemes || card.phonemes.length === 0) {
@@ -149,7 +150,7 @@ export default function LearningScreen() {
         setState('ready');
         
         playPromptAudio(preloadedCard);
-        preloadNextCard();
+        preloadNextCard(preloadedCard.word);
         return;
       }
       
@@ -179,7 +180,7 @@ export default function LearningScreen() {
       setState('ready');
 
       playPromptAudio(card);
-      preloadNextCard();
+      preloadNextCard(card.word);
     } catch (error) {
       console.error('Error loading card:', error);
       Alert.alert('Error', 'Failed to load card. Please try again.');
