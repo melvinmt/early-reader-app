@@ -8,7 +8,7 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
     return db;
   }
 
-  db = await SQLite.openDatabaseAsync('instareader.db');
+  db = await SQLite.openDatabaseAsync('earlyreader.db');
 
   // Enable foreign keys
   await db.execAsync('PRAGMA foreign_keys = ON;');

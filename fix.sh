@@ -38,7 +38,7 @@ echo "   ✓ Killed expo processes"
 # Step 4: Kill node processes for this project
 echo ""
 echo "📍 Step 4: Killing project node processes..."
-pkill -9 -f "node.*instareader" 2>/dev/null || true
+pkill -9 -f "node.*earlyreader" 2>/dev/null || true
 echo "   ✓ Killed project node processes"
 
 # Step 5: Free common ports
@@ -83,7 +83,7 @@ echo ""
 echo "📍 Step 9: Clearing iOS build cache..."
 rm -rf ios/build 2>/dev/null || true
 rm -rf ios/Pods 2>/dev/null || true
-rm -rf ~/Library/Developer/Xcode/DerivedData/*instareader* 2>/dev/null || true
+rm -rf ~/Library/Developer/Xcode/DerivedData/*earlyreader* 2>/dev/null || true
 echo "   ✓ Cleared iOS build cache"
 
 # Step 10: Wait briefly for processes to fully terminate

@@ -49,7 +49,7 @@ export default function EmailInputScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to InstaReader</Text>
+      <Text style={styles.title}>Welcome to Early Reader</Text>
       <Text style={styles.subtitle}>
         Enter your email to get started
       </Text>

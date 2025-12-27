@@ -105,7 +105,7 @@ export default function AddChildrenScreen({ onComplete, asModal = false }: AddCh
         )}
       </View>
       <Text style={styles.subtitle}>
-        Add one or more children to get started with InstaReader
+        Add one or more children to get started with Early Reader
       </Text>
 
       {children.map((child, index) => (

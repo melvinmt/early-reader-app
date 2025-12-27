@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# InstaReader Development Server Startup Script
+# Early Reader Development Server Startup Script
 # This script ensures dependencies are installed and starts the Expo dev server
 
 set -e
 
-echo "🚀 Starting InstaReader development environment..."
+echo "🚀 Starting Early Reader development environment..."
 
 # Check if node_modules exists
 if [ ! -d "node_modules" ]; then
@@ -23,6 +23,7 @@ fi
 # Start Expo dev server
 echo "🎯 Starting Expo dev server..."
 npx expo start
+
 
 
 

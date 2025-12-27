@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "InstaReader",
-    "slug": "instareader",
+    "name": "Early Reader",
+    "slug": "earlyreader",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,19 +16,19 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.instareader.app"
+      "bundleIdentifier": "com.earlyreader.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.instareader.app"
+      "package": "com.earlyreader.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "instareader",
+    "scheme": "earlyreader",
     "plugins": [
       "expo-router"
     ],

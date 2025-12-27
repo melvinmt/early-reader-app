@@ -12,7 +12,7 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>InstaReader</Text>
+      <Text style={styles.title}>Early Reader</Text>
       <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
     </View>
   );

@@ -1,4 +1,4 @@
-# InstaReader: 100 Easy Lessons App Implementation Plan
+# Early Reader: 100 Easy Lessons App Implementation Plan
 
 An app implementation of the DISTAR-based methodology from "Teach Your Child to Read in 100 Easy Lessons" by Siegfried Engelmann, Phyllis Haddox, and Elaine Bruner.
 
@@ -6,7 +6,7 @@ An app implementation of the DISTAR-based methodology from "Teach Your Child to 
 
 ## Executive Summary
 
-This plan outlines the development of **InstaReader**, a mobile/tablet application that digitizes the proven DISTAR (Direct Instruction System for Teaching and Remediation) methodology. The app will guide parents and children through 100 structured phonics lessons, each taking 20-30 minutes, to achieve approximately 2nd-grade reading level.
+This plan outlines the development of **Early Reader**, a mobile/tablet application that digitizes the proven DISTAR (Direct Instruction System for Teaching and Remediation) methodology. The app will guide parents and children through 100 structured phonics lessons, each taking 20-30 minutes, to achieve approximately 2nd-grade reading level.
 
 ---
 
@@ -60,7 +60,7 @@ All user data is stored locally in SQLite on the device. The only cloud interact
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        INSTAREADER APP                               │
+│                        EARLY READER APP                               │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  LOCAL DATA LAYER (SQLite)                                           │
@@ -2069,7 +2069,7 @@ assets/
 ### Folder Structure
 
 ```
-instareader/
+earlyreader/
 ├── src/
 │   ├── components/
 │   │   ├── lesson/
@@ -2424,7 +2424,7 @@ PREMIUM ($49.99 one-time OR $7.99/month)
 
 ## Competitive Differentiation
 
-### What Makes InstaReader Unique
+### What Makes Early Reader Unique
 
 1. **Research-Backed Method** - Based on DISTAR, proven by Project Follow-Through
 2. **Complete Curriculum** - Full 100-lesson sequence, not just activities
@@ -2435,7 +2435,7 @@ PREMIUM ($49.99 one-time OR $7.99/month)
 
 ### Competitor Analysis
 
-| App | Strength | InstaReader Advantage |
+| App | Strength | Early Reader Advantage |
 |-----|----------|----------------------|
 | Homer | Personalization | More structured progression |
 | Hooked on Phonics | Brand recognition | Research-based methodology |

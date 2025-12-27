@@ -1,5 +1,5 @@
 /**
- * Level definitions for InstaReader
+ * Level definitions for Early Reader
  * Based on "Teach Your Child to Read in 100 Easy Lessons"
  * Each level introduces new phonemes and words following DISTAR methodology
  */

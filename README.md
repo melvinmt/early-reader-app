@@ -1,4 +1,4 @@
-# InstaReader
+# Early Reader
 
 A mobile app implementing the DISTAR-based methodology from "Teach Your Child to Read in 100 Easy Lessons" by Siegfried Engelmann.
 
@@ -18,7 +18,7 @@ A mobile app implementing the DISTAR-based methodology from "Teach Your Child to
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd instareader
+cd earlyreader
 
 # Install dependencies
 npm install
@@ -93,7 +93,7 @@ Then:
 ## Project Structure
 
 ```
-instareader/
+earlyreader/
 ├── app/                    # Expo Router screens
 │   ├── auth/              # Authentication screens
 │   ├── onboarding/        # Onboarding flow
@@ -152,6 +152,7 @@ instareader/
 ## License
 
 Private - All rights reserved
+
 
 
 

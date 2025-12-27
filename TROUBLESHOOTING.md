@@ -152,7 +152,7 @@ lsof -ti:8081 | xargs kill -9
 
 # Reset simulator
 killall Simulator
-xcrun simctl uninstall booted com.instareader.app
+xcrun simctl uninstall booted com.earlyreader.app
 
 # Clear cache
 rm -rf $TMPDIR/metro-* $TMPDIR/haste-map-*
