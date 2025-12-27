@@ -103,6 +103,60 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   const newCards: LearningCard[] = [];
 
   if (cardsNeeded > 0) {
+    // Pre-introduce phonemes to ensure enough cards are unlocked
+    // This ensures brand new children get 10 cards, not just 3
+    // Keep introducing phonemes until we have enough unlocked cards
+    const allCards = getAllStaticCards();
+    let introducedPhonemes = await getIntroducedPhonemes(childId);
+    let unlockedCards = getUnlockedCards(allCards, introducedPhonemes);
+    const seenWords = new Set<string>();
+    
+    // Get seen words
+    const database = await initDatabase();
+    const existingWords = await database.getAllAsync<{ word: string }>(
+      `SELECT DISTINCT word FROM card_progress WHERE child_id = ?`,
+      [childId]
+    );
+    existingWords.forEach(w => seenWords.add(w.word));
+    
+    // Keep introducing phonemes until we have enough available cards
+    // For brand new children, we may need to introduce phonemes from multiple lessons
+    let attempts = 0;
+    const maxAttempts = 20; // Safety limit
+    let currentLessonToCheck = currentLevel;
+    
+    while (unlockedCards.filter(c => !seenWords.has(c.plainText)).length < cardsNeeded && attempts < maxAttempts) {
+      // Try current lesson first
+      let unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, currentLessonToCheck);
+      
+      // If no phonemes in current lesson, try next lessons
+      if (unintroducedPhonemes.length === 0) {
+        // Try next few lessons to find phonemes
+        let foundPhonemes = false;
+        for (let lesson = currentLessonToCheck + 1; lesson <= Math.min(currentLevel + 10, 100); lesson++) {
+          unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, lesson);
+          if (unintroducedPhonemes.length > 0) {
+            currentLessonToCheck = lesson;
+            foundPhonemes = true;
+            break;
+          }
+        }
+        if (!foundPhonemes) {
+          break; // No more phonemes available
+        }
+      }
+      
+      // Introduce the first unintroduced phoneme
+      if (unintroducedPhonemes.length > 0) {
+        await markPhonemeAsIntroduced(childId, unintroducedPhonemes[0]);
+        introducedPhonemes = await getIntroducedPhonemes(childId);
+        unlockedCards = getUnlockedCards(allCards, introducedPhonemes);
+      } else {
+        break;
+      }
+      attempts++;
+    }
+    
     // Use pre-generated DISTAR cards only (no AI generation)
     for (let i = 0; i < cardsNeeded; i++) {
       try {

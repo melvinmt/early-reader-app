@@ -21,21 +21,21 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getCardQueue } from '@/services/cardQueueManager';
 import { DISTAR_CARDS } from '@/data/distarCards.en-US';
 import { IntegrationTestHelper } from './integration-test-setup';
-import * as curriculumModule from '@/services/curriculum/curriculumService';
 import * as configModule from '@/config/locale';
 import * as levelsModule from '@/data/levels';
 import * as databaseModule from '@/services/storage/database';
+import * as curriculumModule from '@/services/curriculum/curriculumService';
 
-// Mock all dependencies
+// Mock ONLY database, config, levels
+// DO NOT MOCK curriculum service - we want REAL logic
 vi.mock('@/services/storage/database');
-vi.mock('@/services/curriculum/curriculumService');
 vi.mock('@/config/locale');
 vi.mock('@/data/levels');
+// DO NOT MOCK curriculum service - use REAL implementation
 
 const mockDatabase = vi.mocked(databaseModule);
 const mockConfig = vi.mocked(configModule);
 const mockLevels = vi.mocked(levelsModule);
-const mockCurriculum = vi.mocked(curriculumModule);
 
 describe('REQ-SESSION-001: getCardQueue Integration Tests', () => {
   let testHelper: IntegrationTestHelper;
@@ -86,33 +86,8 @@ describe('REQ-SESSION-001: getCardQueue Integration Tests', () => {
       mastery_threshold: 20,
     } as any);
     
-    // Mock getUnintroducedPhonemesForLesson - return phonemes not yet introduced
-    mockCurriculum.getUnintroducedPhonemesForLesson.mockImplementation(async (id: string, lesson: number) => {
-      const introduced = await testHelper.db.getIntroducedPhonemes(id);
-      const introducedSet = new Set(introduced.map(p => p.toLowerCase()));
-      if (lesson === 1) {
-        const lesson1Phonemes = ['m', 's', 'a', 'e', 'i', 'o', 'u'];
-        return lesson1Phonemes.filter(p => !introducedSet.has(p.toLowerCase()));
-      }
-      return [];
-    });
-    
-    // Mock markPhonemeAsIntroduced to actually mark phonemes in test database
-    mockCurriculum.markPhonemeAsIntroduced.mockImplementation(async (id: string, phoneme: string) => {
-      await testHelper.db.markPhonemeIntroduced(id, phoneme.toLowerCase());
-    });
-    
-    // Mock getUnlockedCards to return cards based on introduced phonemes
-    mockCurriculum.getUnlockedCards.mockImplementation((cards, phonemes) => {
-      const phonemeSet = new Set(phonemes.map((p: string) => p.toLowerCase()));
-      return cards.filter((card: any) => {
-        if (card.type === 'letter' || card.type === 'digraph') {
-          return phonemeSet.has(card.plainText.toLowerCase());
-        }
-        // For words/sentences, check if all phonemes are introduced
-        return card.phonemes.every((p: string) => phonemeSet.has(p.toLowerCase()));
-      });
-    });
+    // Curriculum service is NOT mocked - it will use REAL implementation
+    // The real implementation will call our mocked database functions
   });
 
   afterEach(async () => {
