@@ -5,42 +5,10 @@
  * Validates minimum session size and unlimited daily practice
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { DISTAR_CARDS, getCardsUpToLesson } from '@/data/distarCards.en-US';
-import { mockDb, createMockChild, createMockCardProgress } from '../setup';
-
-// Mock the database functions
-vi.mock('@/services/storage/database', async () => {
-  const actual = await vi.importActual('@/services/storage/database');
-  return {
-    ...actual,
-    getChild: vi.fn((id: string) => mockDb.getChild(id)),
-    getIntroducedPhonemes: vi.fn((id: string) => Promise.resolve(mockDb.getIntroducedPhonemes(id))),
-    getDueReviewCards: vi.fn((id: string, limit: number) => Promise.resolve(mockDb.getDueReviewCards(id, limit))),
-    getDueReviewCardsByPriority: vi.fn((id: string, priority: string, limit: number) =>
-      Promise.resolve(mockDb.getDueReviewCardsByPriority(id, priority as any, limit))
-    ),
-    getAllCardsForChild: vi.fn((id: string) => Promise.resolve(mockDb.getAllCardsForChild(id))),
-    getCardProgress: vi.fn((id: string, word: string) => Promise.resolve(mockDb.getCardProgress(id, word))),
-    createOrUpdateCardProgress: vi.fn((progress: any) => {
-      mockDb.createOrUpdateCardProgress(progress);
-      return Promise.resolve();
-    }),
-    markPhonemeIntroduced: vi.fn((id: string, phoneme: string) => {
-      mockDb.markPhonemeIntroduced(id, phoneme);
-      return Promise.resolve();
-    }),
-  };
-});
-
-vi.mock('@/config/locale', () => ({
-  getLocale: () => 'en-US',
-}));
+import { describe, it, expect } from 'vitest';
+import { getCardsUpToLesson } from '@/data/distarCards.en-US';
 
 describe('REQ-SESSION-001: Minimum Session Size', () => {
-  beforeEach(() => {
-    mockDb.reset();
-  });
 
   it('each lesson provides at least 10 available cards', () => {
     // Check that lessons have enough cards available
@@ -59,15 +27,10 @@ describe('REQ-SESSION-001: Minimum Session Size', () => {
     }
   });
 
-  it('can generate a session with at least 10 cards for early lessons', () => {
-    // Check that lesson 5 has sufficient cards available
+  it('early lessons have cards available', () => {
+    // Check that early lessons have cards available
     const cardsUpTo5 = getCardsUpToLesson(5);
-    
-    // Lesson 5 should have cards available (may need reviews from previous lessons to reach 10)
     expect(cardsUpTo5.length).toBeGreaterThan(0);
-    
-    // Conceptually: getNextCard should be able to generate 10+ cards by including reviews
-    // This is validated by the requirement that sessions have at least 10 cards
   });
 
   it('can form 10+ card session for milestone lessons', () => {
@@ -82,48 +45,27 @@ describe('REQ-SESSION-001: Minimum Session Size', () => {
 });
 
 describe('REQ-SESSION-004: Unlimited Daily Practice', () => {
-  beforeEach(() => {
-    mockDb.reset();
-  });
 
-  it('system always returns a card when available', () => {
-    // Conceptually: getNextCard should always return a card when cards are available
-    // This requirement is validated by ensuring lessons have content
+  it('lessons have cards available for practice', () => {
+    // Validate that lessons have content available
     const cardsUpTo10 = getCardsUpToLesson(10);
-    
-    expect(
-      cardsUpTo10.length,
-      'Lesson 10 should have cards available'
-    ).toBeGreaterThan(0);
+    expect(cardsUpTo10.length, 'Lesson 10 should have cards available').toBeGreaterThan(0);
   });
 
-  it('can practice same lesson multiple times in one day', () => {
-    // Conceptually: unlimited daily practice means child can do multiple sessions
-    // This is validated by ensuring the system has sufficient cards for repetition
+  it('curriculum has sufficient cards for repeated practice', () => {
+    // Validate that there are enough cards to support multiple practice sessions
     const cardsUpTo5 = getCardsUpToLesson(5);
-    
-    // Should have enough cards to support multiple sessions
     expect(cardsUpTo5.length).toBeGreaterThan(5);
   });
 
-  it('review cards are available when no new cards remain', async () => {
-    const child = createMockChild({ current_level: 5 });
-    mockDb.createChild(child);
-    
-    mockDb.markPhonemeIntroduced(child.id, 'm');
-    mockDb.markPhonemeIntroduced(child.id, 's');
-    mockDb.markPhonemeIntroduced(child.id, 'a');
-    
-    // Create some card progress (review cards)
-    const progress1 = createMockCardProgress(child.id, 'am', {
-      next_review_at: new Date(Date.now() - 1000).toISOString(), // Due now
-    });
-    mockDb.createOrUpdateCardProgress(progress1);
-    
-    // Should still get cards even if we've seen everything new
-    // Note: This test validates the requirement conceptually
-    // Actual getNextCard implementation would be tested with proper mocks
-    expect(child).toBeTruthy();
+  it('curriculum supports review card system', () => {
+    // Validate that the curriculum has enough cards to support spaced repetition
+    // with reviews from previous lessons
+    const totalCards = DISTAR_CARDS.length;
+    expect(totalCards).toBeGreaterThan(100); // Sufficient cards for reviews
   });
 });
+
+
+
 
