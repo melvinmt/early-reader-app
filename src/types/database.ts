@@ -1,7 +1,7 @@
 // Database entity types
 
 export interface Parent {
-  id: string; // Supabase Auth user ID
+  id: string;
   email: string;
   created_at: string; // ISO timestamp
   subscription_status: 'none' | 'trial' | 'active' | 'cancelled' | 'expired';

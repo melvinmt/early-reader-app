@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LogBox } from 'react-native';
-import { useAuthStore } from '@/stores/authStore';
 import { initDatabase, clearTestingData } from '@/services/storage';
 
 // Suppress touch-related warnings from gesture handler
@@ -13,8 +12,6 @@ LogBox.ignoreLogs([
 ]);
 
 export default function RootLayout() {
-  const { initialize, session, initialized } = useAuthStore();
-
   useEffect(() => {
     // Initialize database
     initDatabase()
@@ -23,21 +20,13 @@ export default function RootLayout() {
         return clearTestingData();
       })
       .catch(console.error);
-
-    // Initialize auth
-    if (!initialized) {
-      initialize();
-    }
   }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
-        <Stack.Screen name="auth/email-input" />
-        <Stack.Screen name="auth/otp-verification" />
         <Stack.Screen name="onboarding/add-children" />
-        <Stack.Screen name="onboarding/subscription" />
         <Stack.Screen name="children" />
         <Stack.Screen 
           name="learning" 
@@ -50,11 +39,3 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
-
-
-
-
-
-
-
-

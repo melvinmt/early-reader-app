@@ -1,32 +1,24 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '@/stores/authStore';
-import { getChildrenByParentId } from '@/services/storage';
+import { getAllChildren } from '@/services/storage';
 import { useEffect, useState } from 'react';
 import { Child } from '@/types/database';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { session, signOut } = useAuthStore();
   const [children, setChildren] = useState<Child[]>([]);
 
   useEffect(() => {
     loadChildren();
-  }, [session]);
+  }, []);
 
   const loadChildren = async () => {
-    if (!session?.user) return;
     try {
-      const kids = await getChildrenByParentId(session.user.id);
+      const kids = await getAllChildren();
       setChildren(kids);
     } catch (error) {
       console.error('Error loading children:', error);
     }
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-    router.replace('/auth/email-input');
   };
 
   return (
@@ -48,13 +40,6 @@ export default function SettingsScreen() {
           onPress={() => router.push('/onboarding/add-children')}
         >
           <Text style={styles.addButtonText}>+ Add Child</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        <TouchableOpacity style={styles.button} onPress={handleSignOut}>
-          <Text style={styles.buttonText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -112,29 +97,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  button: {
-    backgroundColor: '#FF3B30',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
