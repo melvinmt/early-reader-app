@@ -67,6 +67,9 @@ describe('REQ-SESSION-001: getCardQueue Integration Tests', () => {
     mockDatabase.getIntroducedPhonemes.mockImplementation((childId: string) => 
       testDb.getIntroducedPhonemes(childId)
     );
+    mockDatabase.markPhonemeIntroduced.mockImplementation((childId: string, phoneme: string) => 
+      testDb.markPhonemeIntroduced(childId, phoneme)
+    );
     mockDatabase.initDatabase.mockResolvedValue({
       getAllAsync: vi.fn().mockImplementation(async (sql: string, params: any[]) => {
         // For "SELECT DISTINCT word FROM card_progress WHERE child_id = ?"
@@ -133,6 +136,12 @@ describe('REQ-SESSION-001: getCardQueue Integration Tests', () => {
       // Verify phonemes were introduced
       const introduced = await testHelper.db.getIntroducedPhonemes(child.id);
       expect(introduced.length).toBeGreaterThan(0);
+      
+      // Verify all cards are valid
+      result.cards.forEach(card => {
+        expect(card.word).toBeTruthy();
+        expect(card.phonemes.length).toBeGreaterThan(0);
+      });
     });
   });
 

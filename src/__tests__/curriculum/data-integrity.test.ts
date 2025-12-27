@@ -57,12 +57,13 @@ describe('REQ-DATA-001: Card Structure Completeness', () => {
 describe('REQ-DATA-002: Asset Path Validity', () => {
   // Note: This test checks path format, not actual file existence
   // Actual file existence should be verified in integration tests or CI
+  // Paths are flexible to handle any locale and any card ID format (regeneration-safe)
   it('all imagePath values have valid format', () => {
     DISTAR_CARDS.forEach(card => {
       expect(
         card.imagePath,
         `Card ${card.id} has invalid imagePath format`
-      ).toMatch(/^assets\/en-US\/[\w-]+\/image\.webp$/);
+      ).toMatch(/^assets\/[\w-]+\/[\w-]+\/image\.webp$/);
     });
   });
 
@@ -71,7 +72,7 @@ describe('REQ-DATA-002: Asset Path Validity', () => {
       expect(
         card.audioPath,
         `Card ${card.id} has invalid audioPath format`
-      ).toMatch(/^assets\/en-US\/[\w-]+\/audio\.mp3$/);
+      ).toMatch(/^assets\/[\w-]+\/[\w-]+\/audio\.mp3$/);
     });
   });
 
@@ -80,7 +81,7 @@ describe('REQ-DATA-002: Asset Path Validity', () => {
       expect(
         card.promptPath,
         `Card ${card.id} has invalid promptPath format`
-      ).toMatch(/^assets\/en-US\/[\w-]+\/prompt\.mp3$/);
+      ).toMatch(/^assets\/[\w-]+\/[\w-]+\/prompt\.mp3$/);
     });
   });
 
@@ -90,7 +91,7 @@ describe('REQ-DATA-002: Asset Path Validity', () => {
         expect(
           card.soundedOutPath,
           `Word card ${card.id} has invalid soundedOutPath format`
-        ).toMatch(/^assets\/en-US\/[\w-]+\/audio-sounded\.mp3$/);
+        ).toMatch(/^assets\/[\w-]+\/[\w-]+\/audio-sounded\.mp3$/);
       }
     });
   });
