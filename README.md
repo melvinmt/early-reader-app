@@ -149,9 +149,15 @@ earlyreader/
 - **Payments**: RevenueCat
 - **Animations**: React Native Reanimated + Lottie
 
-## License
+## License & Contributing
 
-Private - All rights reserved
+This project is dual-licensed to support both open research and sustainable development.
+
+* **Community Use:** The source code is available under the **GNU Affero General Public License v3.0 (AGPLv3)**. This ensures that the research and educational methodology remain open for everyone to learn from and improve.
+* **Commercial Use:** The official builds on the Apple App Store and Google Play are published by **Instalabs, LLC** under a standard commercial license.
+
+**Contributing**
+We welcome pull requests! However, because this project has a commercial release, all contributors must sign a **Contributor License Agreement (CLA)**. This grants **Instalabs, LLC** the right to include your code in our app store releases while keeping your contribution open source for the community.
 
 
 
