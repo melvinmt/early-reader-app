@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getCardQueue } from '@/services/cardQueueManager';
+import { getCardQueue, CARDS_PER_SESSION } from '@/services/cardQueueManager';
 import { DISTAR_CARDS } from '@/data/distarCards.en-US';
 import { IntegrationTestHelper } from './integration-test-setup';
 import * as configModule from '@/config/locale';
@@ -39,7 +39,6 @@ const mockLevels = vi.mocked(levelsModule);
 
 describe('REQ-SESSION-001: getCardQueue Integration Tests', () => {
   let testHelper: IntegrationTestHelper;
-  const CARDS_PER_SESSION = 10;
 
   beforeEach(async () => {
     testHelper = new IntegrationTestHelper();

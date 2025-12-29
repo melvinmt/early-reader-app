@@ -603,10 +603,11 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   
   // 2. Get LEARNING cards (step 0-2) with spacing check
   const learningCards = await getLearningCards(childId, 10);
-  console.log(`[2] Learning cards: ${learningCards.map(p => `${p.word} (step=${p.learning_step ?? 3}, since=${p.cards_since_last_seen ?? 0})`).join(', ')}`);
+  const safeLearningCards = learningCards || [];
+  console.log(`[2] Learning cards: ${safeLearningCards.map(p => `${p.word} (step=${p.learning_step ?? 3}, since=${p.cards_since_last_seen ?? 0})`).join(', ')}`);
   
   // Filter by spacing requirements and exclude word
-  const learningCardsFiltered = learningCards.filter(progress => {
+  const learningCardsFiltered = safeLearningCards.filter(progress => {
     if (excludeWord && progress.word === excludeWord) {
       return false;
     }
@@ -804,10 +805,11 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   
   // 7. If we've exhausted all priority options, try to get any due card as fallback
   const fallbackDue = await getDueReviewCards(childId, 10);
-  console.log(`[7] Fallback due cards: ${fallbackDue.map(p => p.word).join(', ')}`);
+  const safeFallbackDue = fallbackDue || [];
+  console.log(`[7] Fallback due cards: ${safeFallbackDue.map(p => p.word).join(', ')}`);
   const fallbackFiltered = excludeWord 
-    ? fallbackDue.filter(p => p.word !== excludeWord)
-    : fallbackDue;
+    ? safeFallbackDue.filter(p => p.word !== excludeWord)
+    : safeFallbackDue;
   console.log(`[7] Fallback after exclude: ${fallbackFiltered.map(p => p.word).join(', ')}`);
   if (fallbackFiltered.length > 0) {
     const progress = fallbackFiltered[0];
