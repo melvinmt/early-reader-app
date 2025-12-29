@@ -26,8 +26,10 @@ jobs:
 
     - name: Install dependencies
       run: |
-        # First try npm ci, if it fails due to optional dependencies, fall back to npm install
-        npm ci || (rm -rf node_modules && npm install)
+        # Remove node_modules and package-lock.json to fix npm optional dependency bug
+        # This ensures optional dependencies like @rollup/rollup-linux-x64-gnu are properly installed
+        rm -rf node_modules package-lock.json
+        npm install
 
     - name: Run tests
       run: npm test
