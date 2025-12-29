@@ -37,6 +37,8 @@ export default function LearningScreen() {
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const cardQueueRef = useRef<LearningCard[]>([]);
   const isLoadingQueueRef = useRef(false);
+  const wordTapDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const isProcessingRef = useRef(false);
 
   useEffect(() => {
     if (!childId) {
@@ -51,6 +53,10 @@ export default function LearningScreen() {
 
     return () => {
       cleanup();
+      // Cleanup debounce timer
+      if (wordTapDebounceRef.current) {
+        clearTimeout(wordTapDebounceRef.current);
+      }
     };
   }, [childId]);
 
@@ -95,8 +101,18 @@ export default function LearningScreen() {
   };
 
   const handleWordTap = () => {
+    // Debounce rapid taps - prevent playing audio if tapped within last 500ms
+    if (wordTapDebounceRef.current) {
+      return; // Ignore rapid taps
+    }
+    
     if (currentCard?.distarCard?.audioPath) {
       audioPlayer.playSoundFromAsset(currentCard.distarCard.audioPath).catch(console.error);
+      
+      // Set debounce timer
+      wordTapDebounceRef.current = setTimeout(() => {
+        wordTapDebounceRef.current = null;
+      }, 500);
     }
   };
 
@@ -156,6 +172,11 @@ export default function LearningScreen() {
   };
 
   const loadNextCard = async () => {
+    // Prevent rapid card loading
+    if (isProcessingRef.current) {
+      return;
+    }
+    
     try {
       uiOpacity.setValue(1);
       
@@ -232,8 +253,15 @@ export default function LearningScreen() {
     }
   };
 
+  const handleSwipeStart = () => {
+    // Stop prompt audio when child starts swiping
+    audioPlayer.stopAllAudio().catch(console.error);
+  };
+
   const handleSwipeComplete = async (success: boolean) => {
-    if (!currentCard) return;
+    if (!currentCard || isProcessingRef.current) return;
+    
+    isProcessingRef.current = true;
 
     if (success) {
       setState('revealing');
@@ -279,12 +307,14 @@ export default function LearningScreen() {
       
       setShowConfetti(false);
       setState('ready');
+      isProcessingRef.current = false;
       loadNextCard();
     } else {
       setAttempts(attempts + 1);
       if (attempts >= 2) {
         setNeededHelp(true);
       }
+      isProcessingRef.current = false;
     }
   };
 
@@ -384,6 +414,7 @@ export default function LearningScreen() {
             phonemes={currentCard.phonemes}
             distarCard={currentCard.distarCard}
             onLetterEnter={() => {}}
+            onSwipeStart={handleSwipeStart}
             onSwipeComplete={handleSwipeComplete}
           />
         </View>

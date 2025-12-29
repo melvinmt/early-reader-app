@@ -10,6 +10,7 @@ interface WordSwipeDetectorProps {
   phonemes: string[];
   distarCard?: DistarCard;
   onLetterEnter: (index: number) => void;
+  onSwipeStart?: () => void;
   onSwipeComplete: (success: boolean) => void;
 }
 
@@ -24,12 +25,14 @@ export default function WordSwipeDetector({
   phonemes,
   distarCard,
   onLetterEnter,
+  onSwipeStart,
   onSwipeComplete,
 }: WordSwipeDetectorProps) {
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const isMountedRef = useRef(true);
   const onSwipeCompleteRef = useRef(onSwipeComplete);
+  const onSwipeStartRef = useRef(onSwipeStart);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const holdProgressRef = useRef(0); // Progress from holding
   const swipeProgressRef = useRef(0); // Progress from swiping
@@ -37,7 +40,8 @@ export default function WordSwipeDetector({
 
   useEffect(() => {
     onSwipeCompleteRef.current = onSwipeComplete;
-  }, [onSwipeComplete]);
+    onSwipeStartRef.current = onSwipeStart;
+  }, [onSwipeComplete, onSwipeStart]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -68,6 +72,11 @@ export default function WordSwipeDetector({
   // Start tracking when finger touches down
   const handleStart = useCallback(() => {
     if (!isMountedRef.current) return;
+    
+    // Call onSwipeStart callback if provided (e.g., to stop prompt audio)
+    if (onSwipeStartRef.current) {
+      onSwipeStartRef.current();
+    }
     
     setIsActive(true);
     holdProgressRef.current = 0;

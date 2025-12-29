@@ -5,6 +5,7 @@ import { getAudioSource } from '@/utils/audioAssetMap';
 class AudioPlayerService {
   private soundCache: Map<string, Audio.Sound> = new Map();
   private audioInitialized = false;
+  private currentlyPlaying: Audio.Sound | null = null;
 
   /**
    * Initialize audio mode for playback
@@ -50,11 +51,28 @@ class AudioPlayerService {
   }
 
   /**
+   * Stop all currently playing audio
+   */
+  async stopAllAudio(): Promise<void> {
+    try {
+      if (this.currentlyPlaying) {
+        await this.currentlyPlaying.stopAsync();
+        this.currentlyPlaying = null;
+      }
+    } catch (error) {
+      console.error('Error stopping audio:', error);
+    }
+  }
+
+  /**
    * Play sound from static asset path (e.g., "assets/en-US/001-l/audio.mp3")
    * Uses expo-asset to properly load bundled audio files
    */
   async playSoundFromAsset(assetPath: string): Promise<void> {
     try {
+      // Stop any currently playing audio
+      await this.stopAllAudio();
+      
       // Initialize audio mode first
       await this.initializeAudio();
       
@@ -88,10 +106,22 @@ class AudioPlayerService {
         this.soundCache.set(assetPath, sound);
       }
 
+      this.currentlyPlaying = sound;
       await sound.replayAsync();
+      
+      // Clear currentlyPlaying when sound finishes
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          if (this.currentlyPlaying === sound) {
+            this.currentlyPlaying = null;
+          }
+          sound.setOnPlaybackStatusUpdate(null);
+        }
+      });
     } catch (error) {
       console.error('Error playing sound from asset:', error);
       console.error('Asset path was:', assetPath);
+      this.currentlyPlaying = null;
     }
   }
 
@@ -102,6 +132,9 @@ class AudioPlayerService {
   async playSoundFromAssetAndWait(assetPath: string): Promise<void> {
     return new Promise(async (resolve) => {
       try {
+        // Stop any currently playing audio
+        await this.stopAllAudio();
+        
         // Initialize audio mode first
         await this.initializeAudio();
         
@@ -135,9 +168,14 @@ class AudioPlayerService {
           this.soundCache.set(assetPath, sound);
         }
 
+        this.currentlyPlaying = sound;
+
         // Set up playback status listener to detect when audio finishes
         const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
           if (status.isLoaded && status.didJustFinish) {
+            if (this.currentlyPlaying === sound) {
+              this.currentlyPlaying = null;
+            }
             sound?.setOnPlaybackStatusUpdate(null);
             resolve();
           }
@@ -150,6 +188,7 @@ class AudioPlayerService {
       } catch (error) {
         console.error('Error playing sound from asset:', error);
         console.error('Asset path was:', assetPath);
+        this.currentlyPlaying = null;
         // Resolve anyway to not block the flow
         resolve();
       }
@@ -192,10 +231,12 @@ class AudioPlayerService {
   }
 
   async cleanup(): Promise<void> {
+    await this.stopAllAudio();
     for (const sound of this.soundCache.values()) {
       await sound.unloadAsync();
     }
     this.soundCache.clear();
+    this.currentlyPlaying = null;
   }
 }
 
