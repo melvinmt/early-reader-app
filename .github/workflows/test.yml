@@ -25,7 +25,9 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci
+      run: |
+        # First try npm ci, if it fails due to optional dependencies, fall back to npm install
+        npm ci || (rm -rf node_modules && npm install)
 
     - name: Run tests
       run: npm test
