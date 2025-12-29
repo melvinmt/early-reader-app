@@ -25,7 +25,11 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci
+      run: |
+        # Remove node_modules and package-lock.json to fix npm optional dependency bug
+        # This ensures optional dependencies like @rollup/rollup-linux-x64-gnu are properly installed
+        rm -rf node_modules package-lock.json
+        npm install
 
     - name: Run tests
       run: npm test
