@@ -139,7 +139,9 @@ describe('REQ-SESSION-002: Consecutive Cards Prevention (Runtime)', () => {
       mockDatabase.getAllCardsForChild.mockResolvedValue([]);
       // Mock to return same values for both calls
       mockCurriculum.getUnintroducedPhonemesForLesson.mockResolvedValue(['m', 's']);
-      mockCurriculum.getUnlockedCards.mockReturnValue([]); // No unlocked cards
+      // Need to provide the 'm' card from static cards so it can be found
+      const mCard = DISTAR_CARDS.find(c => c.plainText === 'm');
+      mockCurriculum.getUnlockedCards.mockReturnValue(mCard ? [mCard] : []);
       mockDatabase.initDatabase.mockResolvedValue({
         getAllAsync: vi.fn().mockResolvedValue([]),
       } as any);

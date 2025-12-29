@@ -603,10 +603,11 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   
   // 2. Get LEARNING cards (step 0-2) with spacing check
   const learningCards = await getLearningCards(childId, 10);
-  console.log(`[2] Learning cards: ${learningCards.map(p => `${p.word} (step=${p.learning_step ?? 3}, since=${p.cards_since_last_seen ?? 0})`).join(', ')}`);
+  const safeLearningCards = learningCards || [];
+  console.log(`[2] Learning cards: ${safeLearningCards.map(p => `${p.word} (step=${p.learning_step ?? 3}, since=${p.cards_since_last_seen ?? 0})`).join(', ')}`);
   
   // Filter by spacing requirements and exclude word
-  const learningCardsFiltered = learningCards.filter(progress => {
+  const learningCardsFiltered = safeLearningCards.filter(progress => {
     if (excludeWord && progress.word === excludeWord) {
       return false;
     }
@@ -629,8 +630,9 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   
   if (learningCardsFiltered.length > 0) {
     // Check recent card types to balance selection
+    // If there are no words at all, allow phonemes
     const recentCounts = await getRecentCardTypeCounts(childId, 10);
-    const shouldPrioritizeWords = recentCounts.wordCount === 0 || 
+    const shouldPrioritizeWords = (recentCounts.wordCount > 0 && recentCounts.phonemeCount > 0) && 
       (recentCounts.phonemeCount / recentCounts.wordCount) > (2 / 3);
     
     // Separate learning cards by type
@@ -665,8 +667,9 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
       const { progress, matchingCard } = prioritizedCards[0];
       if (matchingCard) {
         console.log(`✅ Selected: [LEARNING] ${progress.word} (step=${progress.learning_step})`);
-        // Increment spacing counter for all learning cards (including this one)
-        // The counter will be reset to 0 in recordCardCompletion when the card is completed
+        // Reset the spacing counter for this specific card (it's being shown now)
+        await resetCardsSinceLastSeen(childId, progress.word);
+        // Increment spacing counter for all other learning cards
         await incrementCardsSinceLastSeen(childId);
         const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
         console.log(`=== getNextCard END ===\n`);
@@ -690,8 +693,9 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   console.log(`[3] New cards this session: ${sessionNewCards.length}/${MAX_NEW_CARDS_PER_SESSION}, can introduce: ${canIntroduceNewCard}`);
   
   // Check recent card types - only introduce new phonemes if we haven't had too many recently
+  // If there are no words at all (wordCount === 0 and phonemeCount === 0), allow phonemes
   const recentCounts = await getRecentCardTypeCounts(childId, 10);
-  const shouldSkipPhonemes = recentCounts.wordCount === 0 || 
+  const shouldSkipPhonemes = (recentCounts.wordCount > 0 && recentCounts.phonemeCount > 0) && 
     (recentCounts.phonemeCount / recentCounts.wordCount) > (2 / 3);
   
   if (canIntroduceNewCard && !shouldSkipPhonemes) {
@@ -804,10 +808,11 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   
   // 7. If we've exhausted all priority options, try to get any due card as fallback
   const fallbackDue = await getDueReviewCards(childId, 10);
-  console.log(`[7] Fallback due cards: ${fallbackDue.map(p => p.word).join(', ')}`);
+  const safeFallbackDue = fallbackDue || [];
+  console.log(`[7] Fallback due cards: ${safeFallbackDue.map(p => p.word).join(', ')}`);
   const fallbackFiltered = excludeWord 
-    ? fallbackDue.filter(p => p.word !== excludeWord)
-    : fallbackDue;
+    ? safeFallbackDue.filter(p => p.word !== excludeWord)
+    : safeFallbackDue;
   console.log(`[7] Fallback after exclude: ${fallbackFiltered.map(p => p.word).join(', ')}`);
   if (fallbackFiltered.length > 0) {
     const progress = fallbackFiltered[0];
