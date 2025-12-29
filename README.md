@@ -22,6 +22,27 @@ This isn't just another flashcard app. Early Reader is built on decades of resea
 - **Spaced Repetition (SM-2)**: The same algorithm used by Anki and SuperMemo, optimized for long-term retention
 - **AI-Powered Cards**: Contextual word generation and imagery that adapts to your child's learning journey
 
+## 📊 Content Stats
+
+The app includes a comprehensive curriculum with pre-generated assets:
+
+| Category | Cards | Description |
+|----------|-------|-------------|
+| **Letters (Phonemes)** | 31 | Individual letter sounds (a, m, s, etc.) |
+| **Digraphs** | 12 | Two-letter combinations (sh, th, ch, etc.) |
+| **Words** | 590 | Decodable words built from learned phonemes |
+| **Sentences** | 88 | Simple sentences for reading practice |
+| **Total Cards** | **721** | Complete DISTAR-based curriculum |
+
+### Asset Breakdown
+
+- 🖼️ **721 images** — AI-generated illustrations for each card
+- 🔊 **4,195 audio files** — Professional voice recordings including:
+  - Word/phoneme pronunciations
+  - Prompts ("What sound does this make?")
+  - Encouragement ("Great job!")
+  - Hints and retry prompts
+
 ## 🚀 Getting Started
 
 ### Prerequisites
