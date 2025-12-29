@@ -630,8 +630,9 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   
   if (learningCardsFiltered.length > 0) {
     // Check recent card types to balance selection
+    // If there are no words at all, allow phonemes
     const recentCounts = await getRecentCardTypeCounts(childId, 10);
-    const shouldPrioritizeWords = recentCounts.wordCount === 0 || 
+    const shouldPrioritizeWords = (recentCounts.wordCount > 0 && recentCounts.phonemeCount > 0) && 
       (recentCounts.phonemeCount / recentCounts.wordCount) > (2 / 3);
     
     // Separate learning cards by type
@@ -666,8 +667,9 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
       const { progress, matchingCard } = prioritizedCards[0];
       if (matchingCard) {
         console.log(`✅ Selected: [LEARNING] ${progress.word} (step=${progress.learning_step})`);
-        // Increment spacing counter for all learning cards (including this one)
-        // The counter will be reset to 0 in recordCardCompletion when the card is completed
+        // Reset the spacing counter for this specific card (it's being shown now)
+        await resetCardsSinceLastSeen(childId, progress.word);
+        // Increment spacing counter for all other learning cards
         await incrementCardsSinceLastSeen(childId);
         const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
         console.log(`=== getNextCard END ===\n`);
@@ -691,8 +693,9 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   console.log(`[3] New cards this session: ${sessionNewCards.length}/${MAX_NEW_CARDS_PER_SESSION}, can introduce: ${canIntroduceNewCard}`);
   
   // Check recent card types - only introduce new phonemes if we haven't had too many recently
+  // If there are no words at all (wordCount === 0 and phonemeCount === 0), allow phonemes
   const recentCounts = await getRecentCardTypeCounts(childId, 10);
-  const shouldSkipPhonemes = recentCounts.wordCount === 0 || 
+  const shouldSkipPhonemes = (recentCounts.wordCount > 0 && recentCounts.phonemeCount > 0) && 
     (recentCounts.phonemeCount / recentCounts.wordCount) > (2 / 3);
   
   if (canIntroduceNewCard && !shouldSkipPhonemes) {

@@ -49,7 +49,9 @@ describe('Learning Steps Implementation', () => {
       mockDatabase.getIntroducedPhonemes.mockResolvedValue([]);
       mockDatabase.getAllCardsForChild.mockResolvedValue([]);
       mockCurriculum.getUnintroducedPhonemesForLesson.mockResolvedValue(['m']);
-      mockCurriculum.getUnlockedCards.mockReturnValue([]);
+      // Mock unlocked cards to return the phoneme card 'm'
+      const mCard = DISTAR_CARDS.find(c => c.plainText === 'm');
+      mockCurriculum.getUnlockedCards.mockReturnValue(mCard ? [mCard] : []);
       mockDatabase.getCardProgress.mockResolvedValue(null); // New card
       mockDatabase.createOrUpdateCardProgress.mockImplementation(async (progress) => {
         // Verify learning_step is 0 for new card
@@ -240,7 +242,32 @@ describe('Learning Steps Implementation', () => {
         ]),
       } as any);
       mockDatabase.getIntroducedPhonemes.mockResolvedValue([]);
-      mockDatabase.getAllCardsForChild.mockResolvedValue([]);
+      // Provide a fallback card for the last resort (step 8)
+      const fallbackCard: CardProgress = {
+        id: 'fallback-1',
+        child_id: childId,
+        word: 'test',
+        ease_factor: 2.5,
+        interval_days: 1,
+        next_review_at: new Date().toISOString(),
+        attempts: 0,
+        successes: 0,
+        last_seen_at: null,
+        hint_used: 0,
+        learning_step: 3,
+        cards_since_last_seen: 0,
+      };
+      mockDatabase.getAllCardsForChild.mockResolvedValue([fallbackCard]);
+      // Also need to mock the static card lookup - find a real card from DISTAR_CARDS
+      const testCard = DISTAR_CARDS.find(c => c.plainText === 'test');
+      if (!testCard) {
+        // If 'test' doesn't exist, use 'me' which should exist
+        const meCard = DISTAR_CARDS.find(c => c.plainText === 'me');
+        if (meCard) {
+          fallbackCard.word = 'me';
+          mockDatabase.getAllCardsForChild.mockResolvedValue([fallbackCard]);
+        }
+      }
       mockCurriculum.getUnintroducedPhonemesForLesson.mockResolvedValue(['a']);
 
       const card = await getNextCard(childId);
