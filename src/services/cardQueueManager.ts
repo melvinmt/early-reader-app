@@ -78,7 +78,7 @@ export interface CardQueueResult {
   currentLevel: number;
 }
 
-export const CARDS_PER_SESSION = 8; // Optimized for 4.5 year olds (research: 5-7 cards)
+export const CARDS_PER_SESSION = 20; // Fixed 20 cards per lesson
 const MAX_NEW_CARDS_PER_SESSION = 2; // Limit completely new items per session
 const MAX_LEARNING_CARDS = 4; // Cards still in learning phase (steps 0-2)
 const MIN_CARDS_FOR_LEVEL_UP = 20;
@@ -235,9 +235,45 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
 }
 
 /**
+ * Get recent card types to balance selection
+ * Returns counts of phonemes and words from last N cards
+ */
+async function getRecentCardTypeCounts(
+  childId: string,
+  lookbackCount: number = 10
+): Promise<{ phonemeCount: number; wordCount: number }> {
+  const database = await initDatabase();
+  const recentCards = await database.getAllAsync<{ word: string }>(
+    `SELECT word FROM card_progress 
+     WHERE child_id = ? AND last_seen_at IS NOT NULL
+     ORDER BY last_seen_at DESC
+     LIMIT ?`,
+    [childId, lookbackCount]
+  );
+  
+  const allStaticCards = getAllStaticCards();
+  let phonemeCount = 0;
+  let wordCount = 0;
+  
+  for (const card of recentCards) {
+    const staticCard = allStaticCards.find(c => c.plainText === card.word);
+    if (staticCard) {
+      if (staticCard.type === 'letter' || staticCard.type === 'digraph') {
+        phonemeCount++;
+      } else if (staticCard.type === 'word') {
+        wordCount++;
+      }
+    }
+  }
+  
+  return { phonemeCount, wordCount };
+}
+
+/**
  * Generate a new learning card from pre-generated DISTAR cards
  * Uses curriculum-aware selection: only shows unlocked cards
  * Also introduces new phonemes for the current lesson when needed
+ * Balances phonemes and words using a 2:3 ratio
  */
 async function generateNewCardFromStatic(
   childId: string,
@@ -286,21 +322,42 @@ async function generateNewCardFromStatic(
     return null;
   }
   
-  // Prioritize phonemes first, then words, then sentences
+  // Get recent card type counts to balance selection
+  const recentCounts = await getRecentCardTypeCounts(childId, 10);
+  
+  // Separate cards by type
   const phonemeCards = availableCards.filter(c => c.type === 'letter' || c.type === 'digraph');
   const wordCards = availableCards.filter(c => c.type === 'word');
   const sentenceCards = availableCards.filter(c => c.type === 'sentence');
   
-  // Select first available card type in priority order
-  const targetCards = phonemeCards.length > 0 ? phonemeCards : 
-                      wordCards.length > 0 ? wordCards : 
-                      sentenceCards;
+  // Use 2:3 ratio (phonemes:words) - aim for 2 phonemes per 3 words
+  // If we've had 2+ phonemes in last 10 cards, prioritize words
+  // If we've had 3+ words in last 10 cards, allow phonemes
+  let targetCards: DistarCard[] = [];
+  
+  // Calculate ratio: if phonemeCount/wordCount > 2/3, prioritize words
+  const shouldPrioritizeWords = recentCounts.wordCount === 0 || 
+    (recentCounts.phonemeCount / recentCounts.wordCount) > (2 / 3);
+  
+  if (shouldPrioritizeWords && wordCards.length > 0) {
+    // Prioritize words if we've had too many phonemes
+    targetCards = wordCards;
+  } else if (phonemeCards.length > 0) {
+    // Use phonemes if available and ratio allows
+    targetCards = phonemeCards;
+  } else if (wordCards.length > 0) {
+    // Fall back to words if no phonemes
+    targetCards = wordCards;
+  } else if (sentenceCards.length > 0) {
+    // Last resort: sentences
+    targetCards = sentenceCards;
+  }
   
   if (targetCards.length === 0) {
     return null;
   }
   
-  // Select a random card from the priority group
+  // Select a random card from the target group
   const distarCard = targetCards[Math.floor(Math.random() * targetCards.length)];
   
   return createLearningCardFromDistar(childId, level, distarCard);
@@ -571,32 +628,54 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   console.log(`[2] Learning cards ready (spacing met): ${learningCardsFiltered.map(p => p.word).join(', ')}`);
   
   if (learningCardsFiltered.length > 0) {
+    // Check recent card types to balance selection
+    const recentCounts = await getRecentCardTypeCounts(childId, 10);
+    const shouldPrioritizeWords = recentCounts.wordCount === 0 || 
+      (recentCounts.phonemeCount / recentCounts.wordCount) > (2 / 3);
+    
+    // Separate learning cards by type
+    const learningCardsWithTypes = learningCardsFiltered.map(progress => {
+      const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
+      const isPhoneme = matchingCard && (matchingCard.type === 'letter' || matchingCard.type === 'digraph');
+      return { progress, matchingCard, isPhoneme };
+    }).filter(item => item.matchingCard); // Only include cards that exist in static cards
+    
+    // If we should prioritize words, filter to word cards first
+    let prioritizedCards = learningCardsWithTypes;
+    if (shouldPrioritizeWords) {
+      const wordCards = learningCardsWithTypes.filter(item => !item.isPhoneme);
+      if (wordCards.length > 0) {
+        prioritizedCards = wordCards;
+      }
+    }
+    
     // Prioritize by step (lower step = higher priority) and then by cards_since_last_seen
-    learningCardsFiltered.sort((a, b) => {
-      const stepA = a.learning_step ?? 3;
-      const stepB = b.learning_step ?? 3;
+    prioritizedCards.sort((a, b) => {
+      const stepA = a.progress.learning_step ?? 3;
+      const stepB = b.progress.learning_step ?? 3;
       if (stepA !== stepB) {
         return stepA - stepB;
       }
-      const sinceA = a.cards_since_last_seen ?? 0;
-      const sinceB = b.cards_since_last_seen ?? 0;
+      const sinceA = a.progress.cards_since_last_seen ?? 0;
+      const sinceB = b.progress.cards_since_last_seen ?? 0;
       return sinceB - sinceA; // Higher cards_since_last_seen = more ready
     });
     
-    const progress = learningCardsFiltered[0];
-    const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
-    if (matchingCard) {
-      console.log(`✅ Selected: [LEARNING] ${progress.word} (step=${progress.learning_step})`);
-      // Increment spacing counter for all learning cards (including this one)
-      // The counter will be reset to 0 in recordCardCompletion when the card is completed
-      await incrementCardsSinceLastSeen(childId);
-      const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
-      console.log(`=== getNextCard END ===\n`);
-      return card;
+    if (prioritizedCards.length > 0) {
+      const { progress, matchingCard } = prioritizedCards[0];
+      if (matchingCard) {
+        console.log(`✅ Selected: [LEARNING] ${progress.word} (step=${progress.learning_step})`);
+        // Increment spacing counter for all learning cards (including this one)
+        // The counter will be reset to 0 in recordCardCompletion when the card is completed
+        await incrementCardsSinceLastSeen(childId);
+        const card = await createLearningCardFromProgress(childId, currentLesson, progress, matchingCard);
+        console.log(`=== getNextCard END ===\n`);
+        return card;
+      }
     }
   }
   
-  // 3. Get new phonemes for current lesson
+  // 3. Get new phonemes for current lesson (only if we haven't had too many phonemes recently)
   // Check if we've already introduced MAX_NEW_CARDS_PER_SESSION new cards in this session
   const database = await initDatabase();
   const sessionNewCards = await database.getAllAsync<{ word: string }>(
@@ -610,7 +689,12 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   const canIntroduceNewCard = sessionNewCards.length < MAX_NEW_CARDS_PER_SESSION;
   console.log(`[3] New cards this session: ${sessionNewCards.length}/${MAX_NEW_CARDS_PER_SESSION}, can introduce: ${canIntroduceNewCard}`);
   
-  if (canIntroduceNewCard) {
+  // Check recent card types - only introduce new phonemes if we haven't had too many recently
+  const recentCounts = await getRecentCardTypeCounts(childId, 10);
+  const shouldSkipPhonemes = recentCounts.wordCount === 0 || 
+    (recentCounts.phonemeCount / recentCounts.wordCount) > (2 / 3);
+  
+  if (canIntroduceNewCard && !shouldSkipPhonemes) {
     const unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, currentLesson);
     console.log(`[3] Unintroduced phonemes for lesson ${currentLesson}: ${unintroducedPhonemes.join(', ')}`);
     if (unintroducedPhonemes.length > 0) {
@@ -632,7 +716,11 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
       }
     }
   } else {
-    console.log(`[3] Skipping new phonemes - already at max new cards per session`);
+    if (!canIntroduceNewCard) {
+      console.log(`[3] Skipping new phonemes - already at max new cards per session`);
+    } else {
+      console.log(`[3] Skipping new phonemes - too many phonemes recently (${recentCounts.phonemeCount} phonemes, ${recentCounts.wordCount} words)`);
+    }
   }
   
   // 4. Get MEDIUM priority due review cards (hint used)

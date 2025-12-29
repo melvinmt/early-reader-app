@@ -106,17 +106,17 @@ Consider specialized agents with distinct roles:
 
 ## Applying to This Project
 
-For InstaReader, implement these patterns:
+For Early Reader, implement these patterns:
 
 ```
-/instareader
+/earlyreader
 ├── init.sh                    # Dev server startup script
 ├── claude-progress.txt        # Session-by-session log
 ├── features.json              # All features with pass/fail status
 └── src/
 ```
 
-### Feature Categories for InstaReader
+### Feature Categories for Early Reader
 
 1. **Authentication** - Supabase email OTP flow
 2. **Onboarding** - Child management, subscription

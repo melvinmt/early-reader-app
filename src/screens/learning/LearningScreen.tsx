@@ -257,7 +257,20 @@ export default function LearningScreen() {
           neededHelp,
         });
         
-        setCardsCompleted(cardsCompleted + 1);
+        const newCardsCompleted = cardsCompleted + 1;
+        setCardsCompleted(newCardsCompleted);
+        
+        // Check if lesson is complete (20 cards)
+        if (newCardsCompleted >= CARDS_PER_SESSION) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          setShowConfetti(false);
+          Alert.alert(
+            'Lesson Complete!',
+            `Great job! You completed ${newCardsCompleted} cards!`,
+            [{ text: 'OK', onPress: handleExitSuccess }]
+          );
+          return;
+        }
       } catch (error) {
         console.error('Error recording completion:', error);
       }
