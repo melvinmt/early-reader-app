@@ -92,6 +92,7 @@ const SCREENSHOT_CARD_IDS = [
   '048-at',          // word "at" (a+t)
   '049-sat',         // word "sat" (s+a+t)
   '077-cat',         // word "cat" (c+a+t)
+  '537-made',        // word "made" (m+a+d)
   '637-the-cat-sat', // sentence "the cat sat"
 ];
 let screenshotCardIndex = 0;
