@@ -65,9 +65,15 @@ echo "  → Killing Expo processes..."
 pkill -f "expo start" 2>/dev/null || true
 pkill -f "expo-cli" 2>/dev/null || true
 
-# Kill xcodebuild
-echo "  → Killing xcodebuild..."
-killall xcodebuild 2>/dev/null || true
+# Kill xcodebuild and related processes
+echo "  → Killing xcodebuild and Xcode processes..."
+killall -9 xcodebuild 2>/dev/null || true
+killall -9 XCBuild 2>/dev/null || true
+killall -9 "com.apple.dt.SKAgent" 2>/dev/null || true
+
+# Remove locked Xcode build database files
+echo "  → Removing locked Xcode build database..."
+rm -rf ~/Library/Developer/Xcode/DerivedData/EarlyReader-*/Build/Intermediates.noindex/XCBuildData/*.db* 2>/dev/null || true
 
 # Kill node processes related to this project
 echo "  → Killing node processes for this project..."
