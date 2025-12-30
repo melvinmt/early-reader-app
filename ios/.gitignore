@@ -1,0 +1,30 @@
+# OSX
+.DS_Store
+
+# Xcode - user-specific and build artifacts
+build/
+DerivedData/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.hmap
+*.xcuserstate
+.xcode.env.local
+
+# Keep xcworkspace but ignore user data inside it
+*.xcworkspace/xcuserdata/
+
+# Bundle artifacts
+*.jsbundle
+
+# CocoaPods - can be regenerated from Podfile
+/Pods/
+Podfile.lock
