@@ -83,10 +83,77 @@ const MAX_NEW_CARDS_PER_SESSION = 2; // Limit completely new items per session
 const MAX_LEARNING_CARDS = 4; // Cards still in learning phase (steps 0-2)
 const MIN_CARDS_FOR_LEVEL_UP = 20;
 
+// ============================================
+// SCREENSHOT MODE - Hardcoded cards for App Store screenshots
+// Set to true to show only these specific cards in order
+// ============================================
+export const SCREENSHOT_MODE = true;
+const SCREENSHOT_CARD_IDS = [
+  '003-a',           // letter "a"
+  '049-sat',         // word "sat" (s+a+t)
+  '077-cat',         // word "cat" (c+a+t)
+  '637-the-cat-sat', // sentence "the cat sat"
+];
+let screenshotCardIndex = 0;
+
+/**
+ * Get screenshot cards for App Store screenshots
+ * Returns hardcoded cards in a specific order
+ */
+function getScreenshotCards(): LearningCard[] {
+  const allCards = getAllStaticCards();
+  const screenshotCards: LearningCard[] = [];
+  
+  for (const cardId of SCREENSHOT_CARD_IDS) {
+    const distarCard = allCards.find(c => c.id === cardId);
+    if (distarCard) {
+      screenshotCards.push({
+        word: distarCard.plainText,
+        phonemes: distarCard.phonemes,
+        imageUrl: distarCard.imagePath,
+        progress: null,
+        level: distarCard.lesson,
+        distarCard,
+      });
+    }
+  }
+  
+  return screenshotCards;
+}
+
+/**
+ * Get next screenshot card (cycles through the list)
+ */
+export function getNextScreenshotCard(): LearningCard | null {
+  const cards = getScreenshotCards();
+  if (cards.length === 0) return null;
+  
+  const card = cards[screenshotCardIndex % cards.length];
+  screenshotCardIndex++;
+  return card;
+}
+
+/**
+ * Reset screenshot card index (call when starting a new session)
+ */
+export function resetScreenshotMode(): void {
+  screenshotCardIndex = 0;
+}
+
 /**
  * Get the next queue of cards for a child
  */
 export async function getCardQueue(childId: string): Promise<CardQueueResult> {
+  // Screenshot mode: return hardcoded cards for App Store screenshots
+  if (SCREENSHOT_MODE) {
+    const screenshotCards = getScreenshotCards();
+    return {
+      cards: screenshotCards,
+      hasMore: true,
+      currentLevel: 1,
+    };
+  }
+
   // Get child info
   const child = await getChild(childId);
   if (!child) {
