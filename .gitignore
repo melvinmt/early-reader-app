@@ -65,8 +65,12 @@ local.properties
 *.hprof
 .cxx/
 
-# iOS
-ios/
+# iOS - keep xcodeproj and xcworkspace for version/asset tracking
+ios/build/
+ios/Pods/
+ios/Podfile.lock
+ios/.xcode.env.local
+ios/DerivedData/
 *.pbxuser
 !default.pbxuser
 *.mode1v3
@@ -78,14 +82,8 @@ ios/
 xcuserdata/
 *.xccheckout
 *.moved-aside
-DerivedData/
 *.hmap
-*.ipa
 *.xcuserstate
-project.xcworkspace/
-.xcode.env.local
-Pods/
-Podfile.lock
 
 # TypeScript
 *.tsbuildinfo
