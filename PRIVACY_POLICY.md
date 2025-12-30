@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: January 2025**
+**Last Updated: December 2025**
 
 ## Introduction
 
@@ -52,9 +52,10 @@ We may update this Privacy Policy from time to time. Any changes will be posted 
 
 If you have any questions about this Privacy Policy, please contact us at:
 
+info@instalabs.ai
 **Instalabs, LLC**
 
 ---
 
-*This privacy policy is effective as of January 2025 and applies to all versions of the Early Reader mobile application.*
+*This privacy policy is effective as of December 2025 and applies to all versions of the Early Reader mobile application.*
 
