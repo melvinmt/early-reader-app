@@ -76,6 +76,8 @@ npm install
 
 ### Running the App
 
+#### Development Mode (Expo Go)
+
 ```bash
 # Start the development server
 npm start
@@ -88,6 +90,20 @@ Then:
 - Press `i` for iOS Simulator
 - Press `a` for Android Emulator
 - Scan QR code with Expo Go app on physical device
+
+#### After Prebuild (Native Development)
+
+If you've run `npx expo prebuild` to generate native iOS/Android projects:
+
+```bash
+# For iOS - this will start Metro and build/run the app
+npx expo run:ios
+
+# For Android
+npx expo run:android
+```
+
+**Important**: After prebuild, always use `npx expo run:ios` or `npx expo run:android` rather than opening Xcode/Android Studio directly. This ensures Metro bundler is properly configured and the entry point resolves correctly.
 
 ## 📁 Project Structure
 
