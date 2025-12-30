@@ -10,7 +10,6 @@ import WordSwipeDetector from '@/components/lesson/WordSwipeDetector';
 import ConfettiCelebration from '@/components/ui/ConfettiCelebration';
 import { createSession, updateSession } from '@/services/storage/database';
 import { isTablet, responsiveFontSize, responsiveSpacing } from '@/utils/responsive';
-import ParentalGate from '@/components/parent/ParentalGate';
 
 type LearningState = 'loading' | 'ready' | 'revealing';
 
@@ -31,8 +30,6 @@ export default function LearningScreen() {
   const [cardsCompleted, setCardsCompleted] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [showExitGate, setShowExitGate] = useState(false);
-  const [exitGatePassed, setExitGatePassed] = useState(false);
 
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const cardQueueRef = useRef<LearningCard[]>([]);
@@ -295,7 +292,13 @@ export default function LearningScreen() {
           Alert.alert(
             'Lesson Complete!',
             `Great job! You completed ${newCardsCompleted} cards!`,
-            [{ text: 'OK', onPress: handleExitSuccess }]
+            [{ 
+              text: 'OK', 
+              onPress: async () => {
+                await cleanup();
+                router.back();
+              }
+            }]
           );
           return;
         }
@@ -319,20 +322,24 @@ export default function LearningScreen() {
   };
 
   const handleExit = () => {
-    // If gate already passed, exit directly
-    if (exitGatePassed) {
-      handleExitSuccess();
-    } else {
-      // Show gate first time
-      setShowExitGate(true);
-    }
-  };
-
-  const handleExitSuccess = async () => {
-    setShowExitGate(false);
-    setExitGatePassed(true);
-    await cleanup();
-    router.back();
+    Alert.alert(
+      'Exit Learning Session?',
+      'Are you sure you want to go back? Your progress will be saved.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Exit',
+          style: 'destructive',
+          onPress: async () => {
+            await cleanup();
+            router.back();
+          },
+        },
+      ]
+    );
   };
 
   if (state === 'loading' || !currentCard) {
@@ -424,12 +431,6 @@ export default function LearningScreen() {
       </View>
 
       <ConfettiCelebration visible={showConfetti} onComplete={() => setShowConfetti(false)} />
-      
-      <ParentalGate
-        visible={showExitGate}
-        onSuccess={handleExitSuccess}
-        onCancel={() => setShowExitGate(false)}
-      />
     </View>
   );
 }
