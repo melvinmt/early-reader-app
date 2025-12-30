@@ -126,4 +126,22 @@ For Early Reader, implement these patterns:
 6. **UI/UX** - Swipe detection, blur reveal, orthography rendering
 
 Each feature should have clear acceptance criteria and be testable via device automation.
-i
+
+## Issue Documentation
+
+After resolving a hard or non-obvious problem, document it in the `./issues` directory as a Markdown file so others on GitHub can fix the same problem. Use the following format:
+
+```
+./issues/
+├── YYYY-MM-DD-short-description.md
+```
+
+Each issue file should include:
+
+1. **Title** - Clear, searchable description of the problem
+2. **Symptoms** - Error messages, unexpected behavior
+3. **Root Cause** - What was actually wrong
+4. **Solution** - Step-by-step fix
+5. **Prevention** - How to avoid this in the future (if applicable)
+
+Example filename: `2024-12-29-expo-router-entry-not-found.md`
