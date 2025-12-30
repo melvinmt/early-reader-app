@@ -8,6 +8,7 @@
     "start:tunnel": "expo start --tunnel",
     "clean": "./clean-start.sh",
     "clean:ios": "./clean-start.sh ios",
+    "clean:ios:full": "./clean-start.sh ios --full",
     "clean:android": "./clean-start.sh android",
     "fix": "./fix.sh",
     "android": "expo run:android",
