@@ -87,7 +87,7 @@ const MIN_CARDS_FOR_LEVEL_UP = 20;
 // SCREENSHOT MODE - Hardcoded cards for App Store screenshots
 // Set to true to show only these specific cards in order
 // ============================================
-export const SCREENSHOT_MODE = true;
+export const SCREENSHOT_MODE = false;
 const SCREENSHOT_CARD_IDS = [
   '048-at',          // word "at" (a+t)
   '049-sat',         // word "sat" (s+a+t)
