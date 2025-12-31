@@ -556,7 +556,11 @@ export default function LearningScreen() {
                   )}
                 </View>
                 <Text style={dynamicStyles.transcriptMessage}>
-                  {speechRecognition.hasCorrectPronunciation ? 'Correct! Swipe right to reveal the picture.' : 'Please try again!'}
+                  {speechRecognition.hasCorrectPronunciation 
+                    ? (speechRecognition.matchConfidence === 1.0 
+                        ? 'Correct! Swipe right to reveal the picture.' 
+                        : 'Close enough! Swipe right to reveal the picture.')
+                    : 'Please try again!'}
                 </Text>
               </>
             ) : (

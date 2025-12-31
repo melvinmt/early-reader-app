@@ -20,6 +20,7 @@ export interface UseSpeechRecognitionResult {
   hasCorrectPronunciation: boolean;
   hasSaidAnything: boolean;
   recognizedText: string | null; // Real-time recognized text for parent feedback
+  matchConfidence: number | null; // Confidence of the match (1.0 = perfect, < 1.0 = close enough)
   startListening: () => Promise<void>;
   stopListening: () => Promise<void>;
   pauseListening: () => Promise<void>; // Temporarily pause (e.g., during audio playback)
@@ -56,6 +57,7 @@ export function useSpeechRecognition(
   const [hasCorrectPronunciation, setHasCorrectPronunciation] = useState(false);
   const [hasSaidAnything, setHasSaidAnything] = useState(false);
   const [recognizedText, setRecognizedText] = useState<string | null>(null);
+  const [matchConfidence, setMatchConfidence] = useState<number | null>(null);
 
   const targetTextRef = useRef(targetText);
   const isMountedRef = useRef(true);
@@ -155,6 +157,7 @@ export function useSpeechRecognition(
         console.log('🎤 ✅ Pronunciation matched!');
         hasMatchedRef.current = true;
         setHasCorrectPronunciation(true);
+        setMatchConfidence(matchResult.confidence);
         setState('matched');
         
         // Stop listening once matched (session-based pass persistence)
@@ -351,6 +354,7 @@ export function useSpeechRecognition(
     setHasCorrectPronunciation(false);
     setHasSaidAnything(false);
     setRecognizedText(null);
+    setMatchConfidence(null);
     setState('idle');
     speechRecognitionService.setRecognizedText(null);
 
@@ -387,6 +391,7 @@ export function useSpeechRecognition(
     setHasCorrectPronunciation(false);
     setHasSaidAnything(false);
     setRecognizedText(null);
+    setMatchConfidence(null);
     setState('idle');
 
     // Mark that we're starting for this target
@@ -440,6 +445,7 @@ export function useSpeechRecognition(
     hasCorrectPronunciation,
     hasSaidAnything,
     recognizedText,
+    matchConfidence,
     startListening,
     stopListening,
     pauseListening,
