@@ -42,7 +42,13 @@
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Early Reader needs access to your microphone to help your child practice pronunciation.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Early Reader needs speech recognition to help your child learn to read by practicing pronunciation.</string>
 	<key>NSUserActivityTypes</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Pressable, useWindowDimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Pressable, useWindowDimensions, TouchableOpacity, StatusBar } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { recordCardCompletion, getCardQueue, LearningCard, CARDS_PER_SESSION } from '@/services/cardQueueManager';
@@ -10,6 +10,7 @@ import WordSwipeDetector from '@/components/lesson/WordSwipeDetector';
 import ConfettiCelebration from '@/components/ui/ConfettiCelebration';
 import { createSession, updateSession } from '@/services/storage/database';
 import { isTablet, responsiveFontSize, responsiveSpacing } from '@/utils/responsive';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 
 type LearningState = 'loading' | 'ready' | 'revealing';
 
@@ -30,12 +31,25 @@ export default function LearningScreen() {
   const [cardsCompleted, setCardsCompleted] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [pronunciationAttempts, setPronunciationAttempts] = useState(0);
+  const [pronunciationFailed, setPronunciationFailed] = useState(false);
 
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const cardQueueRef = useRef<LearningCard[]>([]);
   const isLoadingQueueRef = useRef(false);
   const wordTapDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingRef = useRef(false);
+
+  // Speech recognition hook
+  const speechRecognition = useSpeechRecognition({
+    targetText: currentCard?.word || '',
+    onMatch: (confidence) => {
+      console.log('Pronunciation matched with confidence:', confidence);
+    },
+    onError: (error) => {
+      console.error('Speech recognition error:', error);
+    },
+  });
 
   useEffect(() => {
     if (!childId) {
@@ -87,24 +101,57 @@ export default function LearningScreen() {
     }
   };
 
+  // Check if card is a phoneme (1-2 characters) - skip speech recognition for phonemes
+  const isPhoneme = (card: LearningCard) => {
+    const text = card.distarCard?.plainText || card.word;
+    return text.length <= 2;
+  };
+
   const playPromptAudio = async (card: LearningCard) => {
     try {
+      // Play the prompt first (speech recognition not active yet)
       if (card.distarCard?.promptPath) {
-        await audioPlayer.playSoundFromAsset(card.distarCard.promptPath);
+        await audioPlayer.playSoundFromAssetAndWait(card.distarCard.promptPath);
       }
+      
+      // Start speech recognition AFTER prompt finishes
+      // Skip for phonemes - iOS is not good at recognizing single sounds
+      if (isPhoneme(card)) {
+        console.log('🎤 Skipping speech recognition for phoneme:', card.word);
+        return;
+      }
+      
+      // Try to start listening - the hook will check if it's actually enabled
+      // This handles the case where isEnabled becomes true after the prompt
+      console.log('🎤 Starting speech recognition after prompt finished');
+      await speechRecognition.startListening();
     } catch (error) {
       console.error('Error playing prompt audio:', error);
+      // Try to start listening even on error (but not for phonemes)
+      if (!isPhoneme(card)) {
+        await speechRecognition.startListening();
+      }
     }
   };
 
-  const handleWordTap = () => {
+  const handleWordTap = async () => {
     // Debounce rapid taps - prevent playing audio if tapped within last 500ms
     if (wordTapDebounceRef.current) {
       return; // Ignore rapid taps
     }
     
     if (currentCard?.distarCard?.audioPath) {
-      audioPlayer.playSoundFromAsset(currentCard.distarCard.audioPath).catch(console.error);
+      // Pause speech recognition during audio playback
+      await speechRecognition.pauseListening();
+      
+      try {
+        await audioPlayer.playSoundFromAssetAndWait(currentCard.distarCard.audioPath);
+      } catch (error) {
+        console.error('Error playing word audio:', error);
+      }
+      
+      // Resume speech recognition after playback
+      await speechRecognition.resumeListening();
       
       // Set debounce timer
       wordTapDebounceRef.current = setTimeout(() => {
@@ -115,6 +162,7 @@ export default function LearningScreen() {
 
   const playSuccessAudioSequence = async (card: LearningCard): Promise<void> => {
     try {
+      // Speech recognition is already stopped at this point (card completed)
       if (card.distarCard?.greatJobPath) {
         await audioPlayer.playSoundFromAssetAndWait(card.distarCard.greatJobPath);
       }
@@ -174,6 +222,9 @@ export default function LearningScreen() {
       return;
     }
     
+    // Clear transcript immediately when loading next card
+    speechRecognition.clearTranscript();
+    
     try {
       uiOpacity.setValue(1);
       
@@ -219,7 +270,15 @@ export default function LearningScreen() {
         setIsImageRevealed(false);
         setAttempts(0);
         setNeededHelp(false);
+        setPronunciationAttempts(0);
+        setPronunciationFailed(false);
         setState('ready');
+        
+        // Restart speech recognition for new card
+        if (speechRecognition.isEnabled) {
+          speechRecognition.restart();
+        }
+        
         playPromptAudio(retryCard);
         
         // Preload next batch in background
@@ -236,7 +295,14 @@ export default function LearningScreen() {
       setIsImageRevealed(false);
       setAttempts(0);
       setNeededHelp(false);
+      setPronunciationAttempts(0);
+      setPronunciationFailed(false);
       setState('ready');
+
+      // Restart speech recognition for new card
+      if (speechRecognition.isEnabled) {
+        speechRecognition.restart();
+      }
 
       playPromptAudio(card);
       
@@ -260,7 +326,60 @@ export default function LearningScreen() {
     
     isProcessingRef.current = true;
 
+    // Track pronunciation failure locally to avoid React state async issues
+    let didFailPronunciation = pronunciationFailed;
+
     if (success) {
+      // Check pronunciation if speech recognition is enabled (skip for phonemes)
+      if (speechRecognition.isEnabled && !isPhoneme(currentCard)) {
+        const hasCorrectPronunciation = speechRecognition.hasCorrectPronunciation;
+        const hasSaidAnything = speechRecognition.hasSaidAnything;
+
+        if (!hasCorrectPronunciation) {
+          // Pronunciation check failed
+          const newAttempts = pronunciationAttempts + 1;
+          setPronunciationAttempts(newAttempts);
+
+          // Pause listening while playing feedback audio
+          await speechRecognition.pauseListening();
+
+          if (!hasSaidAnything) {
+            // No input detected
+            if (currentCard.distarCard?.noInputPath) {
+              await audioPlayer.playSoundFromAssetAndWait(currentCard.distarCard.noInputPath);
+            }
+            
+            if (newAttempts >= 2) {
+              // Allow pass on 2nd fail, but mark as pronunciation failed
+              didFailPronunciation = true;
+              setPronunciationFailed(true);
+            } else {
+              // First attempt - allow retry, resume listening
+              await speechRecognition.resumeListening();
+              isProcessingRef.current = false;
+              return;
+            }
+          } else {
+            // Incorrect pronunciation
+            if (currentCard.distarCard?.tryAgainPath) {
+              await audioPlayer.playSoundFromAssetAndWait(currentCard.distarCard.tryAgainPath);
+            }
+            
+            if (newAttempts >= 2) {
+              // Allow pass on 2nd fail, but mark as pronunciation failed
+              didFailPronunciation = true;
+              setPronunciationFailed(true);
+            } else {
+              // First attempt - allow retry, resume listening
+              await speechRecognition.resumeListening();
+              isProcessingRef.current = false;
+              return;
+            }
+          }
+        }
+        // If hasCorrectPronunciation is true, proceed normally
+      }
+
       setState('revealing');
       
       Animated.timing(uiOpacity, {
@@ -280,6 +399,7 @@ export default function LearningScreen() {
           attempts: attempts + 1,
           matchScore: 1.0,
           neededHelp,
+          pronunciationFailed: speechRecognition.isEnabled && !isPhoneme(currentCard) ? didFailPronunciation : false,
         });
         
         const newCardsCompleted = cardsCompleted + 1;
@@ -345,6 +465,7 @@ export default function LearningScreen() {
   if (state === 'loading' || !currentCard) {
     return (
       <LinearGradient colors={['#667eea', '#764ba2']} style={dynamicStyles.container}>
+        <StatusBar barStyle="light-content" />
         <View style={dynamicStyles.loadingContainer}>
           <ActivityIndicator size="large" color="#fff" />
           <Text style={dynamicStyles.loadingText}>Loading...</Text>
@@ -356,6 +477,7 @@ export default function LearningScreen() {
   if (state === 'revealing') {
     return (
       <View style={dynamicStyles.revealContainer}>
+        <StatusBar barStyle="light-content" />
         <BlurredImageReveal
           imageUri={currentCard.imageUrl}
           isRevealed={isImageRevealed}
@@ -368,6 +490,7 @@ export default function LearningScreen() {
 
   return (
     <View style={dynamicStyles.container}>
+      <StatusBar barStyle="light-content" />
       {/* Blurred background image */}
       <BlurredImageReveal
         imageUri={currentCard.imageUrl}
@@ -409,6 +532,17 @@ export default function LearningScreen() {
       {/* Main content - combined card */}
       <View style={dynamicStyles.content}>
         <View style={dynamicStyles.combinedCard}>
+          {/* Pronunciation indicator (only shown when speech recognition is enabled and not a phoneme) */}
+          {speechRecognition.isEnabled && currentCard && !isPhoneme(currentCard) && (
+            <View style={dynamicStyles.pronunciationIndicator}>
+              {speechRecognition.hasCorrectPronunciation ? (
+                <Text style={dynamicStyles.pronunciationCheck}>✓</Text>
+              ) : speechRecognition.state === 'incorrect' || speechRecognition.state === 'no-input' ? (
+                <Text style={dynamicStyles.pronunciationX}>✗</Text>
+              ) : null}
+            </View>
+          )}
+
           <WordDisplay
             word={currentCard.word}
             phonemes={currentCard.phonemes}
@@ -426,8 +560,39 @@ export default function LearningScreen() {
           />
         </View>
         
-        {/* Swipe hint caption below card */}
-        <Text style={dynamicStyles.swipeHint}>Swipe right to reveal the image</Text>
+        {/* Transcript feedback for parents (replaces swipe hint when speech recognition is enabled and not a phoneme) */}
+        {speechRecognition.isEnabled && currentCard && !isPhoneme(currentCard) ? (
+          <View style={dynamicStyles.transcriptContainer}>
+            {speechRecognition.recognizedText ? (
+              <>
+                <View style={dynamicStyles.transcriptRow}>
+                  {speechRecognition.hasCorrectPronunciation ? (
+                    <>
+                      <Text style={dynamicStyles.transcriptCheck}>✓</Text>
+                      <Text style={dynamicStyles.transcriptText}>{speechRecognition.recognizedText}</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={dynamicStyles.transcriptX}>X</Text>
+                      <Text style={dynamicStyles.transcriptText}>{speechRecognition.recognizedText}</Text>
+                    </>
+                  )}
+                </View>
+                <Text style={dynamicStyles.transcriptMessage}>
+                  {speechRecognition.hasCorrectPronunciation 
+                    ? (speechRecognition.recognizedText?.toLowerCase() === currentCard?.word?.toLowerCase()
+                        ? 'Correct! Swipe right to reveal the picture.' 
+                        : 'Close enough! Swipe right to reveal the picture.')
+                    : 'Please try again!'}
+                </Text>
+              </>
+            ) : speechRecognition.state === 'listening' ? (
+              <Text style={dynamicStyles.transcriptMessage}>Listening...</Text>
+            ) : null}
+          </View>
+        ) : (
+          <Text style={dynamicStyles.swipeHint}>Swipe right to reveal the image</Text>
+        )}
       </View>
 
       <ConfettiCelebration visible={showConfetti} onComplete={() => setShowConfetti(false)} />
@@ -544,6 +709,26 @@ const createStyles = (isTabletDevice: boolean, screenWidth: number) => {
       shadowOpacity: 0.15,
       shadowRadius: 12,
       elevation: 8,
+      position: 'relative',
+    },
+    pronunciationIndicator: {
+      position: 'absolute',
+      top: responsiveSpacing(12),
+      right: responsiveSpacing(12),
+      width: isTabletDevice ? 32 : 28,
+      height: isTabletDevice ? 32 : 28,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    pronunciationCheck: {
+      fontSize: isTabletDevice ? 24 : 20,
+      color: '#4CAF50',
+      fontWeight: 'bold',
+    },
+    pronunciationX: {
+      fontSize: isTabletDevice ? 24 : 20,
+      color: '#F44336',
+      fontWeight: 'bold',
     },
     swipeHint: {
       textAlign: 'center',
@@ -551,6 +736,39 @@ const createStyles = (isTabletDevice: boolean, screenWidth: number) => {
       fontSize: responsiveFontSize(14),
       color: 'rgba(255, 255, 255, 0.9)',
       fontWeight: '500',
+    },
+    transcriptContainer: {
+      marginTop: responsiveSpacing(20),
+      alignItems: 'center',
+      minHeight: isTabletDevice ? 60 : 50,
+    },
+    transcriptRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: responsiveSpacing(8),
+      marginBottom: responsiveSpacing(4),
+    },
+    transcriptCheck: {
+      fontSize: isTabletDevice ? 20 : 18,
+      color: '#4CAF50',
+      fontWeight: 'bold',
+    },
+    transcriptX: {
+      fontSize: isTabletDevice ? 20 : 18,
+      color: '#F44336',
+      fontWeight: 'bold',
+    },
+    transcriptText: {
+      fontSize: responsiveFontSize(14),
+      color: 'rgba(255, 255, 255, 0.9)',
+      fontWeight: '500',
+      fontStyle: 'italic',
+    },
+    transcriptMessage: {
+      fontSize: responsiveFontSize(12),
+      color: 'rgba(255, 255, 255, 0.8)',
+      fontWeight: '400',
+      textAlign: 'center',
     },
   });
 };

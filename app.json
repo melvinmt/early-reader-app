@@ -16,7 +16,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.earlyreader.app"
+      "bundleIdentifier": "com.earlyreader.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -30,7 +33,14 @@
     },
     "scheme": "earlyreader",
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "@react-native-voice/voice",
+        {
+          "microphonePermission": "Early Reader needs access to your microphone to help your child practice pronunciation.",
+          "speechRecognitionPermission": "Early Reader needs speech recognition to help your child learn to read by practicing pronunciation."
+        }
+      ]
     ],
     "newArchEnabled": true
   }

@@ -78,6 +78,8 @@ npm install
 
 #### Development Mode (Expo Go)
 
+**Note**: Speech recognition features require a native build and cannot run in Expo Go. For full functionality, use native development mode (see below).
+
 ```bash
 # Start the development server
 npm start
@@ -91,19 +93,50 @@ Then:
 - Press `a` for Android Emulator
 - Scan QR code with Expo Go app on physical device
 
-#### After Prebuild (Native Development)
+#### Native Development (Required for Speech Recognition)
 
-If you've run `npx expo prebuild` to generate native iOS/Android projects:
+Speech recognition features require a native build. Follow these steps:
 
+1. **Install dependencies and prebuild native code**:
 ```bash
-# For iOS - this will start Metro and build/run the app
-npx expo run:ios
+# Install npm dependencies
+npm install
 
-# For Android
+# Generate native iOS/Android projects
+# Use WITHOUT --clean to preserve existing Xcode project settings
+# Only use --clean if you need a completely fresh start
+npx expo prebuild
+
+# For iOS, install CocoaPods dependencies
+cd ios && pod install && cd ..
+```
+
+**Important**: 
+- Use `npx expo prebuild` (without `--clean`) to preserve your existing Xcode project settings
+- Only use `npx expo prebuild --clean` when you need a completely fresh native project (this will overwrite all custom settings)
+- If you have custom Xcode settings, consider using [Expo config plugins](https://docs.expo.dev/guides/config-plugins/) to apply them programmatically
+
+2. **Run on a physical device** (speech recognition requires a physical device):
+```bash
+# For iOS - requires physical device connected
+npx expo run:ios --device
+
+# For Android - can use emulator or physical device
 npx expo run:android
 ```
 
-**Important**: After prebuild, always use `npx expo run:ios` or `npx expo run:android` rather than opening Xcode/Android Studio directly. This ensures Metro bundler is properly configured and the entry point resolves correctly.
+**Important Notes**:
+- **iOS Simulator does NOT support speech recognition** - you must use a physical iOS device
+- After prebuild, always use `npx expo run:ios` or `npx expo run:android` rather than opening Xcode/Android Studio directly
+- The app will gracefully degrade if microphone/speech permissions are denied - it will work normally without pronunciation checks
+
+#### Permissions
+
+The app requests the following permissions:
+- **Microphone**: Required for speech recognition to help children practice pronunciation
+- **Speech Recognition**: Required to validate pronunciation accuracy
+
+Both permissions are optional - the app functions normally if permissions are denied, just without pronunciation validation features.
 
 ## 📁 Project Structure
 

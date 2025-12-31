@@ -6,26 +6,56 @@ class AudioPlayerService {
   private soundCache: Map<string, Audio.Sound> = new Map();
   private audioInitialized = false;
   private currentlyPlaying: Audio.Sound | null = null;
+  private recordingModeEnabled = false;
 
   /**
    * Initialize audio mode for playback
+   * @param allowRecording - Set to true when speech recognition is active
    */
-  private async initializeAudio() {
-    if (this.audioInitialized) return;
+  private async initializeAudio(allowRecording: boolean = false) {
+    // Re-initialize if recording mode changed
+    if (this.audioInitialized && this.recordingModeEnabled === allowRecording) {
+      return;
+    }
     
     try {
       await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
+        allowsRecordingIOS: allowRecording, // Enable recording when speech recognition is active
         playsInSilentModeIOS: true, // Play audio even if device is on silent
         shouldDuckAndroid: true,
         staysActiveInBackground: false,
         playThroughEarpieceAndroid: false,
       });
       this.audioInitialized = true;
-      console.log('Audio mode initialized');
+      this.recordingModeEnabled = allowRecording;
+      console.log(`Audio mode initialized (recording: ${allowRecording})`);
     } catch (error) {
       console.error('Error initializing audio mode:', error);
     }
+  }
+
+  /**
+   * Enable recording mode for speech recognition
+   * Note: We don't change expo-av's audio mode here because it conflicts with react-native-voice.
+   * react-native-voice manages its own audio session for speech recognition.
+   */
+  async enableRecordingMode(): Promise<void> {
+    // Stop any playing audio to free up the audio session for speech recognition
+    await this.stopAllAudio();
+    // Set the flag so playback functions preserve recording mode
+    this.recordingModeEnabled = true;
+    // Don't call setAudioModeAsync here - let react-native-voice handle it
+    console.log('Recording mode enabled (audio stopped for speech recognition)');
+  }
+
+  /**
+   * Disable recording mode (playback only)
+   * Restore expo-av audio mode for playback after speech recognition stops
+   */
+  async disableRecordingMode(): Promise<void> {
+    // Re-initialize audio for playback (recording disabled)
+    this.audioInitialized = false; // Force re-initialization
+    await this.initializeAudio(false);
   }
 
   /**
@@ -73,8 +103,8 @@ class AudioPlayerService {
       // Stop any currently playing audio
       await this.stopAllAudio();
       
-      // Initialize audio mode first
-      await this.initializeAudio();
+      // Initialize audio mode first (preserve current recording mode)
+      await this.initializeAudio(this.recordingModeEnabled);
       
       // Check cache first
       let sound = this.soundCache.get(assetPath);
@@ -135,8 +165,8 @@ class AudioPlayerService {
         // Stop any currently playing audio
         await this.stopAllAudio();
         
-        // Initialize audio mode first
-        await this.initializeAudio();
+        // Initialize audio mode first (preserve current recording mode)
+        await this.initializeAudio(this.recordingModeEnabled);
         
         // Check cache first
         let sound = this.soundCache.get(assetPath);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getAllChildren } from '@/services/storage';
 import { Child } from '@/types/database';
@@ -62,6 +62,7 @@ export default function ChildSelectionScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
+        <StatusBar barStyle="dark-content" />
         <Text>Loading...</Text>
       </View>
     );
@@ -74,6 +75,7 @@ export default function ChildSelectionScreen() {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <Text style={styles.title}>Select a Child</Text>
         <TouchableOpacity onPress={handleAddChild} style={styles.addButton}>

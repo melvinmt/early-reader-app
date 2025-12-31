@@ -32,6 +32,7 @@ yarn-error.log*
 .expo/
 .expo-shared/
 dist/
+dist-ios/
 web-build/
 *.jks
 *.p8
