@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Pressable, useWindowDimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Alert, ActivityIndicator, Animated, Pressable, useWindowDimensions, TouchableOpacity, StatusBar } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { recordCardCompletion, getCardQueue, LearningCard, CARDS_PER_SESSION } from '@/services/cardQueueManager';
@@ -460,6 +460,7 @@ export default function LearningScreen() {
   if (state === 'loading' || !currentCard) {
     return (
       <LinearGradient colors={['#667eea', '#764ba2']} style={dynamicStyles.container}>
+        <StatusBar barStyle="light-content" />
         <View style={dynamicStyles.loadingContainer}>
           <ActivityIndicator size="large" color="#fff" />
           <Text style={dynamicStyles.loadingText}>Loading...</Text>
@@ -471,6 +472,7 @@ export default function LearningScreen() {
   if (state === 'revealing') {
     return (
       <View style={dynamicStyles.revealContainer}>
+        <StatusBar barStyle="light-content" />
         <BlurredImageReveal
           imageUri={currentCard.imageUrl}
           isRevealed={isImageRevealed}
@@ -483,6 +485,7 @@ export default function LearningScreen() {
 
   return (
     <View style={dynamicStyles.container}>
+      <StatusBar barStyle="light-content" />
       {/* Blurred background image */}
       <BlurredImageReveal
         imageUri={currentCard.imageUrl}
