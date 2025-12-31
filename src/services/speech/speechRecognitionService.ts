@@ -51,23 +51,34 @@ class SpeechRecognitionService {
    */
   async startListening(locale: string = 'en-US'): Promise<{ available: boolean; error?: string }> {
     if (this.isListening) {
+      console.log('🎤 Already listening, skipping start');
       return { available: true };
     }
 
     try {
+      console.log('🎤 Checking availability...');
       const available = await this.checkAvailability();
       if (!available) {
+        console.error('🎤 Speech recognition not available on this device');
         return { available: false, error: 'Speech recognition not available' };
       }
 
       // Clear previous results
       this.recognizedText = null;
 
+      console.log('🎤 Calling Voice.start() with locale:', locale);
       await Voice.start(locale);
       this.isListening = true;
+      console.log('🎤 Voice.start() succeeded - now listening');
       return { available: true };
-    } catch (error) {
-      console.error('Error starting speech recognition:', error);
+    } catch (error: any) {
+      console.error('🎤 Voice.start() failed:', error);
+      console.error('🎤 Error details:', {
+        message: error?.message,
+        code: error?.code,
+        name: error?.name,
+        stack: error?.stack,
+      });
       this.isListening = false;
       return { 
         available: false, 

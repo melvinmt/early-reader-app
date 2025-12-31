@@ -513,7 +513,7 @@ export default function LearningScreen() {
         {/* Transcript feedback for parents (replaces swipe hint when speech recognition is enabled) */}
         {speechRecognition.isEnabled ? (
           <View style={dynamicStyles.transcriptContainer}>
-            {speechRecognition.recognizedText && (
+            {speechRecognition.recognizedText ? (
               <>
                 <View style={dynamicStyles.transcriptRow}>
                   {speechRecognition.hasCorrectPronunciation ? (
@@ -532,9 +532,10 @@ export default function LearningScreen() {
                   {speechRecognition.hasCorrectPronunciation ? 'Correct!' : 'Please try again!'}
                 </Text>
               </>
-            )}
-            {!speechRecognition.recognizedText && speechRecognition.state === 'listening' && (
-              <Text style={dynamicStyles.transcriptMessage}>Listening...</Text>
+            ) : (
+              <Text style={dynamicStyles.transcriptMessage}>
+                {speechRecognition.state === 'listening' ? 'Listening...' : 'Say the word to continue'}
+              </Text>
             )}
           </View>
         ) : (

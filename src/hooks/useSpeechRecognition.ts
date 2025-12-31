@@ -69,20 +69,28 @@ export function useSpeechRecognition(
 
     const checkAvailability = async () => {
       if (!FEATURES.SPEECH_RECOGNITION_ENABLED) {
+        console.log('🎤 Speech recognition disabled by feature flag');
         setIsEnabled(false);
         setHasCorrectPronunciation(true); // Always pass when disabled
         return;
       }
 
       try {
+        console.log('🎤 Checking speech recognition availability...');
         const available = await speechRecognitionService.checkAvailability();
-        setIsEnabled(available);
+        console.log('🎤 Speech recognition available:', available);
         
         if (!available) {
+          setIsEnabled(false);
           setHasCorrectPronunciation(true); // Always pass when unavailable
+          return;
         }
+
+        // Mark as enabled - permissions will be requested when we actually start listening
+        setIsEnabled(true);
+        console.log('🎤 Speech recognition enabled - permissions will be requested on first use');
       } catch (error) {
-        console.error('Error checking speech recognition availability:', error);
+        console.error('🎤 Error checking speech recognition availability:', error);
         setIsEnabled(false);
         setHasCorrectPronunciation(true); // Always pass on error
       }
@@ -103,20 +111,26 @@ export function useSpeechRecognition(
     }
 
     const onSpeechStart = () => {
+      console.log('🎤 onSpeechStart event fired');
       if (!isMountedRef.current) return;
       setState('listening');
     };
 
     const onSpeechEnd = () => {
+      console.log('🎤 onSpeechEnd event fired');
       if (!isMountedRef.current) return;
       // Don't change state here - let onSpeechResults handle it
     };
 
     const onSpeechResults = (event: any) => {
+      console.log('🎤 onSpeechResults event fired:', event);
       if (!isMountedRef.current) return;
       
       const results = event.value || [];
+      console.log('🎤 Speech results:', results);
+      
       if (results.length === 0) {
+        console.log('🎤 No speech results - no input detected');
         setState('no-input');
         setHasSaidAnything(false);
         setRecognizedText(null);
@@ -124,6 +138,7 @@ export function useSpeechRecognition(
       }
 
       const recognizedText = results[0];
+      console.log('🎤 Recognized text:', recognizedText);
       setRecognizedText(recognizedText);
       speechRecognitionService.setRecognizedText(recognizedText);
       setHasSaidAnything(true);
@@ -133,8 +148,15 @@ export function useSpeechRecognition(
         recognizedText,
         targetTextRef.current
       );
+      console.log('🎤 Match result:', {
+        recognized: recognizedText,
+        target: targetTextRef.current,
+        matched: matchResult.matched,
+        confidence: matchResult.confidence,
+      });
 
       if (matchResult.matched) {
+        console.log('🎤 ✅ Pronunciation matched!');
         hasMatchedRef.current = true;
         setHasCorrectPronunciation(true);
         setState('matched');
@@ -146,6 +168,7 @@ export function useSpeechRecognition(
         
         onMatch?.(matchResult.confidence);
       } else {
+        console.log('🎤 ❌ Pronunciation did not match');
         setState('incorrect');
       }
     };
@@ -156,6 +179,7 @@ export function useSpeechRecognition(
       const results = event.value || [];
       if (results.length > 0) {
         const recognizedText = results[0];
+        console.log('🎤 Partial result:', recognizedText);
         setRecognizedText(recognizedText);
         speechRecognitionService.setRecognizedText(recognizedText);
         setHasSaidAnything(true);
@@ -163,10 +187,11 @@ export function useSpeechRecognition(
     };
 
     const onSpeechError = (event: any) => {
+      const error = event.error?.message || event.error || 'Unknown error';
+      console.error('🎤 Speech recognition error event:', error);
+      console.error('🎤 Error event details:', event);
       if (!isMountedRef.current) return;
       
-      const error = event.error?.message || event.error || 'Unknown error';
-      console.error('Speech recognition error:', error);
       setState('idle');
       
       onError?.(error);
@@ -197,33 +222,56 @@ export function useSpeechRecognition(
   // Start listening
   const startListening = useCallback(async () => {
     if (!isEnabled) {
+      console.log('🎤 Cannot start listening - speech recognition not enabled');
       return;
     }
 
     // If already matched for this card, don't start listening again
     if (hasMatchedRef.current) {
+      console.log('🎤 Already matched for this card - skipping start');
       return;
     }
 
     try {
-      // Enable recording mode for speech recognition
+      console.log('🎤 Starting speech recognition...');
+      
+      // Enable recording mode for speech recognition FIRST
+      console.log('🎤 Enabling recording mode...');
       await audioPlayer.enableRecordingMode();
+      console.log('🎤 Recording mode enabled');
       
       const locale = getLocale();
+      console.log('🎤 Starting Voice API with locale:', locale);
       const result = await speechRecognitionService.startListening(locale);
       
       if (!result.available) {
+        console.error('🎤 Speech recognition not available:', result.error);
         setIsEnabled(false);
         setHasCorrectPronunciation(true); // Fallback to always pass
         await audioPlayer.disableRecordingMode(); // Disable if not available
         if (result.error) {
           onError?.(result.error);
         }
+      } else {
+        console.log('🎤 Speech recognition started successfully');
+        setState('listening');
       }
-    } catch (error) {
-      console.error('Error starting speech recognition:', error);
-      setIsEnabled(false);
-      setHasCorrectPronunciation(true); // Fallback to always pass
+    } catch (error: any) {
+      console.error('🎤 Error starting speech recognition:', error);
+      
+      // Check if it's a permission error
+      if (error?.message?.includes('permission') || 
+          error?.message?.includes('Permission') ||
+          error?.code === 'permission_denied' ||
+          error?.message?.includes('not authorized')) {
+        console.log('🎤 Permission denied - user needs to grant microphone/speech permissions');
+        setIsEnabled(false);
+        setHasCorrectPronunciation(true); // Fallback to always pass
+      } else {
+        setIsEnabled(false);
+        setHasCorrectPronunciation(true); // Fallback to always pass
+      }
+      
       await audioPlayer.disableRecordingMode(); // Disable on error
       onError?.(error instanceof Error ? error.message : 'Unknown error');
     }
@@ -267,8 +315,16 @@ export function useSpeechRecognition(
   // Auto-start listening when target text changes (new card)
   useEffect(() => {
     if (!isEnabled) {
+      console.log('🎤 Auto-start skipped - speech recognition not enabled');
       return;
     }
+
+    if (!targetText) {
+      console.log('🎤 Auto-start skipped - no target text');
+      return;
+    }
+
+    console.log('🎤 New card detected, preparing to start listening for:', targetText);
 
     // Reset for new card
     hasMatchedRef.current = false;
@@ -277,12 +333,19 @@ export function useSpeechRecognition(
     setRecognizedText(null);
     setState('idle');
 
-    // Start listening after a short delay
+    // Start listening after a short delay (to allow card to render)
     const timer = setTimeout(() => {
-      if (isMountedRef.current && !hasMatchedRef.current) {
+      if (isMountedRef.current && !hasMatchedRef.current && isEnabled) {
+        console.log('🎤 Auto-starting speech recognition...');
         startListening();
+      } else {
+        console.log('🎤 Auto-start cancelled:', {
+          isMounted: isMountedRef.current,
+          hasMatched: hasMatchedRef.current,
+          isEnabled,
+        });
       }
-    }, 500);
+    }, 1000); // Increased delay to ensure everything is ready
 
     return () => {
       clearTimeout(timer);
