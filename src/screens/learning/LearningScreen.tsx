@@ -101,6 +101,12 @@ export default function LearningScreen() {
     }
   };
 
+  // Check if card is a phoneme (1-2 characters) - skip speech recognition for phonemes
+  const isPhoneme = (card: LearningCard) => {
+    const text = card.distarCard?.plainText || card.word;
+    return text.length <= 2;
+  };
+
   const playPromptAudio = async (card: LearningCard) => {
     try {
       // Play the prompt first (speech recognition not active yet)
@@ -109,14 +115,17 @@ export default function LearningScreen() {
       }
       
       // Start speech recognition AFTER prompt finishes
-      if (speechRecognition.isEnabled) {
+      // Skip for phonemes - iOS is not good at recognizing single sounds
+      if (speechRecognition.isEnabled && !isPhoneme(card)) {
         console.log('🎤 Starting speech recognition after prompt finished');
         await speechRecognition.startListening();
+      } else if (isPhoneme(card)) {
+        console.log('🎤 Skipping speech recognition for phoneme:', card.word);
       }
     } catch (error) {
       console.error('Error playing prompt audio:', error);
-      // Try to start listening even on error
-      if (speechRecognition.isEnabled) {
+      // Try to start listening even on error (but not for phonemes)
+      if (speechRecognition.isEnabled && !isPhoneme(card)) {
         await speechRecognition.startListening();
       }
     }
@@ -315,8 +324,8 @@ export default function LearningScreen() {
     isProcessingRef.current = true;
 
     if (success) {
-      // Check pronunciation if speech recognition is enabled
-      if (speechRecognition.isEnabled) {
+      // Check pronunciation if speech recognition is enabled (skip for phonemes)
+      if (speechRecognition.isEnabled && !isPhoneme(currentCard)) {
         const hasCorrectPronunciation = speechRecognition.hasCorrectPronunciation;
         const hasSaidAnything = speechRecognition.hasSaidAnything;
 
@@ -512,8 +521,8 @@ export default function LearningScreen() {
       {/* Main content - combined card */}
       <View style={dynamicStyles.content}>
         <View style={dynamicStyles.combinedCard}>
-          {/* Pronunciation indicator (only shown when speech recognition is enabled) */}
-          {speechRecognition.isEnabled && (
+          {/* Pronunciation indicator (only shown when speech recognition is enabled and not a phoneme) */}
+          {speechRecognition.isEnabled && currentCard && !isPhoneme(currentCard) && (
             <View style={dynamicStyles.pronunciationIndicator}>
               {speechRecognition.hasCorrectPronunciation ? (
                 <Text style={dynamicStyles.pronunciationCheck}>✓</Text>
@@ -540,8 +549,8 @@ export default function LearningScreen() {
           />
         </View>
         
-        {/* Transcript feedback for parents (replaces swipe hint when speech recognition is enabled) */}
-        {speechRecognition.isEnabled ? (
+        {/* Transcript feedback for parents (replaces swipe hint when speech recognition is enabled and not a phoneme) */}
+        {speechRecognition.isEnabled && currentCard && !isPhoneme(currentCard) ? (
           <View style={dynamicStyles.transcriptContainer}>
             {speechRecognition.recognizedText ? (
               <>
