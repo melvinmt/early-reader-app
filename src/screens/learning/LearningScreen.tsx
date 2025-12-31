@@ -510,8 +510,36 @@ export default function LearningScreen() {
           />
         </View>
         
-        {/* Swipe hint caption below card */}
-        <Text style={dynamicStyles.swipeHint}>Swipe right to reveal the image</Text>
+        {/* Transcript feedback for parents (replaces swipe hint when speech recognition is enabled) */}
+        {speechRecognition.isEnabled ? (
+          <View style={dynamicStyles.transcriptContainer}>
+            {speechRecognition.recognizedText && (
+              <>
+                <View style={dynamicStyles.transcriptRow}>
+                  {speechRecognition.hasCorrectPronunciation ? (
+                    <>
+                      <Text style={dynamicStyles.transcriptCheck}>✓</Text>
+                      <Text style={dynamicStyles.transcriptText}>{speechRecognition.recognizedText}</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={dynamicStyles.transcriptX}>X</Text>
+                      <Text style={dynamicStyles.transcriptText}>{speechRecognition.recognizedText}</Text>
+                    </>
+                  )}
+                </View>
+                <Text style={dynamicStyles.transcriptMessage}>
+                  {speechRecognition.hasCorrectPronunciation ? 'Correct!' : 'Please try again!'}
+                </Text>
+              </>
+            )}
+            {!speechRecognition.recognizedText && speechRecognition.state === 'listening' && (
+              <Text style={dynamicStyles.transcriptMessage}>Listening...</Text>
+            )}
+          </View>
+        ) : (
+          <Text style={dynamicStyles.swipeHint}>Swipe right to reveal the image</Text>
+        )}
       </View>
 
       <ConfettiCelebration visible={showConfetti} onComplete={() => setShowConfetti(false)} />
@@ -655,6 +683,39 @@ const createStyles = (isTabletDevice: boolean, screenWidth: number) => {
       fontSize: responsiveFontSize(14),
       color: 'rgba(255, 255, 255, 0.9)',
       fontWeight: '500',
+    },
+    transcriptContainer: {
+      marginTop: responsiveSpacing(20),
+      alignItems: 'center',
+      minHeight: isTabletDevice ? 60 : 50,
+    },
+    transcriptRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: responsiveSpacing(8),
+      marginBottom: responsiveSpacing(4),
+    },
+    transcriptCheck: {
+      fontSize: isTabletDevice ? 20 : 18,
+      color: '#4CAF50',
+      fontWeight: 'bold',
+    },
+    transcriptX: {
+      fontSize: isTabletDevice ? 20 : 18,
+      color: '#F44336',
+      fontWeight: 'bold',
+    },
+    transcriptText: {
+      fontSize: responsiveFontSize(14),
+      color: 'rgba(255, 255, 255, 0.9)',
+      fontWeight: '500',
+      fontStyle: 'italic',
+    },
+    transcriptMessage: {
+      fontSize: responsiveFontSize(12),
+      color: 'rgba(255, 255, 255, 0.8)',
+      fontWeight: '400',
+      textAlign: 'center',
     },
   });
 };

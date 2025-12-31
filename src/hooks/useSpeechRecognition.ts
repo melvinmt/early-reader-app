@@ -19,6 +19,7 @@ export interface UseSpeechRecognitionResult {
   state: SpeechRecognitionState;
   hasCorrectPronunciation: boolean;
   hasSaidAnything: boolean;
+  recognizedText: string | null; // Real-time recognized text for parent feedback
   startListening: () => Promise<void>;
   stopListening: () => Promise<void>;
   restart: () => Promise<void>;
@@ -51,6 +52,7 @@ export function useSpeechRecognition(
   const [state, setState] = useState<SpeechRecognitionState>('idle');
   const [hasCorrectPronunciation, setHasCorrectPronunciation] = useState(false);
   const [hasSaidAnything, setHasSaidAnything] = useState(false);
+  const [recognizedText, setRecognizedText] = useState<string | null>(null);
 
   const targetTextRef = useRef(targetText);
   const isMountedRef = useRef(true);
@@ -117,10 +119,12 @@ export function useSpeechRecognition(
       if (results.length === 0) {
         setState('no-input');
         setHasSaidAnything(false);
+        setRecognizedText(null);
         return;
       }
 
       const recognizedText = results[0];
+      setRecognizedText(recognizedText);
       speechRecognitionService.setRecognizedText(recognizedText);
       setHasSaidAnything(true);
 
@@ -152,6 +156,7 @@ export function useSpeechRecognition(
       const results = event.value || [];
       if (results.length > 0) {
         const recognizedText = results[0];
+        setRecognizedText(recognizedText);
         speechRecognitionService.setRecognizedText(recognizedText);
         setHasSaidAnything(true);
       }
@@ -251,6 +256,7 @@ export function useSpeechRecognition(
     hasMatchedRef.current = false;
     setHasCorrectPronunciation(false);
     setHasSaidAnything(false);
+    setRecognizedText(null);
     setState('idle');
     speechRecognitionService.setRecognizedText(null);
 
@@ -268,6 +274,7 @@ export function useSpeechRecognition(
     hasMatchedRef.current = false;
     setHasCorrectPronunciation(false);
     setHasSaidAnything(false);
+    setRecognizedText(null);
     setState('idle');
 
     // Start listening after a short delay
@@ -287,6 +294,7 @@ export function useSpeechRecognition(
     state,
     hasCorrectPronunciation,
     hasSaidAnything,
+    recognizedText,
     startListening,
     stopListening,
     restart,
