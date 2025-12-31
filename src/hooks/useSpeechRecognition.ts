@@ -62,6 +62,7 @@ export function useSpeechRecognition(
   const targetTextRef = useRef(targetText);
   const isMountedRef = useRef(true);
   const hasMatchedRef = useRef(false); // Session-based pass persistence
+  const lastSpeechEndTimeRef = useRef<number | null>(null); // Track when speech last ended
 
   // Update target text ref when it changes
   useEffect(() => {
@@ -111,15 +112,25 @@ export function useSpeechRecognition(
     const onSpeechStart = () => {
       console.log('🎤 onSpeechStart event fired');
       if (!isMountedRef.current) return;
-      // Clear transcript when starting to speak (after a pause)
-      setRecognizedText(null);
-      speechRecognitionService.setRecognizedText(null);
+      
+      // Check if enough time has passed since last speech ended (1.5 seconds)
+      const now = Date.now();
+      const lastEnd = lastSpeechEndTimeRef.current;
+      if (lastEnd && (now - lastEnd) > 1500) {
+        // Clear transcript after a pause
+        console.log('🎤 Clearing transcript (pause detected:', now - lastEnd, 'ms)');
+        setRecognizedText(null);
+        speechRecognitionService.setRecognizedText(null);
+      }
+      
       setState('listening');
     };
 
     const onSpeechEnd = () => {
       console.log('🎤 onSpeechEnd event fired');
       if (!isMountedRef.current) return;
+      // Record when speech ended to detect pauses
+      lastSpeechEndTimeRef.current = Date.now();
       // Don't change state here - let onSpeechResults handle it
     };
 
@@ -356,6 +367,7 @@ export function useSpeechRecognition(
     // Reset state for new card
     hasMatchedRef.current = false;
     lastStartedTargetRef.current = null; // Allow re-starting for the same target
+    lastSpeechEndTimeRef.current = null; // Reset pause detection
     setHasCorrectPronunciation(false);
     setHasSaidAnything(false);
     setRecognizedText(null);
