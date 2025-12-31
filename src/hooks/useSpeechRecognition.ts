@@ -400,25 +400,23 @@ export function useSpeechRecognition(
   // Use a ref to track if we've already started for this target text
   const lastStartedTargetRef = useRef<string | null>(null);
 
-  // Auto-start listening when target text changes (new card)
+  // Reset state when target text changes (new card) - but don't auto-start
+  // LearningScreen will call resumeListening() after prompt audio finishes
   useEffect(() => {
     if (!isEnabled) {
-      console.log('🎤 Auto-start skipped - speech recognition not enabled');
       return;
     }
 
     if (!targetText) {
-      console.log('🎤 Auto-start skipped - no target text');
       return;
     }
 
-    // Prevent starting multiple times for the same target
+    // Prevent resetting multiple times for the same target
     if (lastStartedTargetRef.current === targetText) {
-      console.log('🎤 Auto-start skipped - already started for this target');
       return;
     }
 
-    console.log('🎤 New card detected, preparing to start listening for:', targetText);
+    console.log('🎤 New card detected, resetting state for:', targetText);
 
     // Reset for new card
     hasMatchedRef.current = false;
@@ -428,50 +426,11 @@ export function useSpeechRecognition(
     setMatchConfidence(null);
     setState('idle');
 
-    // Mark that we're starting for this target
+    // Mark this target
     lastStartedTargetRef.current = targetText;
-
-    // Start listening after a short delay (to allow card to render)
-    const timer = setTimeout(async () => {
-      if (isMountedRef.current && !hasMatchedRef.current) {
-        console.log('🎤 Auto-starting speech recognition...');
-        try {
-          // Enable recording mode for speech recognition FIRST
-          console.log('🎤 Enabling recording mode...');
-          await audioPlayer.enableRecordingMode();
-          console.log('🎤 Recording mode enabled');
-          
-          const locale = getLocale();
-          console.log('🎤 Starting Voice API with locale:', locale);
-          const result = await speechRecognitionService.startListening(locale);
-          
-          if (!result.available) {
-            console.error('🎤 Speech recognition not available:', result.error);
-            setIsEnabled(false);
-            setHasCorrectPronunciation(true); // Fallback to always pass
-            await audioPlayer.disableRecordingMode();
-          } else {
-            console.log('🎤 Speech recognition started successfully');
-            setState('listening');
-          }
-        } catch (error: any) {
-          console.error('🎤 Error starting speech recognition:', error);
-          setIsEnabled(false);
-          setHasCorrectPronunciation(true);
-          await audioPlayer.disableRecordingMode();
-        }
-      } else {
-        console.log('🎤 Auto-start cancelled:', {
-          isMounted: isMountedRef.current,
-          hasMatched: hasMatchedRef.current,
-        });
-      }
-    }, 1000); // Delay to ensure everything is ready
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [targetText, isEnabled]); // Removed startListening from deps to prevent infinite loop
+    
+    // Don't auto-start - let LearningScreen start after prompt finishes
+  }, [targetText, isEnabled]);
 
   return {
     isEnabled,

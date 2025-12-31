@@ -103,19 +103,22 @@ export default function LearningScreen() {
 
   const playPromptAudio = async (card: LearningCard) => {
     try {
-      // Pause speech recognition during audio playback
-      await speechRecognition.pauseListening();
-      
+      // Play the prompt first (speech recognition not active yet)
       if (card.distarCard?.promptPath) {
         await audioPlayer.playSoundFromAssetAndWait(card.distarCard.promptPath);
       }
       
-      // Resume speech recognition after playback
-      await speechRecognition.resumeListening();
+      // Start speech recognition AFTER prompt finishes
+      if (speechRecognition.isEnabled) {
+        console.log('🎤 Starting speech recognition after prompt finished');
+        await speechRecognition.startListening();
+      }
     } catch (error) {
       console.error('Error playing prompt audio:', error);
-      // Try to resume even on error
-      await speechRecognition.resumeListening();
+      // Try to start listening even on error
+      if (speechRecognition.isEnabled) {
+        await speechRecognition.startListening();
+      }
     }
   };
 
