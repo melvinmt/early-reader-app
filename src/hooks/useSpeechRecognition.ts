@@ -111,6 +111,9 @@ export function useSpeechRecognition(
     const onSpeechStart = () => {
       console.log('🎤 onSpeechStart event fired');
       if (!isMountedRef.current) return;
+      // Clear transcript when starting to speak (after a pause)
+      setRecognizedText(null);
+      speechRecognitionService.setRecognizedText(null);
       setState('listening');
     };
 
@@ -135,16 +138,15 @@ export function useSpeechRecognition(
         return;
       }
 
-      const fullText = results[0].toLowerCase();
-      // Extract only the last word to avoid accumulation
-      const words = fullText.trim().split(/\s+/);
-      const lastWord = words[words.length - 1];
-      console.log('🎤 Recognized text (last word):', lastWord, 'from:', fullText);
-      setRecognizedText(lastWord);
-      speechRecognitionService.setRecognizedText(lastWord);
+      const recognizedText = results[0].toLowerCase();
+      console.log('🎤 Recognized text:', recognizedText);
+      setRecognizedText(recognizedText);
+      speechRecognitionService.setRecognizedText(recognizedText);
       setHasSaidAnything(true);
 
-      // Fuzzy match against target
+      // Fuzzy match against target (use the last word for matching)
+      const words = recognizedText.trim().split(/\s+/);
+      const lastWord = words[words.length - 1];
       const matchResult = speechRecognitionService.fuzzyMatch(
         lastWord,
         targetTextRef.current
@@ -180,13 +182,10 @@ export function useSpeechRecognition(
       
       const results = event.value || [];
       if (results.length > 0) {
-        const fullText = results[0].toLowerCase();
-        // Extract only the last word to avoid accumulation
-        const words = fullText.trim().split(/\s+/);
-        const lastWord = words[words.length - 1];
-        console.log('🎤 Partial result (last word):', lastWord, 'from:', fullText);
-        setRecognizedText(lastWord);
-        speechRecognitionService.setRecognizedText(lastWord);
+        const recognizedText = results[0].toLowerCase();
+        console.log('🎤 Partial result:', recognizedText);
+        setRecognizedText(recognizedText);
+        speechRecognitionService.setRecognizedText(recognizedText);
         setHasSaidAnything(true);
       }
     };
