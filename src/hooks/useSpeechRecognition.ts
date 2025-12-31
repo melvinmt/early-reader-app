@@ -112,18 +112,8 @@ export function useSpeechRecognition(
       // Start listening after a short delay to ensure everything is ready
       const timer = setTimeout(async () => {
         if (isMountedRef.current && !hasMatchedRef.current) {
-          try {
-            console.log('🎤 Starting speech recognition (from pending)...');
-            await audioPlayer.enableRecordingMode();
-            const locale = getLocale();
-            const result = await speechRecognitionService.startListening(locale);
-            if (result.available) {
-              setState('listening');
-              console.log('🎤 Speech recognition started successfully (from pending)');
-            }
-          } catch (error) {
-            console.error('🎤 Error starting from pending:', error);
-          }
+          console.log('🎤 Starting speech recognition (from pending)...');
+          await performStartListening();
         }
       }, 100);
       return () => clearTimeout(timer);
@@ -277,6 +267,54 @@ export function useSpeechRecognition(
     };
   }, []); // Empty deps - only runs on mount/unmount
 
+  // Helper function to perform the actual start listening logic
+  // Shared between startListening callback and pending start effect
+  const performStartListening = async (): Promise<boolean> => {
+    try {
+      console.log('🎤 Starting speech recognition...');
+      
+      // Enable recording mode for speech recognition FIRST
+      console.log('🎤 Enabling recording mode...');
+      await audioPlayer.enableRecordingMode();
+      console.log('🎤 Recording mode enabled');
+      
+      const locale = getLocale();
+      console.log('🎤 Starting Voice API with locale:', locale);
+      const result = await speechRecognitionService.startListening(locale);
+      
+      if (!result.available) {
+        console.error('🎤 Speech recognition not available:', result.error);
+        setIsEnabled(false);
+        setHasCorrectPronunciation(true); // Fallback to always pass
+        await audioPlayer.disableRecordingMode();
+        if (result.error) {
+          onError?.(result.error);
+        }
+        return false;
+      } else {
+        console.log('🎤 Speech recognition started successfully');
+        setState('listening');
+        return true;
+      }
+    } catch (error: any) {
+      console.error('🎤 Error starting speech recognition:', error);
+      
+      // Check if it's a permission error
+      if (error?.message?.includes('permission') || 
+          error?.message?.includes('Permission') ||
+          error?.code === 'permission_denied' ||
+          error?.message?.includes('not authorized')) {
+        console.log('🎤 Permission denied - user needs to grant microphone/speech permissions');
+      }
+      
+      setIsEnabled(false);
+      setHasCorrectPronunciation(true); // Fallback to always pass
+      await audioPlayer.disableRecordingMode();
+      onError?.(error instanceof Error ? error.message : 'Unknown error');
+      return false;
+    }
+  };
+
   // Start listening
   const startListening = useCallback(async () => {
     if (!isEnabled) {
@@ -294,49 +332,7 @@ export function useSpeechRecognition(
       return;
     }
 
-    try {
-      console.log('🎤 Starting speech recognition...');
-      
-      // Enable recording mode for speech recognition FIRST
-      console.log('🎤 Enabling recording mode...');
-      await audioPlayer.enableRecordingMode();
-      console.log('🎤 Recording mode enabled');
-      
-      const locale = getLocale();
-      console.log('🎤 Starting Voice API with locale:', locale);
-      const result = await speechRecognitionService.startListening(locale);
-      
-      if (!result.available) {
-        console.error('🎤 Speech recognition not available:', result.error);
-        setIsEnabled(false);
-        setHasCorrectPronunciation(true); // Fallback to always pass
-        await audioPlayer.disableRecordingMode(); // Disable if not available
-        if (result.error) {
-          onError?.(result.error);
-        }
-      } else {
-        console.log('🎤 Speech recognition started successfully');
-        setState('listening');
-      }
-    } catch (error: any) {
-      console.error('🎤 Error starting speech recognition:', error);
-      
-      // Check if it's a permission error
-      if (error?.message?.includes('permission') || 
-          error?.message?.includes('Permission') ||
-          error?.code === 'permission_denied' ||
-          error?.message?.includes('not authorized')) {
-        console.log('🎤 Permission denied - user needs to grant microphone/speech permissions');
-        setIsEnabled(false);
-        setHasCorrectPronunciation(true); // Fallback to always pass
-      } else {
-        setIsEnabled(false);
-        setHasCorrectPronunciation(true); // Fallback to always pass
-      }
-      
-      await audioPlayer.disableRecordingMode(); // Disable on error
-      onError?.(error instanceof Error ? error.message : 'Unknown error');
-    }
+    await performStartListening();
   }, [isEnabled, onError]);
 
   // Stop listening
