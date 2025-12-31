@@ -113,10 +113,10 @@ export function useSpeechRecognition(
       console.log('🎤 onSpeechStart event fired');
       if (!isMountedRef.current) return;
       
-      // Check if enough time has passed since last speech ended (1.5 seconds)
+      // Check if enough time has passed since last speech ended (3 seconds)
       const now = Date.now();
       const lastEnd = lastSpeechEndTimeRef.current;
-      if (lastEnd && (now - lastEnd) > 1500) {
+      if (lastEnd && (now - lastEnd) > 3000) {
         // Clear transcript after a pause
         console.log('🎤 Clearing transcript (pause detected:', now - lastEnd, 'ms)');
         setRecognizedText(null);
