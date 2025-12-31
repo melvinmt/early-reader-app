@@ -62,7 +62,7 @@ export function useSpeechRecognition(
   const targetTextRef = useRef(targetText);
   const isMountedRef = useRef(true);
   const hasMatchedRef = useRef(false); // Session-based pass persistence
-  const lastSpeechEndTimeRef = useRef<number | null>(null); // Track when speech last ended
+  const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Timer to reset after pause
 
   // Update target text ref when it changes
   useEffect(() => {
@@ -112,26 +112,32 @@ export function useSpeechRecognition(
     const onSpeechStart = () => {
       console.log('🎤 onSpeechStart event fired');
       if (!isMountedRef.current) return;
-      
-      // Check if enough time has passed since last speech ended (3 seconds)
-      const now = Date.now();
-      const lastEnd = lastSpeechEndTimeRef.current;
-      if (lastEnd && (now - lastEnd) > 3000) {
-        // Clear transcript after a pause
-        console.log('🎤 Clearing transcript (pause detected:', now - lastEnd, 'ms)');
-        setRecognizedText(null);
-        speechRecognitionService.setRecognizedText(null);
-      }
-      
       setState('listening');
     };
 
     const onSpeechEnd = () => {
       console.log('🎤 onSpeechEnd event fired');
       if (!isMountedRef.current) return;
-      // Record when speech ended to detect pauses
-      lastSpeechEndTimeRef.current = Date.now();
       // Don't change state here - let onSpeechResults handle it
+    };
+    
+    // Helper to restart speech recognition (clears iOS buffer)
+    const restartRecognition = async () => {
+      if (!isMountedRef.current || hasMatchedRef.current) return;
+      console.log('🎤 Restarting recognition after pause (clearing buffer)');
+      try {
+        await speechRecognitionService.stopListening();
+        setRecognizedText(null);
+        speechRecognitionService.setRecognizedText(null);
+        // Short delay before restarting
+        setTimeout(async () => {
+          if (!isMountedRef.current || hasMatchedRef.current) return;
+          const locale = getLocale();
+          await speechRecognitionService.startListening(locale);
+        }, 100);
+      } catch (error) {
+        console.error('🎤 Error restarting recognition:', error);
+      }
     };
 
     const onSpeechResults = (event: any) => {
@@ -198,6 +204,14 @@ export function useSpeechRecognition(
         setRecognizedText(recognizedText);
         speechRecognitionService.setRecognizedText(recognizedText);
         setHasSaidAnything(true);
+        
+        // Reset the pause timer - will restart recognition after 3 seconds of silence
+        if (resetTimeoutRef.current) {
+          clearTimeout(resetTimeoutRef.current);
+        }
+        resetTimeoutRef.current = setTimeout(() => {
+          restartRecognition();
+        }, 3000);
       }
     };
 
@@ -367,7 +381,10 @@ export function useSpeechRecognition(
     // Reset state for new card
     hasMatchedRef.current = false;
     lastStartedTargetRef.current = null; // Allow re-starting for the same target
-    lastSpeechEndTimeRef.current = null; // Reset pause detection
+    if (resetTimeoutRef.current) {
+      clearTimeout(resetTimeoutRef.current);
+      resetTimeoutRef.current = null;
+    }
     setHasCorrectPronunciation(false);
     setHasSaidAnything(false);
     setRecognizedText(null);
