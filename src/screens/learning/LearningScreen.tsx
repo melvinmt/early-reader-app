@@ -116,16 +116,19 @@ export default function LearningScreen() {
       
       // Start speech recognition AFTER prompt finishes
       // Skip for phonemes - iOS is not good at recognizing single sounds
-      if (speechRecognition.isEnabled && !isPhoneme(card)) {
-        console.log('🎤 Starting speech recognition after prompt finished');
-        await speechRecognition.startListening();
-      } else if (isPhoneme(card)) {
+      if (isPhoneme(card)) {
         console.log('🎤 Skipping speech recognition for phoneme:', card.word);
+        return;
       }
+      
+      // Try to start listening - the hook will check if it's actually enabled
+      // This handles the case where isEnabled becomes true after the prompt
+      console.log('🎤 Starting speech recognition after prompt finished');
+      await speechRecognition.startListening();
     } catch (error) {
       console.error('Error playing prompt audio:', error);
       // Try to start listening even on error (but not for phonemes)
-      if (speechRecognition.isEnabled && !isPhoneme(card)) {
+      if (!isPhoneme(card)) {
         await speechRecognition.startListening();
       }
     }

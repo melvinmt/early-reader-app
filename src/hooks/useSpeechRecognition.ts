@@ -63,6 +63,7 @@ export function useSpeechRecognition(
   const isMountedRef = useRef(true);
   const hasMatchedRef = useRef(false); // Session-based pass persistence
   const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Timer to reset after pause
+  const pendingStartRef = useRef(false); // Track if start was requested before enabled
 
   // Update target text ref when it changes
   useEffect(() => {
@@ -102,6 +103,32 @@ export function useSpeechRecognition(
 
     checkAvailability();
   }, []);
+
+  // Handle pending start when isEnabled becomes true
+  useEffect(() => {
+    if (isEnabled && pendingStartRef.current) {
+      console.log('🎤 Processing pending start request');
+      pendingStartRef.current = false;
+      // Start listening after a short delay to ensure everything is ready
+      const timer = setTimeout(async () => {
+        if (isMountedRef.current && !hasMatchedRef.current) {
+          try {
+            console.log('🎤 Starting speech recognition (from pending)...');
+            await audioPlayer.enableRecordingMode();
+            const locale = getLocale();
+            const result = await speechRecognitionService.startListening(locale);
+            if (result.available) {
+              setState('listening');
+              console.log('🎤 Speech recognition started successfully (from pending)');
+            }
+          } catch (error) {
+            console.error('🎤 Error starting from pending:', error);
+          }
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isEnabled]);
 
   // Set up Voice event handlers
   useEffect(() => {
@@ -253,9 +280,13 @@ export function useSpeechRecognition(
   // Start listening
   const startListening = useCallback(async () => {
     if (!isEnabled) {
-      console.log('🎤 Cannot start listening - speech recognition not enabled');
+      console.log('🎤 Cannot start listening yet - marking as pending');
+      pendingStartRef.current = true; // Will start once enabled
       return;
     }
+
+    // Clear pending flag since we're starting now
+    pendingStartRef.current = false;
 
     // If already matched for this card, don't start listening again
     if (hasMatchedRef.current) {
