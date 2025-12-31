@@ -103,11 +103,18 @@ Speech recognition features require a native build. Follow these steps:
 npm install
 
 # Generate native iOS/Android projects
-npx expo prebuild --clean
+# Use WITHOUT --clean to preserve existing Xcode project settings
+# Only use --clean if you need a completely fresh start
+npx expo prebuild
 
 # For iOS, install CocoaPods dependencies
 cd ios && pod install && cd ..
 ```
+
+**Important**: 
+- Use `npx expo prebuild` (without `--clean`) to preserve your existing Xcode project settings
+- Only use `npx expo prebuild --clean` when you need a completely fresh native project (this will overwrite all custom settings)
+- If you have custom Xcode settings, consider using [Expo config plugins](https://docs.expo.dev/guides/config-plugins/) to apply them programmatically
 
 2. **Run on a physical device** (speech recognition requires a physical device):
 ```bash
