@@ -135,15 +135,18 @@ export function useSpeechRecognition(
         return;
       }
 
-      const recognizedText = results[0].toLowerCase();
-      console.log('🎤 Recognized text:', recognizedText);
-      setRecognizedText(recognizedText);
-      speechRecognitionService.setRecognizedText(recognizedText);
+      const fullText = results[0].toLowerCase();
+      // Extract only the last word to avoid accumulation
+      const words = fullText.trim().split(/\s+/);
+      const lastWord = words[words.length - 1];
+      console.log('🎤 Recognized text (last word):', lastWord, 'from:', fullText);
+      setRecognizedText(lastWord);
+      speechRecognitionService.setRecognizedText(lastWord);
       setHasSaidAnything(true);
 
       // Fuzzy match against target
       const matchResult = speechRecognitionService.fuzzyMatch(
-        recognizedText,
+        lastWord,
         targetTextRef.current
       );
       console.log('🎤 Match result:', {
@@ -177,10 +180,13 @@ export function useSpeechRecognition(
       
       const results = event.value || [];
       if (results.length > 0) {
-        const recognizedText = results[0].toLowerCase();
-        console.log('🎤 Partial result:', recognizedText);
-        setRecognizedText(recognizedText);
-        speechRecognitionService.setRecognizedText(recognizedText);
+        const fullText = results[0].toLowerCase();
+        // Extract only the last word to avoid accumulation
+        const words = fullText.trim().split(/\s+/);
+        const lastWord = words[words.length - 1];
+        console.log('🎤 Partial result (last word):', lastWord, 'from:', fullText);
+        setRecognizedText(lastWord);
+        speechRecognitionService.setRecognizedText(lastWord);
         setHasSaidAnything(true);
       }
     };
