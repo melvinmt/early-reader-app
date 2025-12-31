@@ -101,8 +101,8 @@ class AudioPlayerService {
       // Stop any currently playing audio
       await this.stopAllAudio();
       
-      // Initialize audio mode first
-      await this.initializeAudio();
+      // Initialize audio mode first (preserve current recording mode)
+      await this.initializeAudio(this.recordingModeEnabled);
       
       // Check cache first
       let sound = this.soundCache.get(assetPath);
@@ -163,8 +163,8 @@ class AudioPlayerService {
         // Stop any currently playing audio
         await this.stopAllAudio();
         
-        // Initialize audio mode first
-        await this.initializeAudio();
+        // Initialize audio mode first (preserve current recording mode)
+        await this.initializeAudio(this.recordingModeEnabled);
         
         // Check cache first
         let sound = this.soundCache.get(assetPath);
