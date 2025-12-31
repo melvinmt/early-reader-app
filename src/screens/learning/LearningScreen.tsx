@@ -322,6 +322,9 @@ export default function LearningScreen() {
           const newAttempts = pronunciationAttempts + 1;
           setPronunciationAttempts(newAttempts);
 
+          // Pause listening while playing feedback audio
+          await speechRecognition.pauseListening();
+
           if (!hasSaidAnything) {
             // No input detected
             if (currentCard.distarCard?.noInputPath) {
@@ -332,7 +335,8 @@ export default function LearningScreen() {
               // Allow pass on 2nd fail, but mark as pronunciation failed
               setPronunciationFailed(true);
             } else {
-              // First attempt - allow retry
+              // First attempt - allow retry, resume listening
+              await speechRecognition.resumeListening();
               isProcessingRef.current = false;
               return;
             }
@@ -346,7 +350,8 @@ export default function LearningScreen() {
               // Allow pass on 2nd fail, but mark as pronunciation failed
               setPronunciationFailed(true);
             } else {
-              // First attempt - allow retry
+              // First attempt - allow retry, resume listening
+              await speechRecognition.resumeListening();
               isProcessingRef.current = false;
               return;
             }
@@ -551,7 +556,7 @@ export default function LearningScreen() {
                   )}
                 </View>
                 <Text style={dynamicStyles.transcriptMessage}>
-                  {speechRecognition.hasCorrectPronunciation ? 'Correct!' : 'Please try again!'}
+                  {speechRecognition.hasCorrectPronunciation ? 'Correct! Swipe right to reveal the picture.' : 'Please try again!'}
                 </Text>
               </>
             ) : (
