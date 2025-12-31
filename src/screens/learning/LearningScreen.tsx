@@ -10,6 +10,7 @@ import WordSwipeDetector from '@/components/lesson/WordSwipeDetector';
 import ConfettiCelebration from '@/components/ui/ConfettiCelebration';
 import { createSession, updateSession } from '@/services/storage/database';
 import { isTablet, responsiveFontSize, responsiveSpacing } from '@/utils/responsive';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 
 type LearningState = 'loading' | 'ready' | 'revealing';
 
@@ -30,12 +31,25 @@ export default function LearningScreen() {
   const [cardsCompleted, setCardsCompleted] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [pronunciationAttempts, setPronunciationAttempts] = useState(0);
+  const [pronunciationFailed, setPronunciationFailed] = useState(false);
 
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const cardQueueRef = useRef<LearningCard[]>([]);
   const isLoadingQueueRef = useRef(false);
   const wordTapDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingRef = useRef(false);
+
+  // Speech recognition hook
+  const speechRecognition = useSpeechRecognition({
+    targetText: currentCard?.word || '',
+    onMatch: (confidence) => {
+      console.log('Pronunciation matched with confidence:', confidence);
+    },
+    onError: (error) => {
+      console.error('Speech recognition error:', error);
+    },
+  });
 
   useEffect(() => {
     if (!childId) {
@@ -219,7 +233,15 @@ export default function LearningScreen() {
         setIsImageRevealed(false);
         setAttempts(0);
         setNeededHelp(false);
+        setPronunciationAttempts(0);
+        setPronunciationFailed(false);
         setState('ready');
+        
+        // Restart speech recognition for new card
+        if (speechRecognition.isEnabled) {
+          speechRecognition.restart();
+        }
+        
         playPromptAudio(retryCard);
         
         // Preload next batch in background
@@ -236,7 +258,14 @@ export default function LearningScreen() {
       setIsImageRevealed(false);
       setAttempts(0);
       setNeededHelp(false);
+      setPronunciationAttempts(0);
+      setPronunciationFailed(false);
       setState('ready');
+
+      // Restart speech recognition for new card
+      if (speechRecognition.isEnabled) {
+        speechRecognition.restart();
+      }
 
       playPromptAudio(card);
       
@@ -261,6 +290,49 @@ export default function LearningScreen() {
     isProcessingRef.current = true;
 
     if (success) {
+      // Check pronunciation if speech recognition is enabled
+      if (speechRecognition.isEnabled) {
+        const hasCorrectPronunciation = speechRecognition.hasCorrectPronunciation;
+        const hasSaidAnything = speechRecognition.hasSaidAnything;
+
+        if (!hasCorrectPronunciation) {
+          // Pronunciation check failed
+          const newAttempts = pronunciationAttempts + 1;
+          setPronunciationAttempts(newAttempts);
+
+          if (!hasSaidAnything) {
+            // No input detected
+            if (currentCard.distarCard?.noInputPath) {
+              await audioPlayer.playSoundFromAssetAndWait(currentCard.distarCard.noInputPath);
+            }
+            
+            if (newAttempts >= 2) {
+              // Allow pass on 2nd fail, but mark as pronunciation failed
+              setPronunciationFailed(true);
+            } else {
+              // First attempt - allow retry
+              isProcessingRef.current = false;
+              return;
+            }
+          } else {
+            // Incorrect pronunciation
+            if (currentCard.distarCard?.tryAgainPath) {
+              await audioPlayer.playSoundFromAssetAndWait(currentCard.distarCard.tryAgainPath);
+            }
+            
+            if (newAttempts >= 2) {
+              // Allow pass on 2nd fail, but mark as pronunciation failed
+              setPronunciationFailed(true);
+            } else {
+              // First attempt - allow retry
+              isProcessingRef.current = false;
+              return;
+            }
+          }
+        }
+        // If hasCorrectPronunciation is true, proceed normally
+      }
+
       setState('revealing');
       
       Animated.timing(uiOpacity, {
@@ -280,6 +352,7 @@ export default function LearningScreen() {
           attempts: attempts + 1,
           matchScore: 1.0,
           neededHelp,
+          pronunciationFailed: speechRecognition.isEnabled ? pronunciationFailed : false,
         });
         
         const newCardsCompleted = cardsCompleted + 1;
@@ -409,6 +482,17 @@ export default function LearningScreen() {
       {/* Main content - combined card */}
       <View style={dynamicStyles.content}>
         <View style={dynamicStyles.combinedCard}>
+          {/* Pronunciation indicator (only shown when speech recognition is enabled) */}
+          {speechRecognition.isEnabled && (
+            <View style={dynamicStyles.pronunciationIndicator}>
+              {speechRecognition.hasCorrectPronunciation ? (
+                <Text style={dynamicStyles.pronunciationCheck}>✓</Text>
+              ) : speechRecognition.state === 'incorrect' || speechRecognition.state === 'no-input' ? (
+                <Text style={dynamicStyles.pronunciationX}>✗</Text>
+              ) : null}
+            </View>
+          )}
+
           <WordDisplay
             word={currentCard.word}
             phonemes={currentCard.phonemes}
@@ -544,6 +628,26 @@ const createStyles = (isTabletDevice: boolean, screenWidth: number) => {
       shadowOpacity: 0.15,
       shadowRadius: 12,
       elevation: 8,
+      position: 'relative',
+    },
+    pronunciationIndicator: {
+      position: 'absolute',
+      top: responsiveSpacing(12),
+      right: responsiveSpacing(12),
+      width: isTabletDevice ? 32 : 28,
+      height: isTabletDevice ? 32 : 28,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    pronunciationCheck: {
+      fontSize: isTabletDevice ? 24 : 20,
+      color: '#4CAF50',
+      fontWeight: 'bold',
+    },
+    pronunciationX: {
+      fontSize: isTabletDevice ? 24 : 20,
+      color: '#F44336',
+      fontWeight: 'bold',
     },
     swipeHint: {
       textAlign: 'center',

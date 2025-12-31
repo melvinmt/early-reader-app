@@ -492,6 +492,7 @@ export async function recordCardCompletion(
     attempts: number;
     matchScore: number;
     neededHelp: boolean;
+    pronunciationFailed?: boolean; // Optional: true if pronunciation check failed
   }
 ): Promise<void> {
   // Get current progress
@@ -523,11 +524,19 @@ export async function recordCardCompletion(
   }
 
   // Calculate SM-2 quality rating
-  const quality = mapPronunciationToQuality(
+  let quality = mapPronunciationToQuality(
     result.matchScore,
     result.attempts,
     result.neededHelp
   );
+
+  // Apply pronunciation penalty if pronunciation check failed
+  // Reduce quality by 1 (e.g., quality 5 becomes 4)
+  // This increases review frequency for words the child struggles to pronounce
+  if (result.pronunciationFailed) {
+    quality = Math.max(0, quality - 1);
+    console.log(`🔊 Pronunciation penalty applied for "${word}": quality reduced to ${quality}`);
+  }
 
   // Handle learning step progression
   const currentLearningStep = progress.learning_step ?? 3; // Default to graduated (3) for existing cards

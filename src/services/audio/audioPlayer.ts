@@ -6,26 +6,48 @@ class AudioPlayerService {
   private soundCache: Map<string, Audio.Sound> = new Map();
   private audioInitialized = false;
   private currentlyPlaying: Audio.Sound | null = null;
+  private recordingModeEnabled = false;
 
   /**
    * Initialize audio mode for playback
+   * @param allowRecording - Set to true when speech recognition is active
    */
-  private async initializeAudio() {
-    if (this.audioInitialized) return;
+  private async initializeAudio(allowRecording: boolean = false) {
+    // Re-initialize if recording mode changed
+    if (this.audioInitialized && this.recordingModeEnabled === allowRecording) {
+      return;
+    }
     
     try {
       await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
+        allowsRecordingIOS: allowRecording, // Enable recording when speech recognition is active
         playsInSilentModeIOS: true, // Play audio even if device is on silent
         shouldDuckAndroid: true,
         staysActiveInBackground: false,
         playThroughEarpieceAndroid: false,
       });
       this.audioInitialized = true;
-      console.log('Audio mode initialized');
+      this.recordingModeEnabled = allowRecording;
+      console.log(`Audio mode initialized (recording: ${allowRecording})`);
     } catch (error) {
       console.error('Error initializing audio mode:', error);
     }
+  }
+
+  /**
+   * Enable recording mode for speech recognition
+   * Call this when speech recognition is active
+   */
+  async enableRecordingMode(): Promise<void> {
+    await this.initializeAudio(true);
+  }
+
+  /**
+   * Disable recording mode (playback only)
+   * Call this when speech recognition is not active
+   */
+  async disableRecordingMode(): Promise<void> {
+    await this.initializeAudio(false);
   }
 
   /**
