@@ -156,7 +156,7 @@ class SpeechRecognitionService {
   }
 
   /**
-   * Extremely fuzzy string matching for children's voices
+   * Fuzzy string matching for children's voices
    * 
    * Accounts for:
    * - Dropped consonants (e.g., "cat" -> "ca")
@@ -164,7 +164,7 @@ class SpeechRecognitionService {
    * - Unclear endings (e.g., "cat" -> "cah")
    * - Partial matches for multi-word phrases
    * 
-   * Uses very low threshold (40%) given children's speech variability
+   * Uses moderate threshold (55%) - forgiving but not too loose
    */
   fuzzyMatch(recognized: string, target: string): FuzzyMatchResult {
     if (!recognized || !target) {
@@ -202,21 +202,21 @@ class SpeechRecognitionService {
       let matchedWords = 0;
       for (const targetWord of targetWords) {
         for (const recognizedWord of recognizedWords) {
-          if (this.wordSimilarity(recognizedWord, targetWord) >= 0.4) {
+          if (this.wordSimilarity(recognizedWord, targetWord) >= 0.55) {
             matchedWords++;
             break;
           }
         }
       }
       const wordMatchRatio = matchedWords / targetWords.length;
-      if (wordMatchRatio >= 0.5) {
+      if (wordMatchRatio >= 0.6) {
         return { matched: true, confidence: wordMatchRatio };
       }
     }
 
     // Single word or phrase similarity
     const similarity = this.wordSimilarity(normalizedRecognized, normalizedTarget);
-    const threshold = 0.4; // Very low threshold for children
+    const threshold = 0.55; // Moderate threshold - forgiving but not too loose
     return {
       matched: similarity >= threshold,
       confidence: similarity,
