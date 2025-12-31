@@ -557,7 +557,7 @@ export default function LearningScreen() {
                 </View>
                 <Text style={dynamicStyles.transcriptMessage}>
                   {speechRecognition.hasCorrectPronunciation 
-                    ? (speechRecognition.matchConfidence === 1.0 
+                    ? (speechRecognition.recognizedText?.toLowerCase() === currentCard?.word?.toLowerCase()
                         ? 'Correct! Swipe right to reveal the picture.' 
                         : 'Close enough! Swipe right to reveal the picture.')
                     : 'Please try again!'}
