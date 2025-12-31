@@ -22,7 +22,10 @@ export interface UseSpeechRecognitionResult {
   recognizedText: string | null; // Real-time recognized text for parent feedback
   startListening: () => Promise<void>;
   stopListening: () => Promise<void>;
+  pauseListening: () => Promise<void>; // Temporarily pause (e.g., during audio playback)
+  resumeListening: () => Promise<void>; // Resume after pause
   restart: () => Promise<void>;
+  clearTranscript: () => void; // Clear the recognized text
 }
 
 export interface UseSpeechRecognitionOptions {
@@ -289,6 +292,53 @@ export function useSpeechRecognition(
     }
   }, [isEnabled]);
 
+  // Pause listening temporarily (e.g., during audio playback)
+  const pauseListening = useCallback(async () => {
+    if (!isEnabled) {
+      return;
+    }
+
+    console.log('🎤 Pausing speech recognition...');
+    try {
+      await speechRecognitionService.stopListening();
+      // Don't change state - we're just pausing temporarily
+    } catch (error) {
+      console.error('Error pausing speech recognition:', error);
+    }
+  }, [isEnabled]);
+
+  // Resume listening after a pause
+  const resumeListening = useCallback(async () => {
+    if (!isEnabled) {
+      return;
+    }
+
+    // Don't resume if already matched
+    if (hasMatchedRef.current) {
+      console.log('🎤 Not resuming - already matched');
+      return;
+    }
+
+    console.log('🎤 Resuming speech recognition...');
+    try {
+      await audioPlayer.enableRecordingMode();
+      const locale = getLocale();
+      const result = await speechRecognitionService.startListening(locale);
+      
+      if (result.available) {
+        setState('listening');
+      }
+    } catch (error) {
+      console.error('Error resuming speech recognition:', error);
+    }
+  }, [isEnabled]);
+
+  // Clear the transcript
+  const clearTranscript = useCallback(() => {
+    setRecognizedText(null);
+    speechRecognitionService.setRecognizedText(null);
+  }, []);
+
   // Restart for a new card
   const restart = useCallback(async () => {
     if (!isEnabled) {
@@ -392,7 +442,10 @@ export function useSpeechRecognition(
     recognizedText,
     startListening,
     stopListening,
+    pauseListening,
+    resumeListening,
     restart,
+    clearTranscript,
   };
 }
 

@@ -103,22 +103,40 @@ export default function LearningScreen() {
 
   const playPromptAudio = async (card: LearningCard) => {
     try {
+      // Pause speech recognition during audio playback
+      await speechRecognition.pauseListening();
+      
       if (card.distarCard?.promptPath) {
-        await audioPlayer.playSoundFromAsset(card.distarCard.promptPath);
+        await audioPlayer.playSoundFromAssetAndWait(card.distarCard.promptPath);
       }
+      
+      // Resume speech recognition after playback
+      await speechRecognition.resumeListening();
     } catch (error) {
       console.error('Error playing prompt audio:', error);
+      // Try to resume even on error
+      await speechRecognition.resumeListening();
     }
   };
 
-  const handleWordTap = () => {
+  const handleWordTap = async () => {
     // Debounce rapid taps - prevent playing audio if tapped within last 500ms
     if (wordTapDebounceRef.current) {
       return; // Ignore rapid taps
     }
     
     if (currentCard?.distarCard?.audioPath) {
-      audioPlayer.playSoundFromAsset(currentCard.distarCard.audioPath).catch(console.error);
+      // Pause speech recognition during audio playback
+      await speechRecognition.pauseListening();
+      
+      try {
+        await audioPlayer.playSoundFromAssetAndWait(currentCard.distarCard.audioPath);
+      } catch (error) {
+        console.error('Error playing word audio:', error);
+      }
+      
+      // Resume speech recognition after playback
+      await speechRecognition.resumeListening();
       
       // Set debounce timer
       wordTapDebounceRef.current = setTimeout(() => {
@@ -129,6 +147,7 @@ export default function LearningScreen() {
 
   const playSuccessAudioSequence = async (card: LearningCard): Promise<void> => {
     try {
+      // Speech recognition is already stopped at this point (card completed)
       if (card.distarCard?.greatJobPath) {
         await audioPlayer.playSoundFromAssetAndWait(card.distarCard.greatJobPath);
       }
@@ -187,6 +206,9 @@ export default function LearningScreen() {
     if (isProcessingRef.current) {
       return;
     }
+    
+    // Clear transcript immediately when loading next card
+    speechRecognition.clearTranscript();
     
     try {
       uiOpacity.setValue(1);
