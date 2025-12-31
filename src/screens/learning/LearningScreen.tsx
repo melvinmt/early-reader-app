@@ -326,6 +326,9 @@ export default function LearningScreen() {
     
     isProcessingRef.current = true;
 
+    // Track pronunciation failure locally to avoid React state async issues
+    let didFailPronunciation = pronunciationFailed;
+
     if (success) {
       // Check pronunciation if speech recognition is enabled (skip for phonemes)
       if (speechRecognition.isEnabled && !isPhoneme(currentCard)) {
@@ -348,6 +351,7 @@ export default function LearningScreen() {
             
             if (newAttempts >= 2) {
               // Allow pass on 2nd fail, but mark as pronunciation failed
+              didFailPronunciation = true;
               setPronunciationFailed(true);
             } else {
               // First attempt - allow retry, resume listening
@@ -363,6 +367,7 @@ export default function LearningScreen() {
             
             if (newAttempts >= 2) {
               // Allow pass on 2nd fail, but mark as pronunciation failed
+              didFailPronunciation = true;
               setPronunciationFailed(true);
             } else {
               // First attempt - allow retry, resume listening
@@ -394,7 +399,7 @@ export default function LearningScreen() {
           attempts: attempts + 1,
           matchScore: 1.0,
           neededHelp,
-          pronunciationFailed: speechRecognition.isEnabled ? pronunciationFailed : false,
+          pronunciationFailed: speechRecognition.isEnabled && !isPhoneme(currentCard) ? didFailPronunciation : false,
         });
         
         const newCardsCompleted = cardsCompleted + 1;
