@@ -137,7 +137,7 @@ export function useSpeechRecognition(
         return;
       }
 
-      const recognizedText = results[0];
+      const recognizedText = results[0].toLowerCase();
       console.log('🎤 Recognized text:', recognizedText);
       setRecognizedText(recognizedText);
       speechRecognitionService.setRecognizedText(recognizedText);
@@ -178,7 +178,7 @@ export function useSpeechRecognition(
       
       const results = event.value || [];
       if (results.length > 0) {
-        const recognizedText = results[0];
+        const recognizedText = results[0].toLowerCase();
         console.log('🎤 Partial result:', recognizedText);
         setRecognizedText(recognizedText);
         speechRecognitionService.setRecognizedText(recognizedText);
