@@ -65,8 +65,6 @@ export function useSpeechRecognition(
 
   // Check feature flag and availability on mount
   useEffect(() => {
-    isMountedRef.current = true;
-
     const checkAvailability = async () => {
       if (!FEATURES.SPEECH_RECOGNITION_ENABLED) {
         console.log('🎤 Speech recognition disabled by feature flag');
@@ -97,11 +95,6 @@ export function useSpeechRecognition(
     };
 
     checkAvailability();
-
-    return () => {
-      isMountedRef.current = false;
-      // Cleanup will be handled by the cleanup effect
-    };
   }, []);
 
   // Set up Voice event handlers
@@ -208,16 +201,18 @@ export function useSpeechRecognition(
     };
   }, [isEnabled, targetText, onMatch, onError]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount ONLY (empty dependency array)
   useEffect(() => {
+    // Set mounted on init
+    isMountedRef.current = true;
+    
     return () => {
+      // Only set to false on actual unmount
       isMountedRef.current = false;
-      if (isEnabled) {
-        speechRecognitionService.destroy().catch(console.error);
-        audioPlayer.disableRecordingMode().catch(console.error);
-      }
+      speechRecognitionService.destroy().catch(console.error);
+      audioPlayer.disableRecordingMode().catch(console.error);
     };
-  }, [isEnabled]);
+  }, []); // Empty deps - only runs on mount/unmount
 
   // Start listening
   const startListening = useCallback(async () => {

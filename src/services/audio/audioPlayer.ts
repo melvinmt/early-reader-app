@@ -36,17 +36,23 @@ class AudioPlayerService {
 
   /**
    * Enable recording mode for speech recognition
-   * Call this when speech recognition is active
+   * Note: We don't change expo-av's audio mode here because it conflicts with react-native-voice.
+   * react-native-voice manages its own audio session for speech recognition.
    */
   async enableRecordingMode(): Promise<void> {
-    await this.initializeAudio(true);
+    // Stop any playing audio to free up the audio session for speech recognition
+    await this.stopAllAudio();
+    // Don't call setAudioModeAsync here - let react-native-voice handle it
+    console.log('Recording mode enabled (audio stopped for speech recognition)');
   }
 
   /**
    * Disable recording mode (playback only)
-   * Call this when speech recognition is not active
+   * Restore expo-av audio mode for playback after speech recognition stops
    */
   async disableRecordingMode(): Promise<void> {
+    // Re-initialize audio for playback (recording disabled)
+    this.audioInitialized = false; // Force re-initialization
     await this.initializeAudio(false);
   }
 
