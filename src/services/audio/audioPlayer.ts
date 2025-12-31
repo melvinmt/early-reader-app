@@ -42,6 +42,8 @@ class AudioPlayerService {
   async enableRecordingMode(): Promise<void> {
     // Stop any playing audio to free up the audio session for speech recognition
     await this.stopAllAudio();
+    // Set the flag so playback functions preserve recording mode
+    this.recordingModeEnabled = true;
     // Don't call setAudioModeAsync here - let react-native-voice handle it
     console.log('Recording mode enabled (audio stopped for speech recognition)');
   }
