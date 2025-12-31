@@ -566,11 +566,9 @@ export default function LearningScreen() {
                     : 'Please try again!'}
                 </Text>
               </>
-            ) : (
-              <Text style={dynamicStyles.transcriptMessage}>
-                {speechRecognition.state === 'listening' ? 'Listening...' : 'Say the word to continue'}
-              </Text>
-            )}
+            ) : speechRecognition.state === 'listening' ? (
+              <Text style={dynamicStyles.transcriptMessage}>Listening...</Text>
+            ) : null}
           </View>
         ) : (
           <Text style={dynamicStyles.swipeHint}>Swipe right to reveal the image</Text>
