@@ -18,7 +18,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.earlyreader.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Early Reader uses photos to display learning card images."
       }
     },
     "android": {
