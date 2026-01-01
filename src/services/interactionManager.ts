@@ -48,10 +48,9 @@ class InteractionManager {
   private onSpeechResultCallbacks: Set<SpeechResultCallback> = new Set();
   
   // Configuration
-  private readonly CARD_TIMEOUT_MS = 15000; // 15 seconds before fallback
+  private readonly CARD_TIMEOUT_MS = 45000; // 45 seconds before fallback
   private readonly WATCHDOG_INTERVAL_MS = 5000; // Check every 5 seconds
-  private readonly VOICE_EVENT_TIMEOUT_MS = 10000; // 10 seconds without events = restart
-  private readonly AUDIO_TIMEOUT_MS = 10000; // 10 seconds audio timeout
+  private readonly VOICE_EVENT_TIMEOUT_MS = 15000; // 15 seconds without events = restart
   private readonly MAX_RESTART_ATTEMPTS = 3; // Max restarts before fallback
   
   private lastVoiceEventTime: number = 0;
@@ -215,7 +214,7 @@ class InteractionManager {
     this.notifyStateChange('playing_prompt');
 
     try {
-      const result = await audioPlayer.playSoundWithTimeout(promptPath, this.AUDIO_TIMEOUT_MS);
+      const result = await audioPlayer.playSoundWithTimeout(promptPath);
       
       if (result === 'timeout') {
         console.warn('⚠️ Prompt audio timed out, starting listening anyway');
@@ -552,7 +551,7 @@ class InteractionManager {
     this.notifyStateChange('playing_feedback');
 
     try {
-      const result = await audioPlayer.playSoundWithTimeout(feedbackPath, this.AUDIO_TIMEOUT_MS);
+      const result = await audioPlayer.playSoundWithTimeout(feedbackPath);
       
       if (result === 'timeout') {
         console.warn('⚠️ Feedback audio timed out, resuming listening anyway');

@@ -148,9 +148,10 @@ class AudioPlayerService {
   }
 
   /**
-   * Play sound with timeout protection
+   * Play sound with dynamic timeout based on audio duration
+   * Timeout = audio duration + buffer (default 3 seconds)
    */
-  async playSoundWithTimeout(assetPath: string, timeoutMs: number = 10000): Promise<'completed' | 'timeout' | 'error'> {
+  async playSoundWithTimeout(assetPath: string, bufferMs: number = 3000): Promise<'completed' | 'timeout' | 'error'> {
     return new Promise(async (resolve) => {
       let timeoutTimer: NodeJS.Timeout | null = null;
       let resolved = false;
@@ -169,8 +170,15 @@ class AudioPlayerService {
         const sound = await this.getOrCreateSound(assetPath);
         this.currentlyPlaying = sound;
 
+        // Get audio duration and set timeout dynamically
+        const status = await sound.getStatusAsync();
+        const durationMs = status.isLoaded && status.durationMillis 
+          ? status.durationMillis 
+          : 10000; // Fallback to 10s if duration unknown
+        const timeoutMs = durationMs + bufferMs;
+
         timeoutTimer = setTimeout(() => {
-          console.warn(`Audio timeout: ${assetPath}`);
+          console.warn(`Audio timeout after ${timeoutMs}ms: ${assetPath}`);
           sound.stopAsync().catch(() => {});
           if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
           safeResolve('timeout');

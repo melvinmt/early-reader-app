@@ -143,15 +143,14 @@ export default function LearningScreen() {
 
   const playSuccessAudioSequence = async (card: LearningCard): Promise<void> => {
     // Use timeout-protected audio to prevent getting stuck
-    const AUDIO_TIMEOUT = 8000; // 8 seconds per audio file
-    
     try {
+      // Timeout = audio duration + 3 second buffer (dynamic)
       if (card.distarCard?.greatJobPath) {
-        await audioPlayer.playSoundWithTimeout(card.distarCard.greatJobPath, AUDIO_TIMEOUT);
+        await audioPlayer.playSoundWithTimeout(card.distarCard.greatJobPath);
       }
       await new Promise(resolve => setTimeout(resolve, 1000));
       if (card.distarCard?.audioPath) {
-        await audioPlayer.playSoundWithTimeout(card.distarCard.audioPath, AUDIO_TIMEOUT);
+        await audioPlayer.playSoundWithTimeout(card.distarCard.audioPath);
       }
     } catch (error) {
       console.error('Error in success audio sequence:', error);
@@ -321,7 +320,7 @@ export default function LearningScreen() {
           : currentCard.distarCard?.noInputPath;
         
         if (feedbackPath) {
-          const FEEDBACK_TIMEOUT = 5000;
+          const FEEDBACK_TIMEOUT = 30000; // 30 seconds safety net
           await Promise.race([
             interactionManager.playFeedbackThenResume(feedbackPath),
             new Promise(resolve => setTimeout(resolve, FEEDBACK_TIMEOUT))
@@ -349,8 +348,8 @@ export default function LearningScreen() {
       setIsImageRevealed(true);
       setShowConfetti(true);
       
-      // Master timeout to prevent getting stuck on reveal
-      const REVEAL_TIMEOUT = 20000;
+      // Master timeout - safety net (individual audio has dynamic timeouts)
+      const REVEAL_TIMEOUT = 60000; // 60 seconds
       await Promise.race([
         playSuccessAudioSequence(currentCard),
         new Promise(resolve => setTimeout(resolve, REVEAL_TIMEOUT))
