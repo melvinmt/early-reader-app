@@ -337,6 +337,9 @@ export default function LearningScreen() {
         setPronunciationFailed(true);
       }
 
+      // Stop speech recognition and watchdog before reveal
+      await interactionManager.reset();
+
       setState('revealing');
       
       Animated.timing(uiOpacity, {
