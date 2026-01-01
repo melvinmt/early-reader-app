@@ -34,28 +34,7 @@ class SpeechRecognitionService {
   }
 
   /**
-   * Sync our internal flag with actual Voice API state
-   * Call this after any Voice event to ensure consistency
-   */
-  async syncState(): Promise<boolean> {
-    try {
-      const actuallyRecognizing = await Voice.isRecognizing();
-      if (this._isListening !== actuallyRecognizing) {
-        console.log(`🎤 State sync: ${this._isListening} → ${actuallyRecognizing}`);
-        this._isListening = actuallyRecognizing;
-      }
-      return actuallyRecognizing;
-    } catch (error) {
-      console.error('Error syncing speech recognition state:', error);
-      // On error, assume not listening to be safe
-      this._isListening = false;
-      return false;
-    }
-  }
-
-  /**
    * Mark as stopped (call when Voice events indicate speech ended)
-   * This is called from event handlers to keep state in sync
    */
   markAsStopped(): void {
     this._isListening = false;
@@ -84,55 +63,38 @@ class SpeechRecognitionService {
 
   /**
    * Start listening for speech recognition
-   * Force-starts by checking actual Voice API state, not just our flag
+   * Always forces a clean start by stopping any existing session first
    */
   async startListening(locale: string = 'en-US'): Promise<{ available: boolean; error?: string }> {
-    try {
-      // Check actual Voice API state - our isListening flag can get out of sync
-      const actuallyRecognizing = await this.isRecognizing();
-      
-      if (this._isListening && actuallyRecognizing) {
-        console.log('🎤 Already listening (verified), skipping start');
-        return { available: true };
-      }
-      
-      // If our flag says listening but Voice API says not - we're desynced
-      if (this._isListening && !actuallyRecognizing) {
-        console.log('🎤 State desync detected - our flag says listening but Voice API says not. Resetting.');
-        this._isListening = false;
-      }
+    // Prevent concurrent starts
+    if (this._isListening) {
+      console.log('🎤 Already listening, skipping start');
+      return { available: true };
+    }
 
-      console.log('🎤 Checking availability...');
+    try {
       const available = await this.checkAvailability();
       if (!available) {
         console.error('🎤 Speech recognition not available on this device');
         return { available: false, error: 'Speech recognition not available' };
       }
 
-      // Force stop any existing session before starting
-      // This ensures clean state
+      // Force stop any existing session for clean state
       try {
         await Voice.stop();
       } catch (e) {
-        // Ignore errors from stopping - it might not have been started
+        // Ignore - might not have been started
       }
 
-      // Clear previous results
       this.recognizedText = null;
 
-      console.log('🎤 Calling Voice.start() with locale:', locale);
+      console.log('🎤 Starting Voice with locale:', locale);
       await Voice.start(locale);
       this._isListening = true;
-      console.log('🎤 Voice.start() succeeded - now listening');
+      console.log('🎤 Voice started successfully');
       return { available: true };
     } catch (error: any) {
-      console.error('🎤 Voice.start() failed:', error);
-      console.error('🎤 Error details:', {
-        message: error?.message,
-        code: error?.code,
-        name: error?.name,
-        stack: error?.stack,
-      });
+      console.error('🎤 Voice.start() failed:', error?.message || error);
       this._isListening = false;
       return { 
         available: false, 
@@ -177,17 +139,6 @@ class SpeechRecognitionService {
       this.recognizedText = null;
     } catch (error) {
       console.error('Error destroying speech recognition:', error);
-    }
-  }
-
-  /**
-   * Get current recognition status
-   */
-  async isRecognizing(): Promise<boolean> {
-    try {
-      return await Voice.isRecognizing();
-    } catch (error) {
-      return false;
     }
   }
 

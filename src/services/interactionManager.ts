@@ -514,7 +514,7 @@ class InteractionManager {
     await audioPlayer.disableRecordingMode();
 
     try {
-      await audioPlayer.playSoundFromAssetAndWait(audioPath);
+      await audioPlayer.playSoundWithTimeout(audioPath);
     } catch (error) {
       console.error('Error playing audio:', error);
     } finally {
