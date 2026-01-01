@@ -519,20 +519,19 @@ class InteractionManager {
    */
   async playAudioWithPause(audioPath: string): Promise<void> {
     if (this.state === 'fallback' || this.state === 'matched') {
-      // In terminal states, just play audio without speech coordination
       await audioPlayer.playSoundFromAssetAndWait(audioPath);
       return;
     }
 
-    // Pause listening before playing audio
+    // Stop speech recognition and switch audio mode to playback
     await this.pauseListening();
+    await audioPlayer.disableRecordingMode();
 
     try {
       await audioPlayer.playSoundFromAssetAndWait(audioPath);
     } catch (error) {
       console.error('Error playing audio:', error);
     } finally {
-      // Always resume listening after audio (even on error)
       await this.resumeListening();
     }
   }
@@ -543,11 +542,11 @@ class InteractionManager {
    */
   async playFeedbackThenResume(feedbackPath: string): Promise<void> {
     if (this.state === 'fallback' || this.state === 'matched') {
-      return; // Don't play feedback in terminal states
+      return;
     }
 
-    // Stop listening before playing feedback audio
     await this.pauseListening();
+    await audioPlayer.disableRecordingMode();
     this.notifyStateChange('playing_feedback');
 
     try {
@@ -559,11 +558,9 @@ class InteractionManager {
         console.warn('⚠️ Feedback audio error, resuming listening anyway');
       }
       
-      // Resume listening after feedback
       await this.startListening();
     } catch (error) {
       console.error('Error in playFeedbackThenResume:', error);
-      // Resume listening even on error
       await this.startListening();
     }
   }
