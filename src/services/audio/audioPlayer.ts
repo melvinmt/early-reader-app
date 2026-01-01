@@ -48,6 +48,10 @@ class AudioPlayerService {
       uri = assetPath;
     }
 
+    if (!uri) {
+      throw new Error(`Failed to resolve audio URI for assetPath: ${assetPath}`);
+    }
+
     const { sound: newSound } = await Audio.Sound.createAsync(
       { uri },
       { shouldPlay: false }
