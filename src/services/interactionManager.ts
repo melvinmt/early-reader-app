@@ -443,27 +443,53 @@ class InteractionManager {
    * Handle speech recognition error
    */
   handleSpeechError(error: string): void {
-    // Ignore benign "No speech detected" errors (error code 1110)
-    // These are expected when the user doesn't speak and shouldn't trigger fallback
+    this.lastVoiceEventTime = Date.now();
+    
+    // Handle "No speech detected" errors (error code 1110)
+    // These are expected when the user doesn't speak - restart listening to continue
     if (error.includes('1110') || error.includes('No speech detected')) {
-      console.log('🎤 Ignoring benign "No speech detected" error');
-      this.lastVoiceEventTime = Date.now();
+      console.log('🎤 No speech detected - restarting speech recognition');
+      // Restart speech recognition to continue listening
+      this.restartListening();
       return;
     }
     
     console.error('🎤 Speech recognition error:', error);
-    this.lastVoiceEventTime = Date.now();
     
-    // Don't immediately fail - let watchdog handle it
-    // But if we get repeated errors, fallback will activate
+    // For other errors, try to restart - watchdog will handle repeated failures
+    this.restartListening();
+  }
+
+  /**
+   * Restart speech recognition after an error or timeout
+   */
+  private async restartListening(): Promise<void> {
+    if (this.state === 'fallback' || this.state === 'matched') {
+      return; // Don't restart in terminal states
+    }
+
+    try {
+      // Brief delay before restarting
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (this.state === 'fallback' || this.state === 'matched') {
+        return; // Check again after delay
+      }
+
+      await this.startListening();
+    } catch (error) {
+      console.error('Error restarting speech recognition:', error);
+      // If restart fails, watchdog will eventually activate fallback
+    }
   }
 
   /**
    * Pause listening temporarily (e.g., during audio playback)
+   * Will stop speech recognition regardless of current state to ensure silence during audio
    */
   async pauseListening(): Promise<void> {
-    if (this.state !== 'listening') {
-      return; // Not listening, nothing to pause
+    if (this.state === 'fallback' || this.state === 'matched') {
+      return; // In terminal states, nothing to pause
     }
 
     try {
@@ -512,12 +538,15 @@ class InteractionManager {
 
   /**
    * Play feedback audio then resume listening
+   * Stops speech recognition before playing to avoid transcribing the audio
    */
   async playFeedbackThenResume(feedbackPath: string): Promise<void> {
     if (this.state === 'fallback' || this.state === 'matched') {
       return; // Don't play feedback in terminal states
     }
 
+    // Stop listening before playing feedback audio
+    await this.pauseListening();
     this.notifyStateChange('playing_feedback');
 
     try {
