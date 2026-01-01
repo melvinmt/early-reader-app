@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Dimensions } from 'react-native';
+import { useEffect, useRef, useCallback } from 'react';
+import { StyleSheet, Animated, Dimensions } from 'react-native';
 
 interface ConfettiCelebrationProps {
   visible: boolean;
@@ -11,92 +11,88 @@ const CONFETTI_COUNT = 50;
 const COLORS = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'];
 
 export default function ConfettiCelebration({ visible, onComplete }: ConfettiCelebrationProps) {
-  const confettiRefs = useRef<Animated.Value[]>([]);
+  const confettiRefs = useRef<any[]>([]);
   const opacityRef = useRef(new Animated.Value(0));
+  const isAnimatingRef = useRef(false);
 
-  useEffect(() => {
-    if (visible) {
-      // Initialize confetti pieces
-      confettiRefs.current = Array.from({ length: CONFETTI_COUNT }, () => {
-        const startX = Math.random() * SCREEN_WIDTH;
-        return {
-          translateY: new Animated.Value(-50),
-          translateX: new Animated.Value(startX),
-          rotation: new Animated.Value(0),
-          scale: new Animated.Value(1),
-          startX, // Store for reference
-        };
-      });
+  const runAnimation = useCallback(() => {
+    if (!isAnimatingRef.current) return;
 
-      // Start animation
-      opacityRef.current.setValue(1);
+    // Reset and re-initialize confetti positions
+    confettiRefs.current = Array.from({ length: CONFETTI_COUNT }, () => {
+      const startX = Math.random() * SCREEN_WIDTH;
+      return {
+        translateY: new Animated.Value(-50),
+        translateX: new Animated.Value(startX),
+        rotation: new Animated.Value(0),
+        scale: new Animated.Value(1),
+        startX,
+      };
+    });
 
-      // Animate each confetti piece
-      const animations = confettiRefs.current.map((confetti, index) => {
-        const duration = 2000 + Math.random() * 1000;
-        const delay = index * 20;
-        const endX = confetti.startX + (Math.random() - 0.5) * 200;
+    // Animate each confetti piece
+    const animations = confettiRefs.current.map((confetti, index) => {
+      const duration = 2000 + Math.random() * 1000;
+      const delay = index * 20;
+      const endX = confetti.startX + (Math.random() - 0.5) * 200;
 
-        return Animated.parallel([
-          Animated.timing(confetti.translateY, {
-            toValue: SCREEN_HEIGHT + 100,
-            duration,
-            delay,
-            useNativeDriver: true,
-          }),
-          Animated.timing(confetti.translateX, {
-            toValue: endX,
-            duration,
-            delay,
-            useNativeDriver: true,
-          }),
-          Animated.timing(confetti.rotation, {
-            toValue: Math.random() * 720 - 360,
-            duration,
-            delay,
-            useNativeDriver: true,
-          }),
-          Animated.sequence([
-            Animated.timing(confetti.scale, {
-              toValue: 1.2,
-              duration: duration * 0.3,
-              delay,
-              useNativeDriver: true,
-            }),
-            Animated.timing(confetti.scale, {
-              toValue: 0.8,
-              duration: duration * 0.7,
-              useNativeDriver: true,
-            }),
-          ]),
-        ]);
-      });
-
-      // Fade out after animation
-      Animated.parallel([
-        ...animations,
+      return Animated.parallel([
+        Animated.timing(confetti.translateY, {
+          toValue: SCREEN_HEIGHT + 100,
+          duration,
+          delay,
+          useNativeDriver: true,
+        }),
+        Animated.timing(confetti.translateX, {
+          toValue: endX,
+          duration,
+          delay,
+          useNativeDriver: true,
+        }),
+        Animated.timing(confetti.rotation, {
+          toValue: Math.random() * 720 - 360,
+          duration,
+          delay,
+          useNativeDriver: true,
+        }),
         Animated.sequence([
-          Animated.delay(1500),
-          Animated.timing(opacityRef.current, {
-            toValue: 0,
-            duration: 500,
+          Animated.timing(confetti.scale, {
+            toValue: 1.2,
+            duration: duration * 0.3,
+            delay,
+            useNativeDriver: true,
+          }),
+          Animated.timing(confetti.scale, {
+            toValue: 0.8,
+            duration: duration * 0.7,
             useNativeDriver: true,
           }),
         ]),
-      ]).start(() => {
-        onComplete?.();
-      });
+      ]);
+    });
+
+    Animated.parallel(animations).start(() => {
+      // Loop: run again if still visible
+      if (isAnimatingRef.current) {
+        runAnimation();
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (visible) {
+      isAnimatingRef.current = true;
+      opacityRef.current.setValue(1);
+      runAnimation();
     } else {
-      // Reset
+      isAnimatingRef.current = false;
       opacityRef.current.setValue(0);
-      confettiRefs.current.forEach((confetti) => {
-        confetti.translateY.setValue(-50);
-        confetti.translateX.setValue(confetti.startX);
-        confetti.rotation.setValue(0);
-        confetti.scale.setValue(1);
-      });
     }
-  }, [visible, onComplete]);
+
+    return () => {
+      isAnimatingRef.current = false;
+    };
+  }, [visible, runAnimation]);
 
   if (!visible) return null;
 
