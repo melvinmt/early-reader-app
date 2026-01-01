@@ -42,6 +42,7 @@ class InteractionManager {
   private hasCorrectPronunciation: boolean = false;
   private recognizedText: string | null = null;
   private matchConfidence: number | null = null;
+  private restartAttempts: number = 0; // Track restart attempts for watchdog
   
   // Callbacks
   private onStateChangeCallbacks: Set<StateChangeCallback> = new Set();
@@ -52,6 +53,7 @@ class InteractionManager {
   private readonly WATCHDOG_INTERVAL_MS = 5000; // Check every 5 seconds
   private readonly VOICE_EVENT_TIMEOUT_MS = 10000; // 10 seconds without events = restart
   private readonly AUDIO_TIMEOUT_MS = 10000; // 10 seconds audio timeout
+  private readonly MAX_RESTART_ATTEMPTS = 3; // Max restarts before fallback
   
   private lastVoiceEventTime: number = 0;
 
@@ -357,6 +359,7 @@ class InteractionManager {
    */
   private startWatchdog(): void {
     this.clearWatchdog();
+    this.restartAttempts = 0; // Reset restart counter
 
     this.watchdogTimer = setInterval(async () => {
       if (this.state !== 'listening') {
@@ -373,14 +376,26 @@ class InteractionManager {
         const hasStaleEvents = timeSinceLastEvent > this.VOICE_EVENT_TIMEOUT_MS;
 
         if (!isRecognizing || hasStaleEvents) {
+          this.restartAttempts++;
           console.warn('⚠️ Speech recognition health check failed:', {
             isRecognizing,
             timeSinceLastEvent,
             hasStaleEvents,
+            restartAttempts: this.restartAttempts,
           });
+          
+          // If too many restart attempts, activate fallback
+          if (this.restartAttempts >= this.MAX_RESTART_ATTEMPTS) {
+            console.warn('⚠️ Max restart attempts reached, activating fallback mode');
+            this.activateFallbackMode();
+            return;
+          }
           
           // Try to restart
           await this.restartListening();
+        } else {
+          // Health check passed, reset restart counter
+          this.restartAttempts = 0;
         }
       } catch (error) {
         console.error('Error in watchdog check:', error);
@@ -632,6 +647,7 @@ class InteractionManager {
     this.recognizedText = null;
     this.matchConfidence = null;
     this.lastVoiceEventTime = 0;
+    this.restartAttempts = 0;
 
     // Stop speech recognition
     try {

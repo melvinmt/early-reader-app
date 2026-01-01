@@ -48,19 +48,37 @@ class SpeechRecognitionService {
 
   /**
    * Start listening for speech recognition
+   * Force-starts by checking actual Voice API state, not just our flag
    */
   async startListening(locale: string = 'en-US'): Promise<{ available: boolean; error?: string }> {
-    if (this.isListening) {
-      console.log('🎤 Already listening, skipping start');
-      return { available: true };
-    }
-
     try {
+      // Check actual Voice API state - our isListening flag can get out of sync
+      const actuallyRecognizing = await this.isRecognizing();
+      
+      if (this.isListening && actuallyRecognizing) {
+        console.log('🎤 Already listening (verified), skipping start');
+        return { available: true };
+      }
+      
+      // If our flag says listening but Voice API says not - we're desynced
+      if (this.isListening && !actuallyRecognizing) {
+        console.log('🎤 State desync detected - our flag says listening but Voice API says not. Resetting.');
+        this.isListening = false;
+      }
+
       console.log('🎤 Checking availability...');
       const available = await this.checkAvailability();
       if (!available) {
         console.error('🎤 Speech recognition not available on this device');
         return { available: false, error: 'Speech recognition not available' };
+      }
+
+      // Force stop any existing session before starting
+      // This ensures clean state
+      try {
+        await Voice.stop();
+      } catch (e) {
+        // Ignore errors from stopping - it might not have been started
       }
 
       // Clear previous results
@@ -89,19 +107,15 @@ class SpeechRecognitionService {
 
   /**
    * Stop listening for speech recognition
+   * Always tries to stop, even if we think we're not listening (to handle desyncs)
    */
   async stopListening(): Promise<void> {
-    if (!this.isListening) {
-      return;
-    }
-
     try {
       await Voice.stop();
-      this.isListening = false;
     } catch (error) {
-      console.error('Error stopping speech recognition:', error);
-      this.isListening = false;
+      // Ignore errors - may not have been started
     }
+    this.isListening = false;
   }
 
   /**
