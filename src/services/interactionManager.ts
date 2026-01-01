@@ -368,40 +368,25 @@ class InteractionManager {
         return;
       }
 
-      try {
-        // Sync our internal state with Voice API
-        const isRecognizing = await speechRecognitionService.syncState();
-        
-        // Check if we've received any voice events recently
-        const timeSinceLastEvent = Date.now() - this.lastVoiceEventTime;
-        const hasStaleEvents = timeSinceLastEvent > this.VOICE_EVENT_TIMEOUT_MS;
+      // Only check for stale events - Voice.isRecognizing() is unreliable
+      // If we received events recently, speech recognition is working
+      const timeSinceLastEvent = Date.now() - this.lastVoiceEventTime;
+      const hasStaleEvents = timeSinceLastEvent > this.VOICE_EVENT_TIMEOUT_MS;
 
-        if (!isRecognizing || hasStaleEvents) {
-          this.restartAttempts++;
-          console.warn('⚠️ Speech recognition health check failed:', {
-            isRecognizing,
-            timeSinceLastEvent,
-            hasStaleEvents,
-            restartAttempts: this.restartAttempts,
-          });
-          
-          // If too many restart attempts, activate fallback
-          if (this.restartAttempts >= this.MAX_RESTART_ATTEMPTS) {
-            console.warn('⚠️ Max restart attempts reached, activating fallback mode');
-            this.activateFallbackMode();
-            return;
-          }
-          
-          // Try to restart
-          await this.restartListening();
-        } else {
-          // Health check passed, reset restart counter
-          this.restartAttempts = 0;
+      if (hasStaleEvents) {
+        this.restartAttempts++;
+        console.warn('⚠️ No voice events for', timeSinceLastEvent, 'ms, restarting (attempt', this.restartAttempts, ')');
+        
+        if (this.restartAttempts >= this.MAX_RESTART_ATTEMPTS) {
+          console.warn('⚠️ Max restart attempts reached, activating fallback mode');
+          this.activateFallbackMode();
+          return;
         }
-      } catch (error) {
-        console.error('Error in watchdog check:', error);
-        // On error, activate fallback
-        this.activateFallbackMode();
+        
+        await this.restartListening();
+      } else {
+        // Received events recently - all good
+        this.restartAttempts = 0;
       }
     }, this.WATCHDOG_INTERVAL_MS);
   }
@@ -546,9 +531,10 @@ class InteractionManager {
       return;
     }
 
+    // Set state BEFORE stopping to prevent error handlers from restarting
+    this.notifyStateChange('playing_feedback');
     await this.pauseListening();
     await audioPlayer.disableRecordingMode();
-    this.notifyStateChange('playing_feedback');
 
     try {
       const result = await audioPlayer.playSoundWithTimeout(feedbackPath);
