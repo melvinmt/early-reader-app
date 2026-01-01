@@ -142,6 +142,27 @@ class SpeechRecognitionService {
   }
 
   /**
+   * Health check: Verify that Voice API state matches our internal state
+   * Returns true if healthy, false if desync detected
+   */
+  async healthCheck(expectedListening: boolean): Promise<boolean> {
+    try {
+      const actualListening = await Voice.isRecognizing();
+      if (expectedListening !== actualListening) {
+        console.warn('⚠️ Speech recognition state desync:', {
+          expected: expectedListening,
+          actual: actualListening,
+        });
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error in speech recognition health check:', error);
+      return false;
+    }
+  }
+
+  /**
    * Set recognized text (called from event handlers)
    */
   setRecognizedText(text: string | null): void {
