@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { StyleSheet, Animated, Dimensions } from 'react-native';
 
 interface ConfettiCelebrationProps {
@@ -10,132 +10,130 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CONFETTI_COUNT = 50;
 const COLORS = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'];
 
-export default function ConfettiCelebration({ visible, onComplete }: ConfettiCelebrationProps) {
-  const confettiRefs = useRef<any[]>([]);
-  const opacityRef = useRef(new Animated.Value(0));
+interface ConfettiPiece {
+  id: number;
+  translateY: Animated.Value;
+  translateX: Animated.Value;
+  rotation: Animated.Value;
+  scale: Animated.Value;
+  color: string;
+  size: number;
+}
+
+function createConfettiPieces(): ConfettiPiece[] {
+  return Array.from({ length: CONFETTI_COUNT }, (_, index) => ({
+    id: index,
+    translateY: new Animated.Value(-50 - Math.random() * 100), // Start above screen
+    translateX: new Animated.Value(Math.random() * SCREEN_WIDTH),
+    rotation: new Animated.Value(0),
+    scale: new Animated.Value(0.8 + Math.random() * 0.4),
+    color: COLORS[index % COLORS.length],
+    size: 8 + Math.random() * 8,
+  }));
+}
+
+export default function ConfettiCelebration({ visible }: ConfettiCelebrationProps) {
+  const [confetti, setConfetti] = useState<ConfettiPiece[]>([]);
   const isAnimatingRef = useRef(false);
-
-  const runAnimation = useCallback(() => {
-    if (!isAnimatingRef.current) return;
-
-    // Reset and re-initialize confetti positions
-    confettiRefs.current = Array.from({ length: CONFETTI_COUNT }, () => {
-      const startX = Math.random() * SCREEN_WIDTH;
-      return {
-        translateY: new Animated.Value(-50),
-        translateX: new Animated.Value(startX),
-        rotation: new Animated.Value(0),
-        scale: new Animated.Value(1),
-        startX,
-      };
-    });
-
-    // Animate each confetti piece
-    const animations = confettiRefs.current.map((confetti, index) => {
-      const duration = 2000 + Math.random() * 1000;
-      const delay = index * 20;
-      const endX = confetti.startX + (Math.random() - 0.5) * 200;
-
-      return Animated.parallel([
-        Animated.timing(confetti.translateY, {
-          toValue: SCREEN_HEIGHT + 100,
-          duration,
-          delay,
-          useNativeDriver: true,
-        }),
-        Animated.timing(confetti.translateX, {
-          toValue: endX,
-          duration,
-          delay,
-          useNativeDriver: true,
-        }),
-        Animated.timing(confetti.rotation, {
-          toValue: Math.random() * 720 - 360,
-          duration,
-          delay,
-          useNativeDriver: true,
-        }),
-        Animated.sequence([
-          Animated.timing(confetti.scale, {
-            toValue: 1.2,
-            duration: duration * 0.3,
-            delay,
-            useNativeDriver: true,
-          }),
-          Animated.timing(confetti.scale, {
-            toValue: 0.8,
-            duration: duration * 0.7,
-            useNativeDriver: true,
-          }),
-        ]),
-      ]);
-    });
-
-    Animated.parallel(animations).start(() => {
-      // Loop: run again if still visible
-      if (isAnimatingRef.current) {
-        runAnimation();
-      }
-    });
-  }, []);
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     if (visible) {
+      // Create confetti immediately so it renders
+      const pieces = createConfettiPieces();
+      setConfetti(pieces);
       isAnimatingRef.current = true;
-      opacityRef.current.setValue(1);
-      runAnimation();
+
+      // Start animation after a brief delay to ensure render
+      const startAnimation = () => {
+        if (!isAnimatingRef.current) return;
+
+        const animations = pieces.map((piece) => {
+          // Reset positions for loop
+          piece.translateY.setValue(-50 - Math.random() * 100);
+          piece.translateX.setValue(Math.random() * SCREEN_WIDTH);
+          piece.rotation.setValue(0);
+
+          const duration = 2500 + Math.random() * 1500;
+          const endX = piece.translateX._value + (Math.random() - 0.5) * 200;
+
+          return Animated.parallel([
+            Animated.timing(piece.translateY, {
+              toValue: SCREEN_HEIGHT + 100,
+              duration,
+              useNativeDriver: true,
+            }),
+            Animated.timing(piece.translateX, {
+              toValue: endX,
+              duration,
+              useNativeDriver: true,
+            }),
+            Animated.timing(piece.rotation, {
+              toValue: Math.random() * 720 - 360,
+              duration,
+              useNativeDriver: true,
+            }),
+          ]);
+        });
+
+        animationRef.current = Animated.parallel(animations);
+        animationRef.current.start(() => {
+          // Loop if still visible
+          if (isAnimatingRef.current) {
+            startAnimation();
+          }
+        });
+      };
+
+      // Small delay to ensure state update has rendered
+      requestAnimationFrame(() => {
+        startAnimation();
+      });
     } else {
       isAnimatingRef.current = false;
-      opacityRef.current.setValue(0);
+      if (animationRef.current) {
+        animationRef.current.stop();
+        animationRef.current = null;
+      }
+      setConfetti([]);
     }
 
     return () => {
       isAnimatingRef.current = false;
+      if (animationRef.current) {
+        animationRef.current.stop();
+      }
     };
-  }, [visible, runAnimation]);
+  }, [visible]);
 
-  if (!visible) return null;
+  if (!visible || confetti.length === 0) return null;
 
   return (
-    <Animated.View
-      style={[styles.container, { opacity: opacityRef.current }]}
-      pointerEvents="none"
-    >
-      {confettiRefs.current.map((confetti, index) => {
-        const color = COLORS[index % COLORS.length];
-        const size = 8 + Math.random() * 8;
-
-        return (
-          <Animated.View
-            key={index}
-            style={[
-              styles.confetti,
-              {
-                width: size,
-                height: size,
-                backgroundColor: color,
-                transform: [
-                  {
-                    translateY: confetti.translateY,
-                  },
-                  {
-                    translateX: confetti.translateX,
-                  },
-                  {
-                    rotate: confetti.rotation.interpolate({
-                      inputRange: [-360, 360],
-                      outputRange: ['-360deg', '360deg'],
-                    }),
-                  },
-                  {
-                    scale: confetti.scale,
-                  },
-                ],
-              },
-            ]}
-          />
-        );
-      })}
+    <Animated.View style={styles.container} pointerEvents="none">
+      {confetti.map((piece) => (
+        <Animated.View
+          key={piece.id}
+          style={[
+            styles.confetti,
+            {
+              width: piece.size,
+              height: piece.size,
+              backgroundColor: piece.color,
+              transform: [
+                { translateY: piece.translateY },
+                { translateX: piece.translateX },
+                {
+                  rotate: piece.rotation.interpolate({
+                    inputRange: [-360, 360],
+                    outputRange: ['-360deg', '360deg'],
+                  }),
+                },
+                { scale: piece.scale },
+              ],
+            },
+          ]}
+        />
+      ))}
     </Animated.View>
   );
 }
@@ -152,7 +150,7 @@ const styles = StyleSheet.create({
   },
   confetti: {
     position: 'absolute',
+    top: 0,
     borderRadius: 2,
   },
 });
-
