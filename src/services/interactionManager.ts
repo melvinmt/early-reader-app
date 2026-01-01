@@ -307,7 +307,7 @@ class InteractionManager {
 
     Voice.onSpeechError = (event: any) => {
       const error = event.error?.message || event.error || 'Unknown error';
-      console.error('🎤 Speech recognition error event:', error);
+      // handleSpeechError will filter benign errors and log appropriately
       this.handleSpeechError(error);
     };
   }
@@ -443,11 +443,71 @@ class InteractionManager {
    * Handle speech recognition error
    */
   handleSpeechError(error: string): void {
+    // Ignore benign "No speech detected" errors (error code 1110)
+    // These are expected when the user doesn't speak and shouldn't trigger fallback
+    if (error.includes('1110') || error.includes('No speech detected')) {
+      console.log('🎤 Ignoring benign "No speech detected" error');
+      this.lastVoiceEventTime = Date.now();
+      return;
+    }
+    
     console.error('🎤 Speech recognition error:', error);
     this.lastVoiceEventTime = Date.now();
     
     // Don't immediately fail - let watchdog handle it
     // But if we get repeated errors, fallback will activate
+  }
+
+  /**
+   * Pause listening temporarily (e.g., during audio playback)
+   */
+  async pauseListening(): Promise<void> {
+    if (this.state !== 'listening') {
+      return; // Not listening, nothing to pause
+    }
+
+    try {
+      await speechRecognitionService.stopListening();
+      // Don't change state - we're just pausing temporarily
+    } catch (error) {
+      console.error('Error pausing speech recognition:', error);
+    }
+  }
+
+  /**
+   * Resume listening after a pause
+   */
+  async resumeListening(): Promise<void> {
+    if (this.state === 'fallback' || this.state === 'matched') {
+      return; // Don't resume in terminal states
+    }
+
+    // Resume listening
+    await this.startListening();
+  }
+
+  /**
+   * Play audio with speech recognition paused
+   * Pauses listening, plays audio, then resumes listening
+   */
+  async playAudioWithPause(audioPath: string): Promise<void> {
+    if (this.state === 'fallback' || this.state === 'matched') {
+      // In terminal states, just play audio without speech coordination
+      await audioPlayer.playSoundFromAssetAndWait(audioPath);
+      return;
+    }
+
+    // Pause listening before playing audio
+    await this.pauseListening();
+
+    try {
+      await audioPlayer.playSoundFromAssetAndWait(audioPath);
+    } catch (error) {
+      console.error('Error playing audio:', error);
+    } finally {
+      // Always resume listening after audio (even on error)
+      await this.resumeListening();
+    }
   }
 
   /**

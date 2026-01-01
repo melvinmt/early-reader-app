@@ -131,12 +131,8 @@ export default function LearningScreen() {
     }
     
     if (currentCard?.distarCard?.audioPath) {
-      // Play audio directly - InteractionManager handles speech coordination
-      try {
-        await audioPlayer.playSoundFromAssetAndWait(currentCard.distarCard.audioPath);
-      } catch (error) {
-        console.error('Error playing word audio:', error);
-      }
+      // Use InteractionManager to play audio with speech recognition paused
+      await interactionManager.playAudioWithPause(currentCard.distarCard.audioPath);
       
       // Set debounce timer
       wordTapDebounceRef.current = setTimeout(() => {
