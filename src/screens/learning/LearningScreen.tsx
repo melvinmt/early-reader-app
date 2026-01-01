@@ -41,7 +41,6 @@ export default function LearningScreen() {
   const isLoadingQueueRef = useRef(false);
   const wordTapDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingRef = useRef(false);
-  const cardStartTimeRef = useRef<number>(0);
 
   // Set up Voice handlers once on mount
   useEffect(() => {
@@ -257,7 +256,6 @@ export default function LearningScreen() {
         setState('ready');
         
         // Start interaction for new card
-        cardStartTimeRef.current = Date.now();
         const skipSpeech = isPhoneme(retryCard);
         await interactionManager.startCard(retryCard.word, retryCard.distarCard?.promptPath, skipSpeech);
         
@@ -279,7 +277,6 @@ export default function LearningScreen() {
       setState('ready');
 
       // Start interaction for new card
-      cardStartTimeRef.current = Date.now();
       const skipSpeech = isPhoneme(card);
       await interactionManager.startCard(card.word, card.distarCard?.promptPath, skipSpeech);
       

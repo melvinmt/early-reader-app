@@ -122,28 +122,34 @@ class AudioPlayerService {
    * Play sound and wait for completion
    */
   async playSoundFromAssetAndWait(assetPath: string): Promise<void> {
-    return new Promise(async (resolve) => {
-      try {
-        await this.stopAllAudio();
-        await this.initializeAudio(this.recordingModeEnabled);
-        
-        const sound = await this.getOrCreateSound(assetPath);
-        this.currentlyPlaying = sound;
+    await this.stopAllAudio();
+    await this.initializeAudio(this.recordingModeEnabled);
+    
+    let sound: Audio.Sound;
+    try {
+      sound = await this.getOrCreateSound(assetPath);
+    } catch (error) {
+      console.error('Error loading sound:', assetPath, error);
+      throw error;
+    }
+    
+    this.currentlyPlaying = sound;
 
-        sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
-          if (status.isLoaded && status.didJustFinish) {
-            if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
-            sound.setOnPlaybackStatusUpdate(null);
-            resolve();
-          }
-        });
+    return new Promise<void>((resolve, reject) => {
+      sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
+        if (status.isLoaded && status.didJustFinish) {
+          if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
+          sound.setOnPlaybackStatusUpdate(null);
+          resolve();
+        }
+      });
 
-        await sound.replayAsync();
-      } catch (error) {
+      sound.replayAsync().catch((error) => {
         console.error('Error playing sound:', assetPath, error);
-        this.currentlyPlaying = null;
-        resolve();
-      }
+        if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
+        sound.setOnPlaybackStatusUpdate(null);
+        reject(error);
+      });
     });
   }
 
@@ -152,52 +158,69 @@ class AudioPlayerService {
    * Timeout = audio duration + buffer (default 3 seconds)
    */
   async playSoundWithTimeout(assetPath: string, bufferMs: number = 3000): Promise<'completed' | 'timeout' | 'error'> {
-    return new Promise(async (resolve) => {
-      let timeoutTimer: NodeJS.Timeout | null = null;
+    // Setup phase (async) - do all awaiting before creating the Promise
+    try {
+      await this.stopAllAudio();
+      await this.initializeAudio(this.recordingModeEnabled);
+    } catch (error) {
+      console.error('Error initializing audio:', error);
+      return 'error';
+    }
+
+    let sound: Audio.Sound;
+    try {
+      sound = await this.getOrCreateSound(assetPath);
+    } catch (error) {
+      console.error('Error loading sound:', assetPath, error);
+      return 'error';
+    }
+
+    this.currentlyPlaying = sound;
+
+    // Get duration for timeout
+    let timeoutMs: number;
+    try {
+      const status = await sound.getStatusAsync();
+      const durationMs = status.isLoaded && status.durationMillis 
+        ? status.durationMillis 
+        : 10000;
+      timeoutMs = durationMs + bufferMs;
+    } catch {
+      timeoutMs = 10000 + bufferMs;
+    }
+
+    // Playback phase (non-async Promise)
+    return new Promise<'completed' | 'timeout' | 'error'>((resolve) => {
       let resolved = false;
+      let timeoutTimer: NodeJS.Timeout | null = null;
 
       const safeResolve = (result: 'completed' | 'timeout' | 'error') => {
         if (resolved) return;
         resolved = true;
         if (timeoutTimer) clearTimeout(timeoutTimer);
+        sound.setOnPlaybackStatusUpdate(null);
         resolve(result);
       };
 
-      try {
-        await this.stopAllAudio();
-        await this.initializeAudio(this.recordingModeEnabled);
-        
-        const sound = await this.getOrCreateSound(assetPath);
-        this.currentlyPlaying = sound;
+      timeoutTimer = setTimeout(() => {
+        console.warn(`Audio timeout after ${timeoutMs}ms: ${assetPath}`);
+        sound.stopAsync().catch(() => {});
+        if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
+        safeResolve('timeout');
+      }, timeoutMs);
 
-        // Get audio duration and set timeout dynamically
-        const status = await sound.getStatusAsync();
-        const durationMs = status.isLoaded && status.durationMillis 
-          ? status.durationMillis 
-          : 10000; // Fallback to 10s if duration unknown
-        const timeoutMs = durationMs + bufferMs;
-
-        timeoutTimer = setTimeout(() => {
-          console.warn(`Audio timeout after ${timeoutMs}ms: ${assetPath}`);
-          sound.stopAsync().catch(() => {});
+      sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
+        if (status.isLoaded && status.didJustFinish) {
           if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
-          safeResolve('timeout');
-        }, timeoutMs);
+          safeResolve('completed');
+        }
+      });
 
-        sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
-          if (status.isLoaded && status.didJustFinish) {
-            if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
-            sound.setOnPlaybackStatusUpdate(null);
-            safeResolve('completed');
-          }
-        });
-
-        await sound.replayAsync();
-      } catch (error) {
+      sound.replayAsync().catch((error) => {
         console.error('Error playing sound:', assetPath, error);
-        this.currentlyPlaying = null;
+        if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
         safeResolve('error');
-      }
+      });
     });
   }
 

@@ -18,18 +18,23 @@ interface ConfettiPiece {
   scale: Animated.Value;
   color: string;
   size: number;
+  initialX: number; // Track initial X position (avoid accessing Animated._value)
 }
 
 function createConfettiPieces(): ConfettiPiece[] {
-  return Array.from({ length: CONFETTI_COUNT }, (_, index) => ({
-    id: index,
-    translateY: new Animated.Value(-50 - Math.random() * 100), // Start above screen
-    translateX: new Animated.Value(Math.random() * SCREEN_WIDTH),
-    rotation: new Animated.Value(0),
-    scale: new Animated.Value(0.8 + Math.random() * 0.4),
-    color: COLORS[index % COLORS.length],
-    size: 8 + Math.random() * 8,
-  }));
+  return Array.from({ length: CONFETTI_COUNT }, (_, index) => {
+    const initialX = Math.random() * SCREEN_WIDTH;
+    return {
+      id: index,
+      translateY: new Animated.Value(-50 - Math.random() * 100),
+      translateX: new Animated.Value(initialX),
+      rotation: new Animated.Value(0),
+      scale: new Animated.Value(0.8 + Math.random() * 0.4),
+      color: COLORS[index % COLORS.length],
+      size: 8 + Math.random() * 8,
+      initialX,
+    };
+  });
 }
 
 export default function ConfettiCelebration({ visible }: ConfettiCelebrationProps) {
@@ -49,13 +54,15 @@ export default function ConfettiCelebration({ visible }: ConfettiCelebrationProp
         if (!isAnimatingRef.current) return;
 
         const animations = pieces.map((piece) => {
-          // Reset positions for loop
+          // Reset positions for loop - update initialX for each cycle
+          const newInitialX = Math.random() * SCREEN_WIDTH;
+          piece.initialX = newInitialX;
           piece.translateY.setValue(-50 - Math.random() * 100);
-          piece.translateX.setValue(Math.random() * SCREEN_WIDTH);
+          piece.translateX.setValue(newInitialX);
           piece.rotation.setValue(0);
 
           const duration = 2500 + Math.random() * 1500;
-          const endX = piece.translateX._value + (Math.random() - 0.5) * 200;
+          const endX = piece.initialX + (Math.random() - 0.5) * 200;
 
           return Animated.parallel([
             Animated.timing(piece.translateY, {

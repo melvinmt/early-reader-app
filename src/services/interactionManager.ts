@@ -192,7 +192,7 @@ class InteractionManager {
       return;
     }
 
-    // Start card timeout (15s to fallback)
+    // Start card timeout (CARD_TIMEOUT_MS = 45s to fallback)
     this.cardStartTimer = setTimeout(() => {
       console.log('⏱️ Card timeout reached, activating fallback mode');
       this.activateFallbackMode();
