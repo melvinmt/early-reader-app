@@ -8,63 +8,67 @@ class AudioPlayerService {
   private currentlyPlaying: Audio.Sound | null = null;
   private recordingModeEnabled = false;
 
-  /**
-   * Initialize audio mode for playback
-   * @param allowRecording - Set to true when speech recognition is active
-   */
   private async initializeAudio(allowRecording: boolean = false) {
-    // Re-initialize if recording mode changed
     if (this.audioInitialized && this.recordingModeEnabled === allowRecording) {
       return;
     }
     
     try {
       await Audio.setAudioModeAsync({
-        allowsRecordingIOS: allowRecording, // Enable recording when speech recognition is active
-        playsInSilentModeIOS: true, // Play audio even if device is on silent
+        allowsRecordingIOS: allowRecording,
+        playsInSilentModeIOS: true,
         shouldDuckAndroid: true,
         staysActiveInBackground: false,
         playThroughEarpieceAndroid: false,
       });
       this.audioInitialized = true;
       this.recordingModeEnabled = allowRecording;
-      console.log(`Audio mode initialized (recording: ${allowRecording})`);
     } catch (error) {
       console.error('Error initializing audio mode:', error);
     }
   }
 
   /**
-   * Enable recording mode for speech recognition
-   * Note: We don't change expo-av's audio mode here because it conflicts with react-native-voice.
-   * react-native-voice manages its own audio session for speech recognition.
+   * Get or create a sound from the cache
    */
-  async enableRecordingMode(): Promise<void> {
-    // Stop any playing audio to free up the audio session for speech recognition
-    await this.stopAllAudio();
-    // Set the flag so playback functions preserve recording mode
-    this.recordingModeEnabled = true;
-    // Don't call setAudioModeAsync here - let react-native-voice handle it
-    console.log('Recording mode enabled (audio stopped for speech recognition)');
+  private async getOrCreateSound(assetPath: string): Promise<Audio.Sound> {
+    let sound = this.soundCache.get(assetPath);
+    if (sound) return sound;
+
+    const audioSource = getAudioSource(assetPath);
+    let uri: string;
+    
+    if (typeof audioSource === 'number') {
+      const asset = Asset.fromModule(audioSource);
+      await asset.downloadAsync();
+      uri = asset.localUri || asset.uri;
+    } else if (audioSource?.uri) {
+      uri = audioSource.uri;
+    } else {
+      uri = assetPath;
+    }
+
+    const { sound: newSound } = await Audio.Sound.createAsync(
+      { uri },
+      { shouldPlay: false }
+    );
+    this.soundCache.set(assetPath, newSound);
+    return newSound;
   }
 
-  /**
-   * Disable recording mode (playback only)
-   * Restore expo-av audio mode for playback after speech recognition stops
-   */
+  async enableRecordingMode(): Promise<void> {
+    await this.stopAllAudio();
+    this.recordingModeEnabled = true;
+  }
+
   async disableRecordingMode(): Promise<void> {
-    // Re-initialize audio for playback (recording disabled)
-    this.audioInitialized = false; // Force re-initialization
+    this.audioInitialized = false;
     await this.initializeAudio(false);
   }
 
-  /**
-   * Play sound from URI (remote or local file)
-   */
   async playSound(soundUri: string): Promise<void> {
     try {
       let sound = this.soundCache.get(soundUri);
-
       if (!sound) {
         const { sound: newSound } = await Audio.Sound.createAsync(
           { uri: soundUri },
@@ -73,252 +77,116 @@ class AudioPlayerService {
         sound = newSound;
         this.soundCache.set(soundUri, sound);
       }
-
       await sound.replayAsync();
     } catch (error) {
       console.error('Error playing sound:', error);
     }
   }
 
-  /**
-   * Stop all currently playing audio
-   */
   async stopAllAudio(): Promise<void> {
-    try {
-      if (this.currentlyPlaying) {
+    if (this.currentlyPlaying) {
+      try {
         await this.currentlyPlaying.stopAsync();
-        this.currentlyPlaying = null;
+      } catch (error) {
+        // Ignore - sound may already be stopped
       }
-    } catch (error) {
-      console.error('Error stopping audio:', error);
-    }
-  }
-
-  /**
-   * Play sound from static asset path (e.g., "assets/en-US/001-l/audio.mp3")
-   * Uses expo-asset to properly load bundled audio files
-   */
-  async playSoundFromAsset(assetPath: string): Promise<void> {
-    try {
-      // Stop any currently playing audio
-      await this.stopAllAudio();
-      
-      // Initialize audio mode first (preserve current recording mode)
-      await this.initializeAudio(this.recordingModeEnabled);
-      
-      // Check cache first
-      let sound = this.soundCache.get(assetPath);
-
-      if (!sound) {
-        // Get the audio source (require() module or URI)
-        const audioSource = getAudioSource(assetPath);
-        
-        let uri: string;
-        
-        // If it's a require() module (number), use Asset.fromModule to get URI
-        if (typeof audioSource === 'number') {
-          const asset = Asset.fromModule(audioSource);
-          await asset.downloadAsync(); // Ensure asset is loaded
-          uri = asset.localUri || asset.uri;
-        } else if (audioSource?.uri) {
-          // Already a URI object
-          uri = audioSource.uri;
-        } else {
-          // Fallback: try assetPath as-is
-          uri = assetPath;
-        }
-
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          { uri },
-          { shouldPlay: false }
-        );
-        sound = newSound;
-        this.soundCache.set(assetPath, sound);
-      }
-
-      this.currentlyPlaying = sound;
-      await sound.replayAsync();
-      
-      // Clear currentlyPlaying when sound finishes
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          if (this.currentlyPlaying === sound) {
-            this.currentlyPlaying = null;
-          }
-          sound.setOnPlaybackStatusUpdate(null);
-        }
-      });
-    } catch (error) {
-      console.error('Error playing sound from asset:', error);
-      console.error('Asset path was:', assetPath);
       this.currentlyPlaying = null;
     }
   }
 
   /**
-   * Play sound from asset and wait for it to complete
-   * Returns a promise that resolves when the audio finishes playing
+   * Play sound from asset (fire and forget)
+   */
+  async playSoundFromAsset(assetPath: string): Promise<void> {
+    try {
+      await this.stopAllAudio();
+      await this.initializeAudio(this.recordingModeEnabled);
+      
+      const sound = await this.getOrCreateSound(assetPath);
+      this.currentlyPlaying = sound;
+      await sound.replayAsync();
+      
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
+          sound.setOnPlaybackStatusUpdate(null);
+        }
+      });
+    } catch (error) {
+      console.error('Error playing sound:', assetPath, error);
+      this.currentlyPlaying = null;
+    }
+  }
+
+  /**
+   * Play sound and wait for completion
    */
   async playSoundFromAssetAndWait(assetPath: string): Promise<void> {
     return new Promise(async (resolve) => {
       try {
-        // Stop any currently playing audio
         await this.stopAllAudio();
-        
-        // Initialize audio mode first (preserve current recording mode)
         await this.initializeAudio(this.recordingModeEnabled);
         
-        // Check cache first
-        let sound = this.soundCache.get(assetPath);
-
-        if (!sound) {
-          // Get the audio source (require() module or URI)
-          const audioSource = getAudioSource(assetPath);
-          
-          let uri: string;
-          
-          // If it's a require() module (number), use Asset.fromModule to get URI
-          if (typeof audioSource === 'number') {
-            const asset = Asset.fromModule(audioSource);
-            await asset.downloadAsync(); // Ensure asset is loaded
-            uri = asset.localUri || asset.uri;
-          } else if (audioSource?.uri) {
-            // Already a URI object
-            uri = audioSource.uri;
-          } else {
-            // Fallback: try assetPath as-is
-            uri = assetPath;
-          }
-
-          const { sound: newSound } = await Audio.Sound.createAsync(
-            { uri },
-            { shouldPlay: false }
-          );
-          sound = newSound;
-          this.soundCache.set(assetPath, sound);
-        }
-
+        const sound = await this.getOrCreateSound(assetPath);
         this.currentlyPlaying = sound;
 
-        // Set up playback status listener to detect when audio finishes
-        const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+        sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
           if (status.isLoaded && status.didJustFinish) {
-            if (this.currentlyPlaying === sound) {
-              this.currentlyPlaying = null;
-            }
-            sound?.setOnPlaybackStatusUpdate(null);
+            if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
+            sound.setOnPlaybackStatusUpdate(null);
             resolve();
           }
-        };
+        });
 
-        sound.setOnPlaybackStatusUpdate(onPlaybackStatusUpdate);
-
-        // Play sound
         await sound.replayAsync();
       } catch (error) {
-        console.error('Error playing sound from asset:', error);
-        console.error('Asset path was:', assetPath);
+        console.error('Error playing sound:', assetPath, error);
         this.currentlyPlaying = null;
-        // Resolve anyway to not block the flow
         resolve();
       }
     });
   }
 
   /**
-   * Play sound from asset with timeout protection
-   * Returns 'completed' if audio finished, 'timeout' if timeout occurred, or 'error' if error occurred
+   * Play sound with timeout protection
    */
   async playSoundWithTimeout(assetPath: string, timeoutMs: number = 10000): Promise<'completed' | 'timeout' | 'error'> {
     return new Promise(async (resolve) => {
       let timeoutTimer: NodeJS.Timeout | null = null;
       let resolved = false;
-      let sound: Audio.Sound | null = null;
-
-      const cleanup = () => {
-        if (timeoutTimer) {
-          clearTimeout(timeoutTimer);
-          timeoutTimer = null;
-        }
-        if (sound) {
-          sound.setOnPlaybackStatusUpdate(null);
-        }
-      };
 
       const safeResolve = (result: 'completed' | 'timeout' | 'error') => {
-        if (!resolved) {
-          resolved = true;
-          cleanup();
-          resolve(result);
-        }
+        if (resolved) return;
+        resolved = true;
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        resolve(result);
       };
 
       try {
-        // Set up timeout
+        await this.stopAllAudio();
+        await this.initializeAudio(this.recordingModeEnabled);
+        
+        const sound = await this.getOrCreateSound(assetPath);
+        this.currentlyPlaying = sound;
+
         timeoutTimer = setTimeout(() => {
-          console.warn(`Audio playback timeout after ${timeoutMs}ms for: ${assetPath}`);
-          if (sound) {
-            sound.stopAsync().catch(console.error);
-          }
-          this.currentlyPlaying = null;
+          console.warn(`Audio timeout: ${assetPath}`);
+          sound.stopAsync().catch(() => {});
+          if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
           safeResolve('timeout');
         }, timeoutMs);
 
-        // Stop any currently playing audio
-        await this.stopAllAudio();
-        
-        // Initialize audio mode first (preserve current recording mode)
-        await this.initializeAudio(this.recordingModeEnabled);
-        
-        // Check cache first
-        sound = this.soundCache.get(assetPath) || null;
-
-        if (!sound) {
-          // Get the audio source (require() module or URI)
-          const audioSource = getAudioSource(assetPath);
-          
-          let uri: string;
-          
-          // If it's a require() module (number), use Asset.fromModule to get URI
-          if (typeof audioSource === 'number') {
-            const asset = Asset.fromModule(audioSource);
-            await asset.downloadAsync(); // Ensure asset is loaded
-            uri = asset.localUri || asset.uri;
-          } else if (audioSource?.uri) {
-            // Already a URI object
-            uri = audioSource.uri;
-          } else {
-            // Fallback: try assetPath as-is
-            uri = assetPath;
-          }
-
-          const { sound: newSound } = await Audio.Sound.createAsync(
-            { uri },
-            { shouldPlay: false }
-          );
-          sound = newSound;
-          this.soundCache.set(assetPath, sound);
-        }
-
-        this.currentlyPlaying = sound;
-
-        // Set up playback status listener to detect when audio finishes
-        const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+        sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
           if (status.isLoaded && status.didJustFinish) {
-            if (this.currentlyPlaying === sound) {
-              this.currentlyPlaying = null;
-            }
+            if (this.currentlyPlaying === sound) this.currentlyPlaying = null;
+            sound.setOnPlaybackStatusUpdate(null);
             safeResolve('completed');
           }
-        };
+        });
 
-        sound.setOnPlaybackStatusUpdate(onPlaybackStatusUpdate);
-
-        // Play sound
         await sound.replayAsync();
       } catch (error) {
-        console.error('Error playing sound from asset:', error);
-        console.error('Asset path was:', assetPath);
+        console.error('Error playing sound:', assetPath, error);
         this.currentlyPlaying = null;
         safeResolve('error');
       }

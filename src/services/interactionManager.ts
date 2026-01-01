@@ -35,7 +35,6 @@ class InteractionManager {
   
   // Timers
   private watchdogTimer: NodeJS.Timeout | null = null;
-  private audioTimeoutTimer: NodeJS.Timeout | null = null;
   private cardStartTimer: NodeJS.Timeout | null = null;
   
   // State tracking
@@ -410,24 +409,6 @@ class InteractionManager {
   }
 
   /**
-   * Restart listening (attempt recovery)
-   */
-  private async restartListening(): Promise<void> {
-    if (this.state === 'fallback' || this.state === 'matched') {
-      return;
-    }
-
-    try {
-      await speechRecognitionService.stopListening();
-      await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay
-      await this.startListening();
-    } catch (error) {
-      console.error('Error restarting listening:', error);
-      this.activateFallbackMode();
-    }
-  }
-
-  /**
    * Handle speech recognition result
    */
   handleSpeechResult(recognized: string, matched: boolean, confidence: number): void {
@@ -480,25 +461,26 @@ class InteractionManager {
   }
 
   /**
-   * Restart speech recognition after an error or timeout
+   * Restart speech recognition (recovery from errors or stale state)
    */
   private async restartListening(): Promise<void> {
     if (this.state === 'fallback' || this.state === 'matched') {
-      return; // Don't restart in terminal states
+      return;
     }
 
     try {
-      // Brief delay before restarting
+      await speechRecognitionService.stopListening();
       await new Promise(resolve => setTimeout(resolve, 100));
       
+      // Re-check state after delay (might have changed)
       if (this.state === 'fallback' || this.state === 'matched') {
-        return; // Check again after delay
+        return;
       }
 
       await this.startListening();
     } catch (error) {
       console.error('Error restarting speech recognition:', error);
-      // If restart fails, watchdog will eventually activate fallback
+      // Watchdog will handle repeated failures
     }
   }
 
