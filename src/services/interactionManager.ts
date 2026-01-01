@@ -445,18 +445,20 @@ class InteractionManager {
   handleSpeechError(error: string): void {
     this.lastVoiceEventTime = Date.now();
     
+    // Don't restart if we're intentionally stopped (playing audio)
+    if (this.state === 'playing_prompt' || this.state === 'playing_feedback' || 
+        this.state === 'fallback' || this.state === 'matched') {
+      return;
+    }
+    
     // Handle "No speech detected" errors (error code 1110)
-    // These are expected when the user doesn't speak - restart listening to continue
     if (error.includes('1110') || error.includes('No speech detected')) {
-      console.log('🎤 No speech detected - restarting speech recognition');
-      // Restart speech recognition to continue listening
+      console.log('🎤 No speech detected - restarting');
       this.restartListening();
       return;
     }
     
     console.error('🎤 Speech recognition error:', error);
-    
-    // For other errors, try to restart - watchdog will handle repeated failures
     this.restartListening();
   }
 
@@ -464,7 +466,8 @@ class InteractionManager {
    * Restart speech recognition (recovery from errors or stale state)
    */
   private async restartListening(): Promise<void> {
-    if (this.state === 'fallback' || this.state === 'matched') {
+    // Only restart if we're supposed to be listening
+    if (this.state !== 'listening') {
       return;
     }
 
@@ -472,15 +475,14 @@ class InteractionManager {
       await speechRecognitionService.stopListening();
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Re-check state after delay (might have changed)
-      if (this.state === 'fallback' || this.state === 'matched') {
+      // Re-check state after delay
+      if (this.state !== 'listening') {
         return;
       }
 
       await this.startListening();
     } catch (error) {
       console.error('Error restarting speech recognition:', error);
-      // Watchdog will handle repeated failures
     }
   }
 
@@ -523,7 +525,8 @@ class InteractionManager {
       return;
     }
 
-    // Stop speech recognition and switch audio mode to playback
+    // Set state BEFORE stopping to prevent error handlers from restarting
+    this.notifyStateChange('playing_feedback');
     await this.pauseListening();
     await audioPlayer.disableRecordingMode();
 
