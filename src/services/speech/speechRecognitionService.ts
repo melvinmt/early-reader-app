@@ -20,10 +20,25 @@ export interface FuzzyMatchResult {
 }
 
 class SpeechRecognitionService {
-  private isListening = false;
+  private _isListening = false;
   private recognizedText: string | null = null;
   private isAvailable = false;
   private availabilityChecked = false;
+
+  /**
+   * Get current listening state (our internal flag)
+   * For accurate state, use syncState() or isRecognizing()
+   */
+  get isListening(): boolean {
+    return this._isListening;
+  }
+
+  /**
+   * Mark as stopped (call when Voice events indicate speech ended)
+   */
+  markAsStopped(): void {
+    this._isListening = false;
+  }
 
   /**
    * Check if speech recognition is available on the device
@@ -48,38 +63,39 @@ class SpeechRecognitionService {
 
   /**
    * Start listening for speech recognition
+   * Always forces a clean start by stopping any existing session first
    */
   async startListening(locale: string = 'en-US'): Promise<{ available: boolean; error?: string }> {
-    if (this.isListening) {
+    // Prevent concurrent starts
+    if (this._isListening) {
       console.log('🎤 Already listening, skipping start');
       return { available: true };
     }
 
     try {
-      console.log('🎤 Checking availability...');
       const available = await this.checkAvailability();
       if (!available) {
         console.error('🎤 Speech recognition not available on this device');
         return { available: false, error: 'Speech recognition not available' };
       }
 
-      // Clear previous results
+      // Force stop any existing session for clean state
+      try {
+        await Voice.stop();
+      } catch (e) {
+        // Ignore - might not have been started
+      }
+
       this.recognizedText = null;
 
-      console.log('🎤 Calling Voice.start() with locale:', locale);
+      console.log('🎤 Starting Voice with locale:', locale);
       await Voice.start(locale);
-      this.isListening = true;
-      console.log('🎤 Voice.start() succeeded - now listening');
+      this._isListening = true;
+      console.log('🎤 Voice started successfully');
       return { available: true };
     } catch (error: any) {
-      console.error('🎤 Voice.start() failed:', error);
-      console.error('🎤 Error details:', {
-        message: error?.message,
-        code: error?.code,
-        name: error?.name,
-        stack: error?.stack,
-      });
-      this.isListening = false;
+      console.error('🎤 Voice.start() failed:', error?.message || error);
+      this._isListening = false;
       return { 
         available: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -89,19 +105,15 @@ class SpeechRecognitionService {
 
   /**
    * Stop listening for speech recognition
+   * Always tries to stop, even if we think we're not listening (to handle desyncs)
    */
   async stopListening(): Promise<void> {
-    if (!this.isListening) {
-      return;
-    }
-
     try {
       await Voice.stop();
-      this.isListening = false;
     } catch (error) {
-      console.error('Error stopping speech recognition:', error);
-      this.isListening = false;
+      // Ignore errors - may not have been started
     }
+    this._isListening = false;
   }
 
   /**
@@ -110,7 +122,7 @@ class SpeechRecognitionService {
   async cancel(): Promise<void> {
     try {
       await Voice.cancel();
-      this.isListening = false;
+      this._isListening = false;
       this.recognizedText = null;
     } catch (error) {
       console.error('Error canceling speech recognition:', error);
@@ -123,21 +135,10 @@ class SpeechRecognitionService {
   async destroy(): Promise<void> {
     try {
       await Voice.destroy();
-      this.isListening = false;
+      this._isListening = false;
       this.recognizedText = null;
     } catch (error) {
       console.error('Error destroying speech recognition:', error);
-    }
-  }
-
-  /**
-   * Get current recognition status
-   */
-  async isRecognizing(): Promise<boolean> {
-    try {
-      return await Voice.isRecognizing();
-    } catch (error) {
-      return false;
     }
   }
 

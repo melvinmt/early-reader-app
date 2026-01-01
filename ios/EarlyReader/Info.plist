@@ -34,6 +34,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSMinimumSystemVersion</key>
 	<string>15.1</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -47,6 +49,8 @@
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Early Reader needs access to your microphone to help your child practice pronunciation.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Early Reader uses photos to display learning card images.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Early Reader needs speech recognition to help your child learn to read by practicing pronunciation.</string>
 	<key>NSUserActivityTypes</key>

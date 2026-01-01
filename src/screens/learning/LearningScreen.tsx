@@ -10,7 +10,7 @@ import WordSwipeDetector from '@/components/lesson/WordSwipeDetector';
 import ConfettiCelebration from '@/components/ui/ConfettiCelebration';
 import { createSession, updateSession } from '@/services/storage/database';
 import { isTablet, responsiveFontSize, responsiveSpacing } from '@/utils/responsive';
-import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { interactionManager, InteractionState } from '@/services/interactionManager';
 
 type LearningState = 'loading' | 'ready' | 'revealing';
 
@@ -31,8 +31,10 @@ export default function LearningScreen() {
   const [cardsCompleted, setCardsCompleted] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [pronunciationAttempts, setPronunciationAttempts] = useState(0);
   const [pronunciationFailed, setPronunciationFailed] = useState(false);
+  const [interactionState, setInteractionState] = useState<InteractionState>('idle');
+  const [recognizedText, setRecognizedText] = useState<string | null>(null);
+  const [speechEnabled, setSpeechEnabled] = useState(false);
 
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const cardQueueRef = useRef<LearningCard[]>([]);
@@ -40,16 +42,14 @@ export default function LearningScreen() {
   const wordTapDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingRef = useRef(false);
 
-  // Speech recognition hook
-  const speechRecognition = useSpeechRecognition({
-    targetText: currentCard?.word || '',
-    onMatch: (confidence) => {
-      console.log('Pronunciation matched with confidence:', confidence);
-    },
-    onError: (error) => {
-      console.error('Speech recognition error:', error);
-    },
-  });
+  // Set up Voice handlers once on mount
+  useEffect(() => {
+    interactionManager.setupVoiceHandlers();
+    
+    return () => {
+      interactionManager.removeVoiceHandlers();
+    };
+  }, []); // Only run once on mount
 
   useEffect(() => {
     if (!childId) {
@@ -58,12 +58,28 @@ export default function LearningScreen() {
       return;
     }
 
+    // Subscribe to state changes
+    const unsubscribeState = interactionManager.onStateChange((state) => {
+      setInteractionState(state);
+    });
+    
+    // Subscribe to speech results
+    const unsubscribeSpeech = interactionManager.onSpeechResult((result) => {
+      setRecognizedText(result.text);
+    });
+    
+    // Check if speech recognition is enabled
+    interactionManager.isEnabled().then(setSpeechEnabled);
+
     initializeSession();
     // Load initial card queue, then load first card
     loadCardQueue().then(() => loadNextCard());
 
     return () => {
       cleanup();
+      interactionManager.reset();
+      unsubscribeState();
+      unsubscribeSpeech();
       // Cleanup debounce timer
       if (wordTapDebounceRef.current) {
         clearTimeout(wordTapDebounceRef.current);
@@ -107,33 +123,6 @@ export default function LearningScreen() {
     return text.length <= 2;
   };
 
-  const playPromptAudio = async (card: LearningCard) => {
-    try {
-      // Play the prompt first (speech recognition not active yet)
-      if (card.distarCard?.promptPath) {
-        await audioPlayer.playSoundFromAssetAndWait(card.distarCard.promptPath);
-      }
-      
-      // Start speech recognition AFTER prompt finishes
-      // Skip for phonemes - iOS is not good at recognizing single sounds
-      if (isPhoneme(card)) {
-        console.log('🎤 Skipping speech recognition for phoneme:', card.word);
-        return;
-      }
-      
-      // Try to start listening - the hook will check if it's actually enabled
-      // This handles the case where isEnabled becomes true after the prompt
-      console.log('🎤 Starting speech recognition after prompt finished');
-      await speechRecognition.startListening();
-    } catch (error) {
-      console.error('Error playing prompt audio:', error);
-      // Try to start listening even on error (but not for phonemes)
-      if (!isPhoneme(card)) {
-        await speechRecognition.startListening();
-      }
-    }
-  };
-
   const handleWordTap = async () => {
     // Debounce rapid taps - prevent playing audio if tapped within last 500ms
     if (wordTapDebounceRef.current) {
@@ -141,17 +130,8 @@ export default function LearningScreen() {
     }
     
     if (currentCard?.distarCard?.audioPath) {
-      // Pause speech recognition during audio playback
-      await speechRecognition.pauseListening();
-      
-      try {
-        await audioPlayer.playSoundFromAssetAndWait(currentCard.distarCard.audioPath);
-      } catch (error) {
-        console.error('Error playing word audio:', error);
-      }
-      
-      // Resume speech recognition after playback
-      await speechRecognition.resumeListening();
+      // Use InteractionManager to play audio with speech recognition paused
+      await interactionManager.playAudioWithPause(currentCard.distarCard.audioPath);
       
       // Set debounce timer
       wordTapDebounceRef.current = setTimeout(() => {
@@ -161,14 +141,15 @@ export default function LearningScreen() {
   };
 
   const playSuccessAudioSequence = async (card: LearningCard): Promise<void> => {
+    // Use timeout-protected audio to prevent getting stuck
     try {
-      // Speech recognition is already stopped at this point (card completed)
+      // Timeout = audio duration + 3 second buffer (dynamic)
       if (card.distarCard?.greatJobPath) {
-        await audioPlayer.playSoundFromAssetAndWait(card.distarCard.greatJobPath);
+        await audioPlayer.playSoundWithTimeout(card.distarCard.greatJobPath);
       }
       await new Promise(resolve => setTimeout(resolve, 1000));
       if (card.distarCard?.audioPath) {
-        await audioPlayer.playSoundFromAssetAndWait(card.distarCard.audioPath);
+        await audioPlayer.playSoundWithTimeout(card.distarCard.audioPath);
       }
     } catch (error) {
       console.error('Error in success audio sequence:', error);
@@ -222,8 +203,9 @@ export default function LearningScreen() {
       return;
     }
     
-    // Clear transcript immediately when loading next card
-    speechRecognition.clearTranscript();
+    // Reset InteractionManager for new card
+    await interactionManager.reset();
+    setRecognizedText(null);
     
     try {
       uiOpacity.setValue(1);
@@ -270,16 +252,12 @@ export default function LearningScreen() {
         setIsImageRevealed(false);
         setAttempts(0);
         setNeededHelp(false);
-        setPronunciationAttempts(0);
         setPronunciationFailed(false);
         setState('ready');
         
-        // Restart speech recognition for new card
-        if (speechRecognition.isEnabled) {
-          speechRecognition.restart();
-        }
-        
-        playPromptAudio(retryCard);
+        // Start interaction for new card
+        const skipSpeech = isPhoneme(retryCard);
+        await interactionManager.startCard(retryCard.word, retryCard.distarCard?.promptPath, skipSpeech);
         
         // Preload next batch in background
         loadCardQueue();
@@ -295,16 +273,12 @@ export default function LearningScreen() {
       setIsImageRevealed(false);
       setAttempts(0);
       setNeededHelp(false);
-      setPronunciationAttempts(0);
       setPronunciationFailed(false);
       setState('ready');
 
-      // Restart speech recognition for new card
-      if (speechRecognition.isEnabled) {
-        speechRecognition.restart();
-      }
-
-      playPromptAudio(card);
+      // Start interaction for new card
+      const skipSpeech = isPhoneme(card);
+      await interactionManager.startCard(card.word, card.distarCard?.promptPath, skipSpeech);
       
       // Preload next batch in background if queue is getting low (exclude the card we just showed)
       if (cardQueueRef.current.length < 5) {
@@ -326,59 +300,42 @@ export default function LearningScreen() {
     
     isProcessingRef.current = true;
 
-    // Track pronunciation failure locally to avoid React state async issues
-    let didFailPronunciation = pronunciationFailed;
-
     if (success) {
-      // Check pronunciation if speech recognition is enabled (skip for phonemes)
-      if (speechRecognition.isEnabled && !isPhoneme(currentCard)) {
-        const hasCorrectPronunciation = speechRecognition.hasCorrectPronunciation;
-        const hasSaidAnything = speechRecognition.hasSaidAnything;
+      // Register swipe attempt (increments swipeAttempts)
+      interactionManager.handleSwipeAttempt();
+      
+      // Check if we can complete (matched OR fallback OR 2nd attempt)
+      const canComplete = interactionManager.canSwipeComplete();
+      const hasMatched = interactionManager.hasMatched();
+      const swipeAttempts = interactionManager.getSwipeAttempts();
 
-        if (!hasCorrectPronunciation) {
-          // Pronunciation check failed
-          const newAttempts = pronunciationAttempts + 1;
-          setPronunciationAttempts(newAttempts);
-
-          // Pause listening while playing feedback audio
-          await speechRecognition.pauseListening();
-
-          if (!hasSaidAnything) {
-            // No input detected
-            if (currentCard.distarCard?.noInputPath) {
-              await audioPlayer.playSoundFromAssetAndWait(currentCard.distarCard.noInputPath);
-            }
-            
-            if (newAttempts >= 2) {
-              // Allow pass on 2nd fail, but mark as pronunciation failed
-              didFailPronunciation = true;
-              setPronunciationFailed(true);
-            } else {
-              // First attempt - allow retry, resume listening
-              await speechRecognition.resumeListening();
-              isProcessingRef.current = false;
-              return;
-            }
-          } else {
-            // Incorrect pronunciation
-            if (currentCard.distarCard?.tryAgainPath) {
-              await audioPlayer.playSoundFromAssetAndWait(currentCard.distarCard.tryAgainPath);
-            }
-            
-            if (newAttempts >= 2) {
-              // Allow pass on 2nd fail, but mark as pronunciation failed
-              didFailPronunciation = true;
-              setPronunciationFailed(true);
-            } else {
-              // First attempt - allow retry, resume listening
-              await speechRecognition.resumeListening();
-              isProcessingRef.current = false;
-              return;
-            }
-          }
+      if (!canComplete) {
+        // First swipe without match - play feedback and allow retry
+        // Use timeout to ensure we never get stuck
+        const feedbackPath = recognizedText 
+          ? currentCard.distarCard?.tryAgainPath 
+          : currentCard.distarCard?.noInputPath;
+        
+        if (feedbackPath) {
+          const FEEDBACK_TIMEOUT = 30000; // 30 seconds safety net
+          await Promise.race([
+            interactionManager.playFeedbackThenResume(feedbackPath),
+            new Promise(resolve => setTimeout(resolve, FEEDBACK_TIMEOUT))
+          ]);
         }
-        // If hasCorrectPronunciation is true, proceed normally
+        
+        isProcessingRef.current = false;
+        return;
       }
+
+      // Can complete - mark pronunciation failed if we didn't match and speech was enabled
+      const didFailPronunciation = speechEnabled && !isPhoneme(currentCard) && !hasMatched;
+      if (didFailPronunciation) {
+        setPronunciationFailed(true);
+      }
+
+      // Stop speech recognition and watchdog before reveal
+      await interactionManager.reset();
 
       setState('revealing');
       
@@ -391,15 +348,20 @@ export default function LearningScreen() {
       setIsImageRevealed(true);
       setShowConfetti(true);
       
-      await playSuccessAudioSequence(currentCard);
+      // Master timeout - safety net (individual audio has dynamic timeouts)
+      const REVEAL_TIMEOUT = 60000; // 60 seconds
+      await Promise.race([
+        playSuccessAudioSequence(currentCard),
+        new Promise(resolve => setTimeout(resolve, REVEAL_TIMEOUT))
+      ]);
       
       try {
         await recordCardCompletion(childId, currentCard.word, {
           success: true,
           attempts: attempts + 1,
-          matchScore: 1.0,
+          matchScore: hasMatched ? (interactionManager.getMatchConfidence() || 1.0) : 0.5,
           neededHelp,
-          pronunciationFailed: speechRecognition.isEnabled && !isPhoneme(currentCard) ? didFailPronunciation : false,
+          pronunciationFailed: didFailPronunciation,
         });
         
         const newCardsCompleted = cardsCompleted + 1;
@@ -533,11 +495,11 @@ export default function LearningScreen() {
       <View style={dynamicStyles.content}>
         <View style={dynamicStyles.combinedCard}>
           {/* Pronunciation indicator (only shown when speech recognition is enabled and not a phoneme) */}
-          {speechRecognition.isEnabled && currentCard && !isPhoneme(currentCard) && (
+          {speechEnabled && currentCard && !isPhoneme(currentCard) && (
             <View style={dynamicStyles.pronunciationIndicator}>
-              {speechRecognition.hasCorrectPronunciation ? (
+              {interactionManager.hasMatched() ? (
                 <Text style={dynamicStyles.pronunciationCheck}>✓</Text>
-              ) : speechRecognition.state === 'incorrect' || speechRecognition.state === 'no-input' ? (
+              ) : interactionState === 'listening' && recognizedText ? (
                 <Text style={dynamicStyles.pronunciationX}>✗</Text>
               ) : null}
             </View>
@@ -561,41 +523,47 @@ export default function LearningScreen() {
         </View>
         
         {/* Transcript feedback for parents (replaces swipe hint when speech recognition is enabled and not a phoneme) */}
-        {speechRecognition.isEnabled && currentCard && !isPhoneme(currentCard) ? (
+        {speechEnabled && currentCard && !isPhoneme(currentCard) ? (
           <View style={dynamicStyles.transcriptContainer}>
-            {speechRecognition.recognizedText ? (
+            {recognizedText ? (
               <>
                 <View style={dynamicStyles.transcriptRow}>
-                  {speechRecognition.hasCorrectPronunciation ? (
+                  {interactionManager.hasMatched() ? (
                     <>
                       <Text style={dynamicStyles.transcriptCheck}>✓</Text>
-                      <Text style={dynamicStyles.transcriptText}>{speechRecognition.recognizedText}</Text>
+                      <Text style={dynamicStyles.transcriptText}>{recognizedText}</Text>
                     </>
                   ) : (
                     <>
                       <Text style={dynamicStyles.transcriptX}>X</Text>
-                      <Text style={dynamicStyles.transcriptText}>{speechRecognition.recognizedText}</Text>
+                      <Text style={dynamicStyles.transcriptText}>{recognizedText}</Text>
                     </>
                   )}
                 </View>
                 <Text style={dynamicStyles.transcriptMessage}>
-                  {speechRecognition.hasCorrectPronunciation 
-                    ? (speechRecognition.recognizedText?.toLowerCase() === currentCard?.word?.toLowerCase()
+                  {interactionManager.hasMatched() 
+                    ? (recognizedText?.toLowerCase() === currentCard?.word?.toLowerCase()
                         ? 'Correct! Swipe right to reveal the picture.' 
                         : 'Close enough! Swipe right to reveal the picture.')
+                    : interactionState === 'fallback'
+                    ? 'Swipe right to continue'
                     : 'Please try again!'}
                 </Text>
               </>
-            ) : speechRecognition.state === 'listening' ? (
+            ) : interactionState === 'listening' ? (
               <Text style={dynamicStyles.transcriptMessage}>Listening...</Text>
+            ) : interactionState === 'fallback' ? (
+              <Text style={dynamicStyles.transcriptMessage}>Swipe right to continue</Text>
             ) : null}
           </View>
         ) : (
-          <Text style={dynamicStyles.swipeHint}>Swipe right to reveal the image</Text>
+          <Text style={dynamicStyles.swipeHint}>
+            {interactionState === 'fallback' ? 'Swipe right to continue' : 'Swipe right to reveal the image'}
+          </Text>
         )}
       </View>
 
-      <ConfettiCelebration visible={showConfetti} onComplete={() => setShowConfetti(false)} />
+      <ConfettiCelebration visible={showConfetti} onComplete={() => {}} />
     </View>
   );
 }
