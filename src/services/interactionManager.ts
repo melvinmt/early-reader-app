@@ -133,24 +133,23 @@ class InteractionManager {
 
   /**
    * Check if swipe can complete the card
-   * Returns true if:
-   * - pronunciation matched, OR
-   * - fallback mode active, OR
-   * - this is 2nd swipe attempt (swipeAttempts >= 2)
    * 
-   * Note: handleSwipeAttempt() should be called before this to increment swipeAttempts
+   * PRIORITY ORDER (first match wins):
+   * 1. 2-swipe override - ALWAYS allows completion regardless of state
+   * 2. Pronunciation matched
+   * 3. Fallback mode active
    */
   canSwipeComplete(): boolean {
-    if (this.state === 'fallback') {
+    // 2-SWIPE OVERRIDE: Always works, no matter what state we're in
+    if (this.swipeAttempts >= 2) {
       return true;
     }
+    // Pronunciation matched
     if (this.hasCorrectPronunciation) {
       return true;
     }
-    // After handleSwipeAttempt is called:
-    // - 1st swipe: swipeAttempts = 1, returns false (allows retry)
-    // - 2nd swipe: swipeAttempts = 2, returns true (allows completion)
-    if (this.swipeAttempts >= 2) {
+    // Fallback mode
+    if (this.state === 'fallback') {
       return true;
     }
     return false;

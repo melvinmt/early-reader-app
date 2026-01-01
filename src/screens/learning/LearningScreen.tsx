@@ -315,12 +315,17 @@ export default function LearningScreen() {
 
       if (!canComplete) {
         // First swipe without match - play feedback and allow retry
+        // Use timeout to ensure we never get stuck
         const feedbackPath = recognizedText 
           ? currentCard.distarCard?.tryAgainPath 
           : currentCard.distarCard?.noInputPath;
         
         if (feedbackPath) {
-          await interactionManager.playFeedbackThenResume(feedbackPath);
+          const FEEDBACK_TIMEOUT = 5000;
+          await Promise.race([
+            interactionManager.playFeedbackThenResume(feedbackPath),
+            new Promise(resolve => setTimeout(resolve, FEEDBACK_TIMEOUT))
+          ]);
         }
         
         isProcessingRef.current = false;
