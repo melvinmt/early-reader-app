@@ -254,6 +254,8 @@ class InteractionManager {
     Voice.onSpeechEnd = () => {
       console.log('🎤 onSpeechEnd event fired');
       this.lastVoiceEventTime = Date.now();
+      // Sync state - Voice API stopped listening
+      speechRecognitionService.markAsStopped();
     };
 
     Voice.onSpeechResults = (event: any) => {
@@ -309,6 +311,8 @@ class InteractionManager {
 
     Voice.onSpeechError = (event: any) => {
       const error = event.error?.message || event.error || 'Unknown error';
+      // Sync state - error means Voice API stopped
+      speechRecognitionService.markAsStopped();
       // handleSpeechError will filter benign errors and log appropriately
       this.handleSpeechError(error);
     };
@@ -368,8 +372,8 @@ class InteractionManager {
       }
 
       try {
-        // Check if Voice API thinks it's recognizing
-        const isRecognizing = await Voice.isRecognizing();
+        // Sync our internal state with Voice API
+        const isRecognizing = await speechRecognitionService.syncState();
         
         // Check if we've received any voice events recently
         const timeSinceLastEvent = Date.now() - this.lastVoiceEventTime;

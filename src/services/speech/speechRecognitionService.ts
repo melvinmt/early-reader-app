@@ -20,10 +20,46 @@ export interface FuzzyMatchResult {
 }
 
 class SpeechRecognitionService {
-  private isListening = false;
+  private _isListening = false;
   private recognizedText: string | null = null;
   private isAvailable = false;
   private availabilityChecked = false;
+
+  /**
+   * Get current listening state (our internal flag)
+   * For accurate state, use syncState() or isRecognizing()
+   */
+  get isListening(): boolean {
+    return this._isListening;
+  }
+
+  /**
+   * Sync our internal flag with actual Voice API state
+   * Call this after any Voice event to ensure consistency
+   */
+  async syncState(): Promise<boolean> {
+    try {
+      const actuallyRecognizing = await Voice.isRecognizing();
+      if (this._isListening !== actuallyRecognizing) {
+        console.log(`🎤 State sync: ${this._isListening} → ${actuallyRecognizing}`);
+        this._isListening = actuallyRecognizing;
+      }
+      return actuallyRecognizing;
+    } catch (error) {
+      console.error('Error syncing speech recognition state:', error);
+      // On error, assume not listening to be safe
+      this._isListening = false;
+      return false;
+    }
+  }
+
+  /**
+   * Mark as stopped (call when Voice events indicate speech ended)
+   * This is called from event handlers to keep state in sync
+   */
+  markAsStopped(): void {
+    this._isListening = false;
+  }
 
   /**
    * Check if speech recognition is available on the device
@@ -55,15 +91,15 @@ class SpeechRecognitionService {
       // Check actual Voice API state - our isListening flag can get out of sync
       const actuallyRecognizing = await this.isRecognizing();
       
-      if (this.isListening && actuallyRecognizing) {
+      if (this._isListening && actuallyRecognizing) {
         console.log('🎤 Already listening (verified), skipping start');
         return { available: true };
       }
       
       // If our flag says listening but Voice API says not - we're desynced
-      if (this.isListening && !actuallyRecognizing) {
+      if (this._isListening && !actuallyRecognizing) {
         console.log('🎤 State desync detected - our flag says listening but Voice API says not. Resetting.');
-        this.isListening = false;
+        this._isListening = false;
       }
 
       console.log('🎤 Checking availability...');
@@ -86,7 +122,7 @@ class SpeechRecognitionService {
 
       console.log('🎤 Calling Voice.start() with locale:', locale);
       await Voice.start(locale);
-      this.isListening = true;
+      this._isListening = true;
       console.log('🎤 Voice.start() succeeded - now listening');
       return { available: true };
     } catch (error: any) {
@@ -97,7 +133,7 @@ class SpeechRecognitionService {
         name: error?.name,
         stack: error?.stack,
       });
-      this.isListening = false;
+      this._isListening = false;
       return { 
         available: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -115,7 +151,7 @@ class SpeechRecognitionService {
     } catch (error) {
       // Ignore errors - may not have been started
     }
-    this.isListening = false;
+    this._isListening = false;
   }
 
   /**
@@ -124,7 +160,7 @@ class SpeechRecognitionService {
   async cancel(): Promise<void> {
     try {
       await Voice.cancel();
-      this.isListening = false;
+      this._isListening = false;
       this.recognizedText = null;
     } catch (error) {
       console.error('Error canceling speech recognition:', error);
@@ -137,7 +173,7 @@ class SpeechRecognitionService {
   async destroy(): Promise<void> {
     try {
       await Voice.destroy();
-      this.isListening = false;
+      this._isListening = false;
       this.recognizedText = null;
     } catch (error) {
       console.error('Error destroying speech recognition:', error);
