@@ -559,7 +559,7 @@ export default function LearningScreen() {
         )}
       </View>
 
-      <ConfettiCelebration visible={showConfetti} onComplete={() => setShowConfetti(false)} />
+      <ConfettiCelebration visible={showConfetti} onComplete={() => {}} />
     </View>
   );
 }
