@@ -414,7 +414,7 @@ const CVC_WORDS: { [vowel: string]: string[] } = {
     'war', 'tar', 'jar', 'far', 'mat', 'hat', 'bat', 'yap', 'nap'
   ],
   'e': [
-    'let', 'met', 'net', 'pet', 'set', 'vet', 'wet', 'yet', 'het',
+    'let', 'met', 'net', 'pet', 'set', 'vet', 'yet', 'het',
     'web', 'gem', 'hem', 'pep', 'yes', 'dew', 'mew', 'pew'
   ],
   'i': [
@@ -751,10 +751,10 @@ async function generateWordCards(): Promise<any[]> {
     ],
     // Lessons 31-40: w, g, sh, ā, h (more sounds)
     '31-40': [
-      'win', 'wit', 'wet', 'wed', 'wag', 'wig', 'will', 'well', 'wall', 'gum',
+      'win', 'wit', 'wed', 'wag', 'wig', 'will', 'well', 'wall', 'gum',
       'run', 'got', 'get', 'gut', 'tag', 'tug', 'rug', 'mug', 'dug', 'hug',
       'wish', 'fish', 'dish', 'shut', 'spot', 'shin', 'ship', 'shop', 'has', 'had',
-      'him', 'his', 'hot', 'hat', 'hut', 'late', 'date', 'gate', 'rate', 'bake'
+      'him', 'his', 'hat', 'hut', 'late', 'date', 'gate', 'rate', 'bake'
     ],
     // Lessons 41-50: k, ō, v, p, ar (more consonants and long o)
     '41-50': [
