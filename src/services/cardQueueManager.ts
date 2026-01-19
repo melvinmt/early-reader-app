@@ -174,6 +174,7 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   // Generate new cards if needed
   const cardsNeeded = CARDS_PER_SESSION - dueCards.length;
   const newCards: LearningCard[] = [];
+  const repeatCards: CardProgress[] = [];
 
   if (cardsNeeded > 0) {
     // Pre-introduce phonemes to ensure enough cards are unlocked
@@ -254,12 +255,40 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     }
   }
 
+  // If we still don't have enough cards, fill with repeat review cards
+  // to ensure we always serve a full session of 20 cards.
+  const remainingNeeded = CARDS_PER_SESSION - (dueCards.length + newCards.length);
+  if (remainingNeeded > 0) {
+    const allProgress = await getAllCardsForChild(childId);
+    const excluded = new Set<string>([
+      ...dueCards.map(p => p.word),
+      ...newCards.map(c => c.word),
+    ]);
+
+    for (const progress of allProgress) {
+      if (!excluded.has(progress.word)) {
+        repeatCards.push(progress);
+        excluded.add(progress.word);
+      }
+      if (repeatCards.length >= remainingNeeded) {
+        break;
+      }
+    }
+  }
+
   // Combine due cards and new cards
   const allCards: LearningCard[] = [
     ...dueCards.map((progress) => ({
       word: progress.word,
       phonemes: [], // Will be loaded from cache or regenerated
       imageUrl: '', // Will be loaded from cache
+      progress,
+      level: currentLevel,
+    })),
+    ...repeatCards.map((progress) => ({
+      word: progress.word,
+      phonemes: [],
+      imageUrl: '',
       progress,
       level: currentLevel,
     })),
