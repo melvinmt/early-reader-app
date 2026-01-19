@@ -202,7 +202,7 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     throw new Error(`Invalid level: ${currentLevel}`);
   }
 
-  const sessionDate = new Date().toISOString().slice(0, 10);
+  const sessionDate = getLocalDateKey(new Date());
   const staticCards = getAllStaticCards();
   const sessionCards = await getSessionCardsForDate(childId, sessionDate);
 
@@ -448,6 +448,13 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     hasMore: validCards.length >= CARDS_PER_SESSION,
     currentLevel, // Return the level at session start
   };
+}
+
+function getLocalDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
