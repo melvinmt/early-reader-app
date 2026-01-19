@@ -19,6 +19,10 @@
 - Added fallback to phonemes/sentences when prioritizing words but none available.
 - Improved card queue filling to aggressively introduce phonemes from ALL lessons (1-100).
 - System now always fills sessions with 20 cards by introducing more phonemes as needed.
+- **CRITICAL FIX**: Fixed lesson progression stalling - phonemes are now proactively introduced
+  at the start of each session, not just when more cards are needed. Before this fix, children
+  could be stuck at level 1 indefinitely even after months of practice.
+- Simulation shows proper progression: Level 69 after 25 sessions (vs Level 27 after 500 sessions before).
 - Tests run: all 107 tests pass (15 test files).
 Next:
 - Validate on-device progression telemetry to confirm real user path advances.
