@@ -73,15 +73,75 @@ const phonemeToCardId: Map<string, string> = new Map();
 // Mapping of word to card ID (for cross-references in sentence cards)
 const wordToCardId: Map<string, string> = new Map();
 
+// Cache of existing card folders: sanitized name -> full cardId (e.g., "bead" -> "541-bead")
+const existingCardIds: Map<string, string> = new Map();
+let existingCardIdsLoaded = false;
+
+/**
+ * Load existing card folder IDs from the assets directory
+ * This ensures we reuse existing folder names instead of creating duplicates
+ */
+function loadExistingCardIds(): void {
+  if (existingCardIdsLoaded) return;
+  
+  const assetsDir = path.join(__dirname, '..', 'assets', LOCALE);
+  if (!fs.existsSync(assetsDir)) {
+    existingCardIdsLoaded = true;
+    return;
+  }
+  
+  const folders = fs.readdirSync(assetsDir, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => d.name);
+  
+  for (const folder of folders) {
+    // Extract the name part after the number prefix (e.g., "541-bead" -> "bead")
+    const match = folder.match(/^\d+-(.+)$/);
+    if (match) {
+      const namePart = match[1];
+      existingCardIds.set(namePart, folder);
+      
+      // Also track the highest number we've seen
+      const numMatch = folder.match(/^(\d+)-/);
+      if (numMatch) {
+        const num = parseInt(numMatch[1], 10);
+        if (num >= globalCardNumber) {
+          globalCardNumber = num;
+        }
+      }
+    }
+  }
+  
+  console.log(`📂 Loaded ${existingCardIds.size} existing card folders (highest number: ${globalCardNumber})`);
+  existingCardIdsLoaded = true;
+}
+
 /**
  * Generate a card ID with a padded number prefix
  * Format: 001-cardname, 002-cardname, etc.
+ * If a folder for this name already exists, reuse that ID
  */
 function generateCardId(name: string): string {
+  // Ensure existing IDs are loaded
+  loadExistingCardIds();
+  
+  const sanitizedName = name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '-').toLowerCase();
+  
+  // Check if we already have a folder for this name
+  const existingId = existingCardIds.get(sanitizedName);
+  if (existingId) {
+    return existingId;
+  }
+  
+  // Create new ID with next available number
   globalCardNumber++;
   const paddedNumber = String(globalCardNumber).padStart(3, '0');
-  const sanitizedName = name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '-').toLowerCase();
-  return `${paddedNumber}-${sanitizedName}`;
+  const newId = `${paddedNumber}-${sanitizedName}`;
+  
+  // Cache it for future lookups
+  existingCardIds.set(sanitizedName, newId);
+  
+  return newId;
 }
 
 /**
@@ -209,7 +269,11 @@ async function generateImage(prompt: string, outputPath: string, displayText?: s
     console.error(`✗ Failed to generate image for ${prompt}:`, error.message);
     if (error.response) {
       console.error('Response status:', error.response.status);
-      console.error('Response data:', JSON.stringify(error.response.data, null, 2));
+      if (error.response.status === 429) {
+        console.error('Rate limit error (429). Response data:', JSON.stringify(error.response.data, null, 2));
+      } else {
+        console.error('Response data:', JSON.stringify(error.response.data, null, 2));
+      }
     }
     // Create placeholder if generation fails
     const placeholderPNG = Buffer.from(
@@ -272,7 +336,11 @@ async function generateAudio(text: string, outputPath: string, emotion: 'happy' 
     console.error(`✗ Failed to generate audio for "${text}":`, error.message);
     if (error.response) {
       console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data?.toString() || 'No data');
+      if (error.response.status === 429) {
+        console.error('Rate limit error (429). Response data:', JSON.stringify(error.response.data, null, 2));
+      } else {
+        console.error('Response data:', error.response.data?.toString() || 'No data');
+      }
     }
     // Create empty file as placeholder
     fs.writeFileSync(outputPath, Buffer.alloc(0));
@@ -398,7 +466,7 @@ Example for "Pam": "Pam is here."
 Example for "ram": "I see a ram."`;
 
     const response = await axios.post(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent',
       {
         contents: [{
           parts: [{
@@ -409,7 +477,7 @@ Example for "ram": "I see a ram."`;
           temperature: 0.7,
           topK: 40,
           topP: 0.95,
-          maxOutputTokens: 50,
+          maxOutputTokens: 75, // Enough for 3-4 word sentences (non-reasoning model, so all tokens go to output)
         }
       },
       {
@@ -436,24 +504,31 @@ Example for "ram": "I see a ram."`;
       }
     }
     
+    // Log the actual response structure to debug
+    console.error('No text in response. Full response structure:', JSON.stringify(response.data, null, 2));
     throw new Error('No text in response');
   } catch (error: any) {
     console.error(`✗ Failed to generate example sentence for "${word}":`, error.message);
-    // Fallback to simple pattern if LLM fails
-    const wordLower = word.toLowerCase();
-    const isCapitalized = word[0] === word[0].toUpperCase() && word[0] !== word[0].toLowerCase();
-    if (isCapitalized) {
-      return `${word} is here.`;
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      if (error.response.status === 429) {
+        console.error('Rate limit error (429). Response data:', JSON.stringify(error.response.data, null, 2));
+      } else {
+        console.error('Response data:', JSON.stringify(error.response.data, null, 2));
+      }
     }
-    return `The ${wordLower} is big.`;
+    // Re-throw error instead of using fallback - this will skip audio generation
+    // so it can be retried on the next run
+    throw error;
   }
 }
 
 /**
  * Generate varied "great job" prompts that repeat the content affirmatively
  * For words and CVC words, includes a short example sentence (3-4 words) generated by LLM
+ * Returns null if example sentence generation fails (so audio generation can be skipped and retried later)
  */
-async function getGreatJobPrompts(content: string, type: 'letter' | 'digraph' | 'word' | 'cvc' | 'sentence'): Promise<string[]> {
+async function getGreatJobPrompts(content: string, type: 'letter' | 'digraph' | 'word' | 'cvc' | 'sentence'): Promise<string[] | null> {
   const prompts: string[] = [];
   
   if (type === 'letter' || type === 'digraph') {
@@ -468,17 +543,24 @@ async function getGreatJobPrompts(content: string, type: 'letter' | 'digraph' | 
       `Well done! The sound ${content} is right.`
     );
   } else if (type === 'word' || type === 'cvc') {
-    const exampleSentence = await getExampleSentence(content);
-    prompts.push(
-      `Great job! You said ${content}. ${exampleSentence}`,
-      `Excellent! You read ${content} correctly. ${exampleSentence}`,
-      `Wonderful! ${content} is right. ${exampleSentence}`,
-      `Perfect! You got ${content}. ${exampleSentence}`,
-      `Awesome! That's correct, ${content}. ${exampleSentence}`,
-      `Fantastic! You read ${content} perfectly. ${exampleSentence}`,
-      `Amazing! ${content} is the right word. ${exampleSentence}`,
-      `Well done! You pronounced ${content} correctly. ${exampleSentence}`
-    );
+    try {
+      const exampleSentence = await getExampleSentence(content);
+      prompts.push(
+        `Great job! You said ${content}. ${exampleSentence}`,
+        `Excellent! You read ${content} correctly. ${exampleSentence}`,
+        `Wonderful! ${content} is right. ${exampleSentence}`,
+        `Perfect! You got ${content}. ${exampleSentence}`,
+        `Awesome! That's correct, ${content}. ${exampleSentence}`,
+        `Fantastic! You read ${content} perfectly. ${exampleSentence}`,
+        `Amazing! ${content} is the right word. ${exampleSentence}`,
+        `Well done! You pronounced ${content} correctly. ${exampleSentence}`
+      );
+    } catch (error) {
+      // Return null to signal that audio generation should be skipped
+      // This allows the script to retry on the next run
+      console.log(`⊘ Skipping great-job audio generation for "${content}" - will retry example sentence generation on next run`);
+      return null;
+    }
   } else { // sentence
     prompts.push(
       `Great job! You read: ${content}.`,
@@ -582,11 +664,17 @@ async function generatePhonemeCards(): Promise<any[]> {
     await generateAudio(phoneme.pronunciation, audioPath, 'neutral', cardLabel);
     
     // Generate one varied "great job" prompt with the phoneme repeated (different variation per card)
-    const greatJobPrompts = await getGreatJobPrompts(phoneme.pronunciation, cardType);
-    const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
-    const greatJobText = greatJobPrompts[greatJobIndex];
     const greatJobPath = path.join(cardDir, 'great-job.mp3');
-    await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
+    if (!fs.existsSync(greatJobPath)) {
+      const greatJobPrompts = await getGreatJobPrompts(phoneme.pronunciation, cardType);
+      if (greatJobPrompts) {
+        const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
+        const greatJobText = greatJobPrompts[greatJobIndex];
+        await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
+      }
+    } else {
+      console.log(`⊘ [${cardLabel}] Skipping existing audio: great-job.mp3`);
+    }
     
     // Determine orthography
     // phoneme.symbol already contains the macron character if hasMacron is true (e.g., "ā", "ē", "ō")
@@ -626,6 +714,9 @@ async function generatePhonemeCards(): Promise<any[]> {
  */
 async function generateWordCards(): Promise<any[]> {
   const cards: any[] = [];
+  
+  // Track processed words to prevent duplicates (words appear in multiple lesson ranges)
+  const processedWords = new Set<string>();
   
   // Full DISTAR word list organized by lesson range
   // Based on DISTAR phonics methodology progression
@@ -739,6 +830,14 @@ async function generateWordCards(): Promise<any[]> {
     const selectedWords = randomSelect(allWordsWithLessons, TEST_CARDS_PER_CATEGORY);
     
     for (const { word, lesson } of selectedWords) {
+      // Skip if we've already processed this word
+      const wordLower = word.toLowerCase();
+      if (processedWords.has(wordLower)) {
+        console.log(`  ⊘ Skipping duplicate word: ${word}`);
+        continue;
+      }
+      processedWords.add(wordLower);
+      
       const phonemes = segmentWordIntoPhonemes(word);
       // Generate card ID with sequential number prefix
       const cardId = generateCardId(word);
@@ -776,11 +875,17 @@ async function generateWordCards(): Promise<any[]> {
       await generateAudio(noInputText, noInputPath, 'neutral', cardLabel);
       
       // Generate one varied "great job" prompt with the word repeated (different variation per card)
-      const greatJobPrompts = await getGreatJobPrompts(word, 'word');
-      const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
-      const greatJobText = greatJobPrompts[greatJobIndex];
       const greatJobPath = path.join(cardDir, 'great-job.mp3');
-      await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
+      if (!fs.existsSync(greatJobPath)) {
+        const greatJobPrompts = await getGreatJobPrompts(word, 'word');
+        if (greatJobPrompts) {
+          const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
+          const greatJobText = greatJobPrompts[greatJobIndex];
+          await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
+        }
+      } else {
+        console.log(`⊘ [${cardLabel}] Skipping existing audio: great-job.mp3`);
+      }
       
       // Generate full word audio - use 'happy' for encouraging learning
       await generateAudio(word, audioPath, 'happy', cardLabel);
@@ -832,19 +937,28 @@ async function generateWordCards(): Promise<any[]> {
     const [startLesson, endLesson] = lessonRange.split('-').map(Number);
     
     for (const word of words) {
-      const lesson = Math.floor((startLesson + endLesson) / 2);
-      
-      const phonemes = segmentWordIntoPhonemes(word);
-      // Generate card ID with sequential number prefix
-      const cardId = generateCardId(word);
-      
-      // Store mapping for cross-references from sentence cards
-      wordToCardId.set(word.toLowerCase(), cardId);
-      
-      const cardLabel = `word:${word}`;
-      console.log(`  Generating ${cardLabel} (${cardId})...`);
-      
-      const cardDir = ensureCardDirectory(cardId);
+      try {
+        // Skip if we've already processed this word (words appear in multiple lesson ranges)
+        const wordLower = word.toLowerCase();
+        if (processedWords.has(wordLower)) {
+          console.log(`  ⊘ Skipping duplicate word: ${word}`);
+          continue;
+        }
+        processedWords.add(wordLower);
+        
+        const lesson = Math.floor((startLesson + endLesson) / 2);
+        
+        const phonemes = segmentWordIntoPhonemes(word);
+        // Generate card ID with sequential number prefix
+        const cardId = generateCardId(word);
+        
+        // Store mapping for cross-references from sentence cards
+        wordToCardId.set(word.toLowerCase(), cardId);
+        
+        const cardLabel = `word:${word}`;
+        console.log(`  Generating ${cardLabel} (${cardId})...`);
+        
+        const cardDir = ensureCardDirectory(cardId);
       
       const imagePath = path.join(cardDir, 'image.webp');
       const promptPath = path.join(cardDir, 'prompt.mp3');
@@ -871,11 +985,17 @@ async function generateWordCards(): Promise<any[]> {
       await generateAudio(noInputText, noInputPath, 'neutral', cardLabel);
       
       // Generate one varied "great job" prompt with the word repeated (different variation per card)
-      const greatJobPrompts = await getGreatJobPrompts(word, 'word');
-      const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
-      const greatJobText = greatJobPrompts[greatJobIndex];
       const greatJobPath = path.join(cardDir, 'great-job.mp3');
-      await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
+      if (!fs.existsSync(greatJobPath)) {
+        const greatJobPrompts = await getGreatJobPrompts(word, 'word');
+        if (greatJobPrompts) {
+          const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
+          const greatJobText = greatJobPrompts[greatJobIndex];
+          await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
+        }
+      } else {
+        console.log(`⊘ [${cardLabel}] Skipping existing audio: great-job.mp3`);
+      }
       
       // Generate full word audio - use 'happy' for encouraging learning
       await generateAudio(word, audioPath, 'happy', cardLabel);
@@ -916,6 +1036,11 @@ async function generateWordCards(): Promise<any[]> {
       });
       
       cardIndex++;
+      } catch (error: any) {
+        console.error(`✗ Error generating word "${word}":`, error.message);
+        // Continue to next word instead of stopping
+        continue;
+      }
     }
   }
   
@@ -988,11 +1113,17 @@ async function generateCVCCards(): Promise<any[]> {
     await generateAudio(noInputText, noInputPath, 'neutral', cardLabel);
     
     // Generate one varied "great job" prompt with the word repeated (different variation per card)
-    const greatJobPrompts = await getGreatJobPrompts(word, 'cvc');
-    const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
-    const greatJobText = greatJobPrompts[greatJobIndex];
     const greatJobPath = path.join(cardDir, 'great-job.mp3');
-    await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
+    if (!fs.existsSync(greatJobPath)) {
+      const greatJobPrompts = await getGreatJobPrompts(word, 'cvc');
+      if (greatJobPrompts) {
+        const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
+        const greatJobText = greatJobPrompts[greatJobIndex];
+        await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
+      }
+    } else {
+      console.log(`⊘ [${cardLabel}] Skipping existing audio: great-job.mp3`);
+    }
     
     // Generate full word audio - use 'happy' for encouraging learning
     await generateAudio(word, audioPath, 'happy', cardLabel);
@@ -1198,11 +1329,17 @@ async function generateSentenceCards(): Promise<any[]> {
     await generateAudio(noInputText, noInputPath, 'neutral', cardLabel);
     
     // Generate one varied "great job" prompt with the sentence repeated (different variation per card)
-    const greatJobPrompts = await getGreatJobPrompts(sentence.text, 'sentence');
-    const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
-    const greatJobText = greatJobPrompts[greatJobIndex];
     const greatJobPath = path.join(cardDir, 'great-job.mp3');
-    await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
+    if (!fs.existsSync(greatJobPath)) {
+      const greatJobPrompts = await getGreatJobPrompts(sentence.text, 'sentence');
+      if (greatJobPrompts) {
+        const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
+        const greatJobText = greatJobPrompts[greatJobIndex];
+        await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
+      }
+    } else {
+      console.log(`⊘ [${cardLabel}] Skipping existing audio: great-job.mp3`);
+    }
     
     // Generate full sentence audio - use 'happy' for encouraging sentences
     await generateAudio(sentence.text, audioPath, 'happy', cardLabel);
@@ -1248,15 +1385,75 @@ async function generateSentenceCards(): Promise<any[]> {
 }
 
 /**
+ * Required files for each card type
+ */
+const REQUIRED_FILES = {
+  base: ['image.webp', 'prompt.mp3', 'try-again.mp3', 'no-input.mp3', 'great-job.mp3', 'audio.mp3'],
+  withSoundedOut: ['audio-sounded.mp3'], // Additional file for words/CVC
+};
+
+/**
+ * Check if a card folder has all required files
+ * Returns true if all required files exist, false otherwise
+ */
+function isCardComplete(cardId: string, cardType: string): boolean {
+  const cardDir = path.join(ASSETS_DIR, cardId);
+  
+  if (!fs.existsSync(cardDir)) {
+    return false;
+  }
+  
+  // Check base required files
+  for (const file of REQUIRED_FILES.base) {
+    const filePath = path.join(cardDir, file);
+    if (!fs.existsSync(filePath)) {
+      console.log(`⚠ Card ${cardId} missing required file: ${file}`);
+      return false;
+    }
+  }
+  
+  // Check sounded-out file for words and CVC types
+  if (cardType === 'word' || cardType === 'cvc') {
+    for (const file of REQUIRED_FILES.withSoundedOut) {
+      const filePath = path.join(cardDir, file);
+      if (!fs.existsSync(filePath)) {
+        console.log(`⚠ Card ${cardId} missing required file: ${file}`);
+        return false;
+      }
+    }
+  }
+  
+  return true;
+}
+
+/**
  * Generate the static cards TypeScript file
+ * Only includes cards that have all required asset files
  */
 function generateCardsFile(cards: any[]): void {
+  // Filter out incomplete cards
+  const completeCards = cards.filter(card => {
+    const complete = isCardComplete(card.id, card.type);
+    if (!complete) {
+      console.log(`⊘ Excluding incomplete card: ${card.id}`);
+    }
+    return complete;
+  });
+  
+  console.log(`\n📊 Card validation: ${completeCards.length}/${cards.length} cards are complete`);
+  
+  if (completeCards.length < cards.length) {
+    const incompleteCount = cards.length - completeCards.length;
+    console.log(`⚠ ${incompleteCount} incomplete cards will be excluded from the app`);
+  }
+  
   const cardsFile = path.join(__dirname, '..', 'src', 'data', `distarCards.${LOCALE}.ts`);
   
   const content = `/**
  * Pre-generated DISTAR Cards for locale: ${LOCALE}
  * 
- * This file contains all ${cards.length} pre-generated cards following the DISTAR methodology.
+ * This file contains ${completeCards.length} complete pre-generated cards following the DISTAR methodology.
+ * Cards with missing asset files are automatically excluded.
  * Generated by scripts/generate-cards.ts
  * 
  * DO NOT EDIT THIS FILE MANUALLY
@@ -1287,7 +1484,7 @@ export interface DistarCard {
   };
 }
 
-export const DISTAR_CARDS: DistarCard[] = ${JSON.stringify(cards, null, 2)};
+export const DISTAR_CARDS: DistarCard[] = ${JSON.stringify(completeCards, null, 2)};
 
 export const LOCALE = '${LOCALE}';
 
@@ -1323,8 +1520,8 @@ export function getCardsByType(type: DistarCard['type']): DistarCard[] {
   fs.writeFileSync(cardsFile, content);
   console.log(`✓ Generated cards file: ${cardsFile}`);
   
-  // Also generate asset mapping files for React Native
-  generateAssetMappings(cards);
+  // Also generate asset mapping files for React Native (only complete cards)
+  generateAssetMappings(completeCards);
 }
 
 /**
