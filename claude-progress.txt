@@ -9,5 +9,8 @@
 - Tests run: full-journey-simulation.test.ts.
 - Added repeat-card fallback so sessions are always filled (no empty lessons).
 - Tests run: FULL_JOURNEY_SIM=1 full-journey-simulation.test.ts.
+- Enforced 20 cards per session and failed-card reappearance within 3 sessions.
+- Prioritized failed cards in review selection; capped SM-2 interval to avoid date overflow.
+- Tests run: FULL_JOURNEY_SIM=1 full-journey-simulation.test.ts (passes).
 Next:
 - Validate on-device progression telemetry to confirm real user path advances.
