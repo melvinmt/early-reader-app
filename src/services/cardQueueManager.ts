@@ -495,7 +495,7 @@ function preventConsecutiveDuplicates(cards: LearningCard[]): LearningCard[] {
 async function getRecentCardTypeCounts(
   childId: string,
   lookbackCount: number = 10
-): Promise<{ phonemeCount: number; wordCount: number }> {
+): Promise<{ phonemeCount: number; wordCount: number; sentenceCount: number }> {
   const database = await initDatabase();
   const recentCards = await database.getAllAsync<{ word: string }>(
     `SELECT word FROM card_progress 
@@ -508,6 +508,7 @@ async function getRecentCardTypeCounts(
   const allStaticCards = getAllStaticCards();
   let phonemeCount = 0;
   let wordCount = 0;
+  let sentenceCount = 0;
   
   for (const card of recentCards) {
     const staticCard = allStaticCards.find(c => c.plainText === card.word);
@@ -516,11 +517,13 @@ async function getRecentCardTypeCounts(
         phonemeCount++;
       } else if (staticCard.type === 'word') {
         wordCount++;
+      } else if (staticCard.type === 'sentence') {
+        sentenceCount++;
       }
     }
   }
   
-  return { phonemeCount, wordCount };
+  return { phonemeCount, wordCount, sentenceCount };
 }
 
 /**
@@ -603,18 +606,15 @@ async function generateNewCardFromStatic(
     if (!cvcMastered && cvcCards.length > 0) {
       // CVC not mastered - prioritize CVC words
       targetCards = cvcCards;
-    } else if (wordCards.length > 0) {
-      // CVC mastered or no CVC cards - prioritize regular words
-      targetCards = wordCards;
+    } else if (wordCards.length > 0 || sentenceCards.length > 0) {
+      // CVC mastered or no CVC cards - prioritize regular words, allow sentences later
+      targetCards = sentenceCards.length > 0 ? [...wordCards, ...sentenceCards] : wordCards;
     } else if (cvcCards.length > 0) {
       // Fall back to CVC if no regular words
       targetCards = cvcCards;
     } else if (phonemeCards.length > 0) {
       // Fall back to phonemes if no CVC or words
       targetCards = phonemeCards;
-    } else if (sentenceCards.length > 0) {
-      // Last resort: sentences
-      targetCards = sentenceCards;
     }
   } else if (phonemeCards.length > 0) {
     // Use phonemes if available and ratio allows
@@ -622,12 +622,9 @@ async function generateNewCardFromStatic(
   } else if (!cvcMastered && cvcCards.length > 0) {
     // No phonemes available, prioritize CVC if not mastered
     targetCards = cvcCards;
-  } else if (wordCards.length > 0) {
-    // Fall back to words if no phonemes or CVC
-    targetCards = wordCards;
-  } else if (sentenceCards.length > 0) {
-    // Last resort: sentences
-    targetCards = sentenceCards;
+  } else if (wordCards.length > 0 || sentenceCards.length > 0) {
+    // Fall back to words; allow sentences once CVC is mastered
+    targetCards = sentenceCards.length > 0 ? [...wordCards, ...sentenceCards] : wordCards;
   }
   
   if (targetCards.length === 0) {

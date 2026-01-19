@@ -177,11 +177,12 @@ describe('Full Journey Simulation - Day-Based Progression', () => {
         const currentCards = new Set(queue.cards.map(c => c.word));
         
         // Track card types
-        let sessionCVC = 0, sessionWords = 0, sessionPhonemes = 0;
+        let sessionCVC = 0, sessionWords = 0, sessionPhonemes = 0, sessionSentences = 0;
         for (const card of queue.cards) {
           const staticCard = allStaticCards.find(c => c.plainText === card.word);
           if (staticCard?.type === 'cvc') sessionCVC++;
           else if (staticCard?.type === 'word') sessionWords++;
+          else if (staticCard?.type === 'sentence') sessionSentences++;
           else if (staticCard?.type === 'letter' || staticCard?.type === 'digraph') sessionPhonemes++;
         }
 
@@ -199,7 +200,7 @@ describe('Full Journey Simulation - Day-Based Progression', () => {
         } else {
           console.log(
             `[SIM] Day ${day}, Session ${sessionNum}: level=${lastLevel} cards=${queue.cards.length} ` +
-            `(CVC=${sessionCVC} words=${sessionWords} phonemes=${sessionPhonemes})`
+            `(CVC=${sessionCVC} words=${sessionWords} sentences=${sessionSentences} phonemes=${sessionPhonemes})`
           );
           previousDayCards = currentCards;
         }
