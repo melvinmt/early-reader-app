@@ -408,7 +408,7 @@ function segmentWordIntoPhonemes(word: string): string[] {
  */
 const CVC_WORDS: { [vowel: string]: string[] } = {
   'a': [
-    'jam', 'Pam', 'ram', 'cam', 'fam', 'ram', 'pan', 'ban', 'can',
+    'jam', 'Pam', 'ram', 'cam', 'fam', 'pan', 'ban', 'can',
     'Dan', 'fan', 'man', 'ran', 'tan', 'van', 'sap', 'cap', 'gap',
     'lap', 'map', 'rap', 'tap', 'pat', 'rat', 'cat', 'bar', 'car',
     'war', 'tar', 'jar', 'far', 'mat', 'hat', 'bat', 'yap', 'nap'
@@ -776,7 +776,7 @@ async function generateWordCards(): Promise<any[]> {
       'yes', 'yet', 'yell', 'yam', 'yarn', 'yard', 'year', 'yeast', 'yellow', 'yonder',
       'her', 'fern', 'herd', 'term', 'verb', 'ever', 'never', 'over', 'under', 'after',
       'sister', 'mister', 'winter', 'better', 'letter', 'butter', 'mother', 'father', 'brother', 'other',
-      'moon', 'soon', 'noon', 'room', 'boom', 'zoom', 'broom', 'groom', 'bloom', 'room',
+      'moon', 'soon', 'noon', 'room', 'boom', 'zoom', 'broom', 'groom', 'bloom', 'gloom',
       'food', 'mood', 'cool', 'pool', 'tool', 'wool', 'drool', 'school', 'stool', 'spool',
       'jam', 'jet', 'job', 'jog', 'jug', 'just', 'jump', 'jest', 'join', 'joke',
       'when', 'what', 'where', 'which', 'while', 'white', 'whale', 'wheat', 'wheel', 'whim'
@@ -1065,6 +1065,9 @@ async function generateWordCards(): Promise<any[]> {
 async function generateCVCCards(): Promise<any[]> {
   const cards: any[] = [];
   
+  // Track processed words to prevent duplicates
+  const processedWords = new Set<string>();
+  
   // Get all CVC words
   const allCVCWords = getAllCVCWords();
   
@@ -1074,6 +1077,13 @@ async function generateCVCCards(): Promise<any[]> {
     : allCVCWords;
   
   for (const word of cvcWordsToGenerate) {
+    // Skip if we've already processed this word
+    const wordLower = word.toLowerCase();
+    if (processedWords.has(wordLower)) {
+      console.log(`  ⊘ Skipping duplicate CVC word: ${word}`);
+      continue;
+    }
+    processedWords.add(wordLower);
     const phonemes = segmentWordIntoPhonemes(word.toLowerCase());
     
     // Determine lesson based on phonemes required

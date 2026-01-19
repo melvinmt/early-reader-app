@@ -62,7 +62,7 @@ class AudioPlayerService {
 
   async enableRecordingMode(): Promise<void> {
     await this.stopAllAudio();
-    this.recordingModeEnabled = true;
+    await this.initializeAudio(true);
   }
 
   async disableRecordingMode(): Promise<void> {

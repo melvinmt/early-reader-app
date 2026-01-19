@@ -141,13 +141,16 @@ export default function LearningScreen() {
   };
 
   const playSuccessAudioSequence = async (card: LearningCard): Promise<void> => {
-    // Use timeout-protected audio to prevent getting stuck
+    // Stop any current audio first, then play great-job followed by word audio
     try {
-      // Timeout = audio duration + 3 second buffer (dynamic)
+      await audioPlayer.stopAllAudio();
+      
+      // Play great-job audio first
       if (card.distarCard?.greatJobPath) {
         await audioPlayer.playSoundWithTimeout(card.distarCard.greatJobPath);
       }
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Then play word audio
       if (card.distarCard?.audioPath) {
         await audioPlayer.playSoundWithTimeout(card.distarCard.audioPath);
       }
@@ -301,40 +304,17 @@ export default function LearningScreen() {
     isProcessingRef.current = true;
 
     if (success) {
-      // Register swipe attempt (increments swipeAttempts)
-      interactionManager.handleSwipeAttempt();
-      
-      // Check if we can complete (matched OR fallback OR 2nd attempt)
-      const canComplete = interactionManager.canSwipeComplete();
+      // Right swipe always completes - no conditions
       const hasMatched = interactionManager.hasMatched();
-      const swipeAttempts = interactionManager.getSwipeAttempts();
-
-      if (!canComplete) {
-        // First swipe without match - play feedback and allow retry
-        // Use timeout to ensure we never get stuck
-        const feedbackPath = recognizedText 
-          ? currentCard.distarCard?.tryAgainPath 
-          : currentCard.distarCard?.noInputPath;
-        
-        if (feedbackPath) {
-          const FEEDBACK_TIMEOUT = 30000; // 30 seconds safety net
-          await Promise.race([
-            interactionManager.playFeedbackThenResume(feedbackPath),
-            new Promise(resolve => setTimeout(resolve, FEEDBACK_TIMEOUT))
-          ]);
-        }
-        
-        isProcessingRef.current = false;
-        return;
-      }
-
-      // Can complete - mark pronunciation failed if we didn't match and speech was enabled
+      
+      // Mark pronunciation failed if we didn't match and speech was enabled (informational only)
       const didFailPronunciation = speechEnabled && !isPhoneme(currentCard) && !hasMatched;
       if (didFailPronunciation) {
         setPronunciationFailed(true);
       }
 
-      // Stop speech recognition and watchdog before reveal
+      // Stop all audio and speech recognition before reveal
+      await audioPlayer.stopAllAudio();
       await interactionManager.reset();
 
       setState('revealing');
@@ -348,8 +328,8 @@ export default function LearningScreen() {
       setIsImageRevealed(true);
       setShowConfetti(true);
       
-      // Master timeout - safety net (individual audio has dynamic timeouts)
-      const REVEAL_TIMEOUT = 60000; // 60 seconds
+      // Play completion audio: great-job then word audio
+      const REVEAL_TIMEOUT = 60000; // 60 seconds safety net
       await Promise.race([
         playSuccessAudioSequence(currentCard),
         new Promise(resolve => setTimeout(resolve, REVEAL_TIMEOUT))
@@ -510,6 +490,7 @@ export default function LearningScreen() {
             phonemes={currentCard.phonemes}
             distarCard={currentCard.distarCard}
             onWordTap={handleWordTap}
+            onHintUsed={() => setNeededHelp(true)}
           />
 
           <WordSwipeDetector

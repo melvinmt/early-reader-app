@@ -17,7 +17,7 @@ describe('REQ-DATA-001: Card Structure Completeness', () => {
     DISTAR_CARDS.forEach(card => {
       expect(card.id, `Card ${card.id} missing id`).toBeTruthy();
       expect(card.type, `Card ${card.id} missing type`).toBeTruthy();
-      expect(['letter', 'digraph', 'word', 'sentence']).toContain(card.type);
+      expect(['letter', 'digraph', 'cvc', 'word', 'sentence']).toContain(card.type);
       expect(card.display, `Card ${card.id} missing display`).toBeTruthy();
       expect(card.plainText, `Card ${card.id} missing plainText`).toBeTruthy();
       expect(Array.isArray(card.phonemes), `Card ${card.id} missing phonemes array`).toBe(true);

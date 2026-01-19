@@ -313,6 +313,7 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
       ...newCards.map(c => c.word),
     ]);
 
+    // First try existing progress records
     for (const progress of allProgress) {
       if (!excluded.has(progress.word)) {
         repeatCards.push(progress);
@@ -320,6 +321,31 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
       }
       if (repeatCards.length >= remainingNeeded) {
         break;
+      }
+    }
+    
+    // If still not enough, try to get more unlocked cards that we haven't seen yet
+    // This handles early lessons where progress pool is small
+    if (repeatCards.length < remainingNeeded) {
+      const staticCards = getAllStaticCards();
+      const introducedPhonemes = await getIntroducedPhonemes(childId);
+      const unlockedCards = getUnlockedCards(staticCards, introducedPhonemes);
+      
+      for (const card of unlockedCards) {
+        if (!excluded.has(card.plainText)) {
+          try {
+            const learningCard = await createLearningCardFromDistar(childId, currentLevel, card);
+            if (learningCard) {
+              newCards.push(learningCard);
+              excluded.add(card.plainText);
+            }
+          } catch (e) {
+            // Skip cards that fail to create
+          }
+        }
+        if (newCards.length + prioritizedDue.length + repeatCards.length >= CARDS_PER_SESSION) {
+          break;
+        }
       }
     }
   }
@@ -500,6 +526,12 @@ async function generateNewCardFromStatic(
     } else if (cvcCards.length > 0) {
       // Fall back to CVC if no regular words
       targetCards = cvcCards;
+    } else if (phonemeCards.length > 0) {
+      // Fall back to phonemes if no CVC or words
+      targetCards = phonemeCards;
+    } else if (sentenceCards.length > 0) {
+      // Last resort: sentences
+      targetCards = sentenceCards;
     }
   } else if (phonemeCards.length > 0) {
     // Use phonemes if available and ratio allows
