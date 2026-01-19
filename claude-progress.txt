@@ -22,9 +22,17 @@
 - **CRITICAL FIX**: Fixed lesson progression stalling - phonemes are now proactively introduced
   at the start of each session, not just when more cards are needed. Before this fix, children
   could be stuck at level 1 indefinitely even after months of practice.
-- Fixed level progression to be exactly 1 level per session (level never exceeds session count).
-- Phonemes are introduced to ensure 20 cards per session, but level advancement is gated.
-- Simulation shows proper progression: Level 501 after 500 sessions (exactly 1 per session).
-- Tests run: all 107 tests pass (15 test files).
+- Fixed level progression with day-based simulation:
+  - Early lessons (1-10): Flexible progression to ensure 20 cards per session
+  - After level 10: Natural 1 level per session progression
+  - Same-day replays get same cards (100% overlap), no level advancement
+  - Skip days don't lose progress
+- Added preventConsecutiveDuplicates() to ensure no back-to-back same words in sessions
+- Added comprehensive day-based simulation tests (3 tests):
+  - "progresses through days with replays and skip days"
+  - "skip days do not lose progress"
+  - "same-day replays do not advance level multiple times"
+- Simulation results: 60 days → level 11 (fast early progression, stabilizes after level 10)
+- Tests run: all 113 tests pass (16 test files).
 Next:
 - Validate on-device progression telemetry to confirm real user path advances.
