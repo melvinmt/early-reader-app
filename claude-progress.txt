@@ -12,5 +12,13 @@
 - Enforced 20 cards per session and failed-card reappearance within 3 sessions.
 - Prioritized failed cards in review selection; capped SM-2 interval to avoid date overflow.
 - Tests run: FULL_JOURNEY_SIM=1 full-journey-simulation.test.ts (passes).
+
+2026-01-19
+- Fixed duplicate card ID issue in generate-cards.ts (duplicate 'ram' and 'room' in word lists).
+- Added duplicate detection to generateCVCCards() to prevent duplicate entries in generated cards.
+- Added fallback to phonemes/sentences when prioritizing words but none available.
+- Improved card queue filling to aggressively introduce phonemes from ALL lessons (1-100).
+- System now always fills sessions with 20 cards by introducing more phonemes as needed.
+- Tests run: all 107 tests pass (15 test files).
 Next:
 - Validate on-device progression telemetry to confirm real user path advances.
