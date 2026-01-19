@@ -150,7 +150,8 @@ async function generateImage(prompt: string, outputPath: string, displayText?: s
     let fullPrompt = `${prompt}. Simple, child-friendly illustration, flat design style. Portrait orientation 9:16 aspect ratio, full screen. Vibrant, colorful, engaging background with lots of colors - no white or plain backgrounds. Bright, cheerful, and visually appealing.`;
     
     if (displayText) {
-      fullPrompt += ` The text "${displayText}" must be prominently displayed in large, clear, child-friendly letters in the center of the image.`;
+      // Preserve the exact case of the display text (lowercase for most words, title case for names)
+      fullPrompt += ` The text "${displayText}" must be prominently displayed in large, clear, child-friendly letters in the center of the image. Display the text exactly as written here, preserving the exact case (lowercase letters should be lowercase, capital letters should be capital).`;
     }
     
     const response = await axios.post(
