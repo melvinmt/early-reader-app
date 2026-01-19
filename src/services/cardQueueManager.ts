@@ -200,20 +200,45 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     throw new Error(`Invalid level: ${currentLevel}`);
   }
 
-  // PROACTIVELY introduce all phonemes for the current lesson
-  // This ensures lesson progression isn't blocked by having "enough" cards
-  const currentLessonPhonemes = await getUnintroducedPhonemesForLesson(childId, currentLevel);
-  for (const phoneme of currentLessonPhonemes) {
-    await markPhonemeAsIntroduced(childId, phoneme);
+  // Introduce phonemes for current lesson and all previous lessons first
+  for (let lesson = 1; lesson <= currentLevel; lesson++) {
+    const lessonPhonemes = await getUnintroducedPhonemesForLesson(childId, lesson);
+    for (const phoneme of lessonPhonemes) {
+      await markPhonemeAsIntroduced(childId, phoneme);
+    }
   }
   
-  // After introducing phonemes, keep advancing through lessons until we hit one that's not complete
-  // This handles lessons with no phonemes (they auto-complete)
-  let advanceAttempts = 0;
-  const maxAdvanceAttempts = 10; // Safety limit per session
-  while (await advanceLessonIfReady(childId) && advanceAttempts < maxAdvanceAttempts) {
-    advanceAttempts++;
+  // Check if we have enough unlocked cards to fill a session
+  // If not, introduce phonemes from future lessons ONLY to unlock more cards
+  // But level advancement is still limited to 1 per session
+  const staticCards = getAllStaticCards();
+  let introducedPhonemes = await getIntroducedPhonemes(childId);
+  let unlockedCards = getUnlockedCards(staticCards, introducedPhonemes);
+  
+  // Get seen words to check available new cards
+  const database = await initDatabase();
+  const existingWords = await database.getAllAsync<{ word: string }>(
+    `SELECT DISTINCT word FROM card_progress WHERE child_id = ?`,
+    [childId]
+  );
+  const seenWords = new Set(existingWords.map(w => w.word));
+  
+  // Keep introducing phonemes until we have enough cards for a session
+  let lessonToCheck = currentLevel + 1;
+  while (unlockedCards.filter(c => !seenWords.has(c.plainText)).length < CARDS_PER_SESSION && lessonToCheck <= 100) {
+    const lessonPhonemes = await getUnintroducedPhonemesForLesson(childId, lessonToCheck);
+    for (const phoneme of lessonPhonemes) {
+      await markPhonemeAsIntroduced(childId, phoneme);
+    }
+    introducedPhonemes = await getIntroducedPhonemes(childId);
+    unlockedCards = getUnlockedCards(staticCards, introducedPhonemes);
+    lessonToCheck++;
   }
+  
+  // After introducing phonemes, check if we can advance (max 1 level per session start)
+  // This prevents skipping ahead too fast - child must complete a session at each level
+  // Note: Phonemes may be ahead of level, but level only advances once per session
+  await advanceLessonIfReady(childId);
 
   // Get due review cards (spaced repetition)
   const dueCards = await getDueReviewCards(childId, CARDS_PER_SESSION);
@@ -241,85 +266,21 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   const repeatCards: CardProgress[] = [];
 
   if (cardsNeeded > 0) {
-    // Pre-introduce phonemes to ensure enough cards are unlocked
-    // This ensures brand new children get 20 cards, not just a few
-    // Keep introducing phonemes until we have enough unlocked cards
-    const allCards = getAllStaticCards();
-    let introducedPhonemes = await getIntroducedPhonemes(childId);
-    let unlockedCards = getUnlockedCards(allCards, introducedPhonemes);
-    const seenWords = new Set<string>();
-    
-    // Get seen words
-    const database = await initDatabase();
-    const existingWords = await database.getAllAsync<{ word: string }>(
-      `SELECT DISTINCT word FROM card_progress WHERE child_id = ?`,
-      [childId]
-    );
-    existingWords.forEach(w => seenWords.add(w.word));
-    
-    // Keep introducing phonemes until we have enough available cards
-    // Search ALL lessons (1-100) to find phonemes to introduce
-    let attempts = 0;
-    const maxAttempts = 50; // Safety limit - enough to introduce all phonemes if needed
-    
-    while (unlockedCards.filter(c => !seenWords.has(c.plainText)).length < cardsNeeded && attempts < maxAttempts) {
-      // Search all lessons for unintroduced phonemes, starting from current and expanding outward
-      let foundPhoneme = false;
-      
-      // Try lessons in order of proximity to current level
-      for (let offset = 0; offset <= 100 && !foundPhoneme; offset++) {
-        const lessonsToTry = offset === 0 
-          ? [currentLevel] 
-          : [currentLevel - offset, currentLevel + offset].filter(l => l >= 1 && l <= 100);
-        
-        for (const lesson of lessonsToTry) {
-          const unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, lesson);
-          if (unintroducedPhonemes.length > 0) {
-            // Introduce this phoneme
-            await markPhonemeAsIntroduced(childId, unintroducedPhonemes[0]);
-            introducedPhonemes = await getIntroducedPhonemes(childId);
-            unlockedCards = getUnlockedCards(allCards, introducedPhonemes);
-            foundPhoneme = true;
-            break;
-          }
-        }
-      }
-      
-      if (!foundPhoneme) {
-        break; // No more phonemes available anywhere
-      }
-      attempts++;
-    }
-    
-    // Use pre-generated DISTAR cards only (no AI generation)
-    // Keep trying until we have enough cards or exhaust available cards
-    let generationAttempts = 0;
-    const maxGenerationAttempts = cardsNeeded * 2; // Allow extra attempts
-    
-    while (newCards.length < cardsNeeded && generationAttempts < maxGenerationAttempts) {
+    // Generate new cards from static DISTAR cards (only using already-introduced phonemes)
+    // We DON'T introduce new phonemes here - that happens at session start for current lesson only
+    // This ensures level never exceeds session count
+    for (let i = 0; i < cardsNeeded; i++) {
       try {
         const card = await generateNewCardFromStatic(childId, currentLevel);
         if (card) {
           newCards.push(card);
         } else {
-          // No more cards available from generateNewCardFromStatic
-          // Try introducing more phonemes
-          let foundNewPhoneme = false;
-          for (let lesson = 1; lesson <= 100 && !foundNewPhoneme; lesson++) {
-            const unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, lesson);
-            if (unintroducedPhonemes.length > 0) {
-              await markPhonemeAsIntroduced(childId, unintroducedPhonemes[0]);
-              foundNewPhoneme = true;
-            }
-          }
-          if (!foundNewPhoneme) {
-            break; // No more phonemes to introduce, can't get more cards
-          }
+          // No more new cards available with current phonemes
+          break;
         }
       } catch (error) {
         console.error('Error loading static card:', error);
       }
-      generationAttempts++;
     }
   }
 
@@ -346,11 +307,10 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     // If still not enough, try to get more unlocked cards that we haven't seen yet
     // This handles early lessons where progress pool is small
     if (repeatCards.length < remainingNeeded) {
-      const staticCards = getAllStaticCards();
-      const introducedPhonemes = await getIntroducedPhonemes(childId);
-      const unlockedCards = getUnlockedCards(staticCards, introducedPhonemes);
+      const currentIntroducedPhonemes = await getIntroducedPhonemes(childId);
+      const currentUnlockedCards = getUnlockedCards(staticCards, currentIntroducedPhonemes);
       
-      for (const card of unlockedCards) {
+      for (const card of currentUnlockedCards) {
         if (!excluded.has(card.plainText)) {
           try {
             const learningCard = await createLearningCardFromDistar(childId, currentLevel, card);
@@ -389,7 +349,7 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   ];
 
   // Load full card data for due cards (from static cards only - no cache fallback for stale cards)
-  const staticCards = getAllStaticCards();
+  // staticCards was already declared earlier in this function
   const validCards: LearningCard[] = [];
   
   for (let i = 0; i < allCards.length; i++) {
@@ -759,17 +719,9 @@ export async function recordCardCompletion(
   if (result.success) {
     await incrementChildCardsCompleted(childId);
   }
-
-  // Check for level progression
-  await checkLevelProgression(childId);
-}
-
-/**
- * Check if child should level up
- * Uses curriculum service to check if current lesson is complete
- */
-async function checkLevelProgression(childId: string): Promise<void> {
-  await advanceLessonIfReady(childId);
+  
+  // Note: Level progression is handled at session start in getCardQueue()
+  // This ensures level never exceeds session count (max 1 level up per session)
 }
 
 /**
