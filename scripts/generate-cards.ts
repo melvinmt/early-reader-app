@@ -380,7 +380,35 @@ function getCardPrompt(type: 'letter' | 'digraph' | 'word' | 'cvc' | 'sentence')
 }
 
 /**
+ * Generate a short example sentence (3-4 words) using the word
+ */
+function getExampleSentence(word: string): string {
+  const wordLower = word.toLowerCase();
+  const isCapitalized = word[0] === word[0].toUpperCase() && word[0] !== word[0].toLowerCase();
+  
+  // Common sentence patterns (3-4 words max)
+  const patterns = [
+    `The ${wordLower} is big.`,
+    `I see a ${wordLower}.`,
+    `The ${wordLower} is here.`,
+    `I like the ${wordLower}.`,
+    `Look at the ${wordLower}.`,
+  ];
+  
+  // For capitalized names, use different patterns
+  if (isCapitalized) {
+    const name = word;
+    return `${name} is here.`;
+  }
+  
+  // Use a simple pattern based on word hash for variety
+  const hash = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return patterns[hash % patterns.length];
+}
+
+/**
  * Generate varied "great job" prompts that repeat the content affirmatively
+ * For words and CVC words, includes a short example sentence (3-4 words)
  */
 function getGreatJobPrompts(content: string, type: 'letter' | 'digraph' | 'word' | 'cvc' | 'sentence'): string[] {
   const prompts: string[] = [];
@@ -397,15 +425,16 @@ function getGreatJobPrompts(content: string, type: 'letter' | 'digraph' | 'word'
       `Well done! The sound ${content} is right.`
     );
   } else if (type === 'word' || type === 'cvc') {
+    const exampleSentence = getExampleSentence(content);
     prompts.push(
-      `Great job! That word is ${content}.`,
-      `Excellent! You read ${content} correctly.`,
-      `Wonderful! ${content} is right.`,
-      `Perfect! You got ${content}.`,
-      `Awesome! That's correct, ${content}.`,
-      `Fantastic! You read ${content} perfectly.`,
-      `Amazing! ${content} is the right word.`,
-      `Well done! You pronounced ${content} correctly.`
+      `Great job! You said ${content}. ${exampleSentence}`,
+      `Excellent! You read ${content} correctly. ${exampleSentence}`,
+      `Wonderful! ${content} is right. ${exampleSentence}`,
+      `Perfect! You got ${content}. ${exampleSentence}`,
+      `Awesome! That's correct, ${content}. ${exampleSentence}`,
+      `Fantastic! You read ${content} perfectly. ${exampleSentence}`,
+      `Amazing! ${content} is the right word. ${exampleSentence}`,
+      `Well done! You pronounced ${content} correctly. ${exampleSentence}`
     );
   } else { // sentence
     prompts.push(
