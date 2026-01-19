@@ -170,9 +170,26 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
 
   // Get due review cards (spaced repetition)
   const dueCards = await getDueReviewCards(childId, CARDS_PER_SESSION);
+  // Prioritize struggled cards first (more failed attempts)
+  dueCards.sort((a, b) => {
+    const failA = (a.attempts ?? 0) - (a.successes ?? 0);
+    const failB = (b.attempts ?? 0) - (b.successes ?? 0);
+    if (failA !== failB) {
+      return failB - failA;
+    }
+    return new Date(a.next_review_at).getTime() - new Date(b.next_review_at).getTime();
+  });
+  // Always surface recently failed cards even if they aren't due yet
+  const allProgress = await getAllCardsForChild(childId);
+  const failedCards = allProgress.filter(
+    (progress) => (progress.attempts ?? 0) > (progress.successes ?? 0)
+  );
+  const dueWords = new Set(dueCards.map(p => p.word));
+  const failedNotDue = failedCards.filter(p => !dueWords.has(p.word));
+  const prioritizedDue = [...failedNotDue, ...dueCards];
 
   // Generate new cards if needed
-  const cardsNeeded = CARDS_PER_SESSION - dueCards.length;
+  const cardsNeeded = CARDS_PER_SESSION - prioritizedDue.length;
   const newCards: LearningCard[] = [];
   const repeatCards: CardProgress[] = [];
 
@@ -257,11 +274,10 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
 
   // If we still don't have enough cards, fill with repeat review cards
   // to ensure we always serve a full session of 20 cards.
-  const remainingNeeded = CARDS_PER_SESSION - (dueCards.length + newCards.length);
+  const remainingNeeded = CARDS_PER_SESSION - (prioritizedDue.length + newCards.length);
   if (remainingNeeded > 0) {
-    const allProgress = await getAllCardsForChild(childId);
     const excluded = new Set<string>([
-      ...dueCards.map(p => p.word),
+      ...prioritizedDue.map(p => p.word),
       ...newCards.map(c => c.word),
     ]);
 
@@ -278,7 +294,7 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
 
   // Combine due cards and new cards
   const allCards: LearningCard[] = [
-    ...dueCards.map((progress) => ({
+    ...prioritizedDue.map((progress) => ({
       word: progress.word,
       phonemes: [], // Will be loaded from cache or regenerated
       imageUrl: '', // Will be loaded from cache

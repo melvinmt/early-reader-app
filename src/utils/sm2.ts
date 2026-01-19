@@ -14,6 +14,8 @@ export interface SM2Input {
   repetitions: number; // Current repetition count
 }
 
+const MAX_INTERVAL_DAYS = 3650; // Cap to avoid date overflow (~10 years)
+
 /**
  * SM-2 Algorithm implementation
  * Quality rating system:
@@ -56,6 +58,9 @@ export function calculateSM2(input: SM2Input): SM2Result {
 
     nextRepetitions = repetitions + 1;
   }
+
+  // Cap interval to avoid overflowing JS Date
+  nextInterval = Math.min(nextInterval, MAX_INTERVAL_DAYS);
 
   // Calculate next review date
   const nextReviewDate = new Date();
@@ -132,6 +137,7 @@ export function calculateCardPriority(
   // Default → high priority (needs attention)
   return 'high';
 }
+
 
 
 

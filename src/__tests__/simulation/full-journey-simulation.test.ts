@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getCardQueue, recordCardCompletion } from '@/services/cardQueueManager';
+import { getCardQueue, recordCardCompletion, CARDS_PER_SESSION } from '@/services/cardQueueManager';
 import { IntegrationTestHelper } from '../session/integration-test-setup';
 import * as configModule from '@/config/locale';
 import * as levelsModule from '@/data/levels';
@@ -29,6 +29,7 @@ describe('Full Journey Simulation - Progression Logs', () => {
   let testHelper: IntegrationTestHelper;
   const runFullJourney = process.env.FULL_JOURNEY_SIM === '1';
   const maxSessions = runFullJourney ? 500 : 25;
+  const maxReappearanceGap = 3;
 
   const hashWord = (word: string): number => {
     let hash = 0;
@@ -105,12 +106,14 @@ describe('Full Journey Simulation - Progression Logs', () => {
 
     let lastLevel = child.current_level;
     let pendingReviewWords = new Set<string>();
+    const failedAtSession = new Map<string, number>();
 
     for (let session = 1; session <= maxSessions; session++) {
       const queue = await getCardQueue(child.id);
       console.log(
         `[SIM] Session ${session}: level=${lastLevel} cards=${queue.cards.length}`
       );
+      expect(queue.cards.length).toBe(CARDS_PER_SESSION);
 
       if (pendingReviewWords.size > 0) {
         const currentWords = new Set(queue.cards.map(c => c.word));
@@ -132,6 +135,17 @@ describe('Full Journey Simulation - Progression Logs', () => {
             expect(progress.attempts).toBeGreaterThan(progress.successes);
           }
         }
+
+        // Ensure failed cards reappear within a bounded number of sessions
+        for (const [word, failedSession] of failedAtSession.entries()) {
+          const gap = session - failedSession;
+          if (gap > maxReappearanceGap) {
+            expect(
+              currentWords.has(word),
+              `Failed card "${word}" did not reappear within ${maxReappearanceGap} sessions`
+            ).toBe(true);
+          }
+        }
       }
 
       const failedThisSession = new Set<string>();
@@ -142,6 +156,7 @@ describe('Full Journey Simulation - Progression Logs', () => {
 
         if (shouldFail) {
           failedThisSession.add(card.word);
+          failedAtSession.set(card.word, session);
           console.log(`[SIM] FAIL -> RETRY: "${card.word}"`);
 
           await recordCardCompletion(child.id, card.word, {
