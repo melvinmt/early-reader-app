@@ -64,6 +64,12 @@ describe('getCardQueue - REAL Implementation Tests', () => {
     mockDatabase.markPhonemeIntroduced.mockImplementation((childId: string, phoneme: string) => 
       testDb.markPhonemeIntroduced(childId, phoneme)
     );
+    mockDatabase.getSessionCardsForDate.mockImplementation((childId: string, sessionDate: string) =>
+      testDb.getSessionCardsForDate(childId, sessionDate)
+    );
+    mockDatabase.saveSessionCardsForDate.mockImplementation((childId: string, sessionDate: string, words: string[]) =>
+      testDb.saveSessionCardsForDate(childId, sessionDate, words)
+    );
     mockDatabase.initDatabase.mockResolvedValue({
       getAllAsync: vi.fn().mockImplementation(async (sql: string, params: any[]) => {
         if (sql.includes('SELECT DISTINCT word')) {

@@ -53,6 +53,12 @@ describe('Same-Day Replay - No Progression Until Next Day', () => {
     mockDatabase.markPhonemeIntroduced.mockImplementation((childId: string, phoneme: string) =>
       testDb.markPhonemeIntroduced(childId, phoneme)
     );
+    mockDatabase.getSessionCardsForDate.mockImplementation((childId: string, sessionDate: string) =>
+      testDb.getSessionCardsForDate(childId, sessionDate)
+    );
+    mockDatabase.saveSessionCardsForDate.mockImplementation((childId: string, sessionDate: string, words: string[]) =>
+      testDb.saveSessionCardsForDate(childId, sessionDate, words)
+    );
     mockDatabase.initDatabase.mockResolvedValue({
       getAllAsync: vi.fn().mockImplementation(async (sql: string, params: any[]) => {
         if (sql.includes('SELECT DISTINCT word')) {
@@ -78,14 +84,14 @@ describe('Same-Day Replay - No Progression Until Next Day', () => {
     }
   });
 
-  it('replaying same day returns similar cards (mostly review)', async () => {
+  it('replaying same day returns the exact same session', async () => {
     const child = await testHelper.createChild({ current_level: 1 });
     
     // First session
     const session1 = await getCardQueue(child.id);
     expect(session1.cards.length).toBe(CARDS_PER_SESSION);
     
-    const session1Words = new Set(session1.cards.map(c => c.word));
+    const session1Words = session1.cards.map(c => c.word);
     
     // Complete all cards
     for (const card of session1.cards) {
@@ -101,17 +107,13 @@ describe('Same-Day Replay - No Progression Until Next Day', () => {
     const session2 = await getCardQueue(child.id);
     expect(session2.cards.length).toBe(CARDS_PER_SESSION);
     
-    const session2Words = new Set(session2.cards.map(c => c.word));
+    const session2Words = session2.cards.map(c => c.word);
     
-    // Calculate overlap - most cards should be from session 1 (now as reviews)
-    const overlap = [...session2Words].filter(w => session1Words.has(w)).length;
-    console.log(`Session overlap: ${overlap}/${CARDS_PER_SESSION} cards repeated`);
-    
-    // At least 50% of cards should be repeats (reviews from session 1)
-    expect(overlap).toBeGreaterThanOrEqual(CARDS_PER_SESSION * 0.5);
+    // Exact same session, same order
+    expect(session2Words).toEqual(session1Words);
   });
 
-  it('level advances only once per day (at first session start)', async () => {
+  it('same-day replays do not advance level', async () => {
     const child = await testHelper.createChild({ current_level: 1 });
     
     // First session - level should advance from 1 to 2
@@ -134,7 +136,7 @@ describe('Same-Day Replay - No Progression Until Next Day', () => {
     
     console.log(`After session 1: level = ${levelAfterSession1}`);
     
-    // Second session same day
+    // Second session same day (replay)
     const session2 = await getCardQueue(child.id);
     const childAfterSession2Start = await testHelper.db.getChild(child.id);
     const levelAfterSession2Start = childAfterSession2Start?.current_level ?? 1;
@@ -154,17 +156,16 @@ describe('Same-Day Replay - No Progression Until Next Day', () => {
     
     console.log(`After session 2: level = ${levelAfterSession2}`);
     
-    // Third session same day
+    // Third session same day (replay)
     const session3 = await getCardQueue(child.id);
     const childAfterSession3Start = await testHelper.db.getChild(child.id);
     const levelAfterSession3 = childAfterSession3Start?.current_level ?? 1;
     
     console.log(`After session 3 start: level = ${levelAfterSession3}`);
     
-    // Level should have advanced each session (since we're not actually tracking days in this test)
-    // In a real scenario with day tracking, it would only advance once per day
-    // For now, verify level advances are happening
-    expect(levelAfterSession1).toBeGreaterThanOrEqual(1);
+    // Level should NOT advance on same-day replays
+    expect(levelAfterSession2).toBe(levelAfterSession1);
+    expect(levelAfterSession3).toBe(levelAfterSession1);
   });
 
   it('can retake lessons multiple times on same day', async () => {

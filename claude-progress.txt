@@ -34,5 +34,7 @@
   - "same-day replays do not advance level multiple times"
 - Simulation results: 60 days → level 11 (fast early progression, stabilizes after level 10)
 - Tests run: all 113 tests pass (16 test files).
+- Re-verified day-based simulation outputs and session invariants (20 cards, no consecutive duplicates).
+- Tests run: npx vitest run (113/113 passing).
 Next:
 - Validate on-device progression telemetry to confirm real user path advances.

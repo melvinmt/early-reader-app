@@ -102,11 +102,26 @@ async function createTables(database: SQLite.SQLiteDatabase) {
     );
   `);
 
+  // Session cards table (persist exact session for replays)
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS session_cards (
+      id TEXT PRIMARY KEY,
+      child_id TEXT NOT NULL,
+      session_date TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      word TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (child_id) REFERENCES children(id),
+      UNIQUE(child_id, session_date, position)
+    );
+  `);
+
   // Create indexes
   await database.execAsync(`
     CREATE INDEX IF NOT EXISTS idx_card_progress_child ON card_progress(child_id);
     CREATE INDEX IF NOT EXISTS idx_card_progress_review ON card_progress(next_review_at);
     CREATE INDEX IF NOT EXISTS idx_sessions_child ON sessions(child_id);
+    CREATE INDEX IF NOT EXISTS idx_session_cards_child_date ON session_cards(child_id, session_date);
     CREATE INDEX IF NOT EXISTS idx_content_cache_type ON content_cache(content_type, content_key);
     CREATE INDEX IF NOT EXISTS idx_introduced_phonemes_child ON introduced_phonemes(child_id);
   `);
@@ -167,6 +182,10 @@ export async function clearTestingData(): Promise<void> {
     // Clear sessions
     await database.execAsync('DELETE FROM sessions;');
     console.log('Cleared sessions table');
+
+    // Clear session cards
+    await database.execAsync('DELETE FROM session_cards;');
+    console.log('Cleared session_cards table');
     
     // Reset children's progress counters
     await database.execAsync(`
@@ -517,6 +536,45 @@ export async function getSessionsByChildId(childId: string): Promise<Session[]> 
     [childId]
   );
   return result;
+}
+
+// Session cards operations (persist exact session for replays)
+export async function getSessionCardsForDate(
+  childId: string,
+  sessionDate: string
+): Promise<string[]> {
+  const database = await initDatabase();
+  const result = await database.getAllAsync<{ word: string }>(
+    `SELECT word FROM session_cards 
+     WHERE child_id = ? AND session_date = ?
+     ORDER BY position ASC`,
+    [childId, sessionDate]
+  );
+  return result.map((row) => row.word);
+}
+
+export async function saveSessionCardsForDate(
+  childId: string,
+  sessionDate: string,
+  words: string[]
+): Promise<void> {
+  const database = await initDatabase();
+  const now = new Date().toISOString();
+
+  // Replace any existing session cards for the day
+  await database.runAsync(
+    `DELETE FROM session_cards WHERE child_id = ? AND session_date = ?`,
+    [childId, sessionDate]
+  );
+
+  for (let i = 0; i < words.length; i++) {
+    const id = `${childId}-${sessionDate}-${i}`;
+    await database.runAsync(
+      `INSERT INTO session_cards (id, child_id, session_date, position, word, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, childId, sessionDate, i, words[i], now]
+    );
+  }
 }
 
 // Introduced phonemes operations

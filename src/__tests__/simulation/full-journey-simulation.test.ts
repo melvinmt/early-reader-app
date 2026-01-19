@@ -82,6 +82,12 @@ describe('Full Journey Simulation - Day-Based Progression', () => {
     mockDatabase.markPhonemeIntroduced.mockImplementation((childId: string, phoneme: string) =>
       testDb.markPhonemeIntroduced(childId, phoneme)
     );
+    mockDatabase.getSessionCardsForDate.mockImplementation((childId: string, sessionDate: string) =>
+      testDb.getSessionCardsForDate(childId, sessionDate)
+    );
+    mockDatabase.saveSessionCardsForDate.mockImplementation((childId: string, sessionDate: string, words: string[]) =>
+      testDb.saveSessionCardsForDate(childId, sessionDate, words)
+    );
     mockDatabase.initDatabase.mockResolvedValue({
       getAllAsync: vi.fn().mockImplementation(async (sql: string, params: any[]) => {
         if (sql.includes('SELECT DISTINCT word')) {
@@ -275,10 +281,8 @@ describe('Full Journey Simulation - Day-Based Progression', () => {
     // Child should have progressed
     expect(lastLevel).toBeGreaterThan(1);
     
-    // Level should roughly track with sessions
-    // Early lessons (1-10) may progress faster, after that ~1 level per session
-    // For 10 days with 8 active days and 15 total sessions, level could be up to ~15
-    expect(lastLevel).toBeLessThanOrEqual(totalSessionsCompleted + 1);
+    // Level should roughly track with active days (one unique session per day)
+    expect(lastLevel).toBeLessThanOrEqual(activeDays + 1);
     
     if (runFullJourney) {
       console.log(`[SIM] Completed ${maxDays} day simulation`);
@@ -381,7 +385,7 @@ describe('Full Journey Simulation - Day-Based Progression', () => {
 
     console.log(`[SIM] Levels: after S1=${levelAfterSession1}, S2=${levelAfterSession2}, S3=${levelAfterSession3}`);
 
-    // All sessions return similar cards (reviews)
+    // All sessions return the exact same cards (replay)
     const cards1 = new Set(queue1.cards.map(c => c.word));
     const cards2 = new Set(queue2.cards.map(c => c.word));
     const cards3 = new Set(queue3.cards.map(c => c.word));
@@ -391,8 +395,12 @@ describe('Full Journey Simulation - Day-Based Progression', () => {
     
     console.log(`[SIM] Card overlap: S1-S2=${overlap12}/${CARDS_PER_SESSION}, S2-S3=${overlap23}/${CARDS_PER_SESSION}`);
     
-    // High overlap indicates replays are working
-    expect(overlap12).toBeGreaterThanOrEqual(CARDS_PER_SESSION * 0.5);
-    expect(overlap23).toBeGreaterThanOrEqual(CARDS_PER_SESSION * 0.5);
+    // Exact match indicates replay session persistence
+    expect(overlap12).toBe(CARDS_PER_SESSION);
+    expect(overlap23).toBe(CARDS_PER_SESSION);
+
+    // Level should not advance on same-day replays
+    expect(levelAfterSession2).toBe(levelAfterSession1);
+    expect(levelAfterSession3).toBe(levelAfterSession1);
   });
 });
