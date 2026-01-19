@@ -13,6 +13,7 @@ import * as levelsModule from '@/data/levels';
 import * as databaseModule from '@/services/storage/database';
 import {
   getPhonemesForLessonNumber,
+  getMaxLesson,
   isLessonComplete,
 } from '@/services/curriculum/curriculumService';
 
@@ -27,6 +28,22 @@ const mockLevels = vi.mocked(levelsModule);
 
 describe('Full Journey Simulation - Progression Logs', () => {
   let testHelper: IntegrationTestHelper;
+  const runFullJourney = process.env.FULL_JOURNEY_SIM === '1';
+  const maxSessions = runFullJourney ? 500 : 25;
+  const maxLesson = getMaxLesson();
+
+  const hashWord = (word: string): number => {
+    let hash = 0;
+    for (let i = 0; i < word.length; i++) {
+      hash = (hash * 31 + word.charCodeAt(i)) % 100000;
+    }
+    return hash;
+  };
+
+  const shouldFailCard = (word: string, index: number, session: number): boolean => {
+    // Deterministic "sometimes fail" rule (no randomness)
+    return (hashWord(word) + index + session) % 5 === 0;
+  };
 
   beforeEach(async () => {
     testHelper = new IntegrationTestHelper();
@@ -85,11 +102,11 @@ describe('Full Journey Simulation - Progression Logs', () => {
     }
   });
 
-  it('logs progression and advances beyond level 1', async () => {
+  it('logs progression, handles failures, and advances levels', async () => {
     const child = await testHelper.createChild({ current_level: 1 });
 
     let lastLevel = child.current_level;
-    const maxSessions = 10;
+    let pendingReviewWords = new Set<string>();
 
     for (let session = 1; session <= maxSessions; session++) {
       const queue = await getCardQueue(child.id);
@@ -97,13 +114,62 @@ describe('Full Journey Simulation - Progression Logs', () => {
         `[SIM] Session ${session}: level=${lastLevel} cards=${queue.cards.length}`
       );
 
-      for (const card of queue.cards) {
-        await recordCardCompletion(child.id, card.word, {
-          success: true,
-          attempts: 1,
-          matchScore: 0.9,
-          neededHelp: false,
-        });
+      if (pendingReviewWords.size > 0) {
+        const currentWords = new Set(queue.cards.map(c => c.word));
+        const repeats = Array.from(pendingReviewWords).filter(w => currentWords.has(w));
+        console.log(
+          `[SIM] Review repeats from previous failures: ${repeats.join(', ') || 'none'}`
+        );
+
+        for (const word of pendingReviewWords) {
+          const progress = await testHelper.db.getCardProgress(child.id, word);
+          const attempts = progress?.attempts ?? 0;
+          const successes = progress?.successes ?? 0;
+          console.log(
+            `[SIM] Review stats for "${word}": attempts=${attempts} successes=${successes} next_review_at=${progress?.next_review_at ?? 'n/a'}`
+          );
+          expect(progress).not.toBeNull();
+          if (progress) {
+            // Failure + retry should leave attempts higher than successes
+            expect(progress.attempts).toBeGreaterThan(progress.successes);
+          }
+        }
+      }
+
+      const failedThisSession = new Set<string>();
+
+      for (let i = 0; i < queue.cards.length; i++) {
+        const card = queue.cards[i];
+        const shouldFail = shouldFailCard(card.word, i, session);
+
+        if (shouldFail) {
+          failedThisSession.add(card.word);
+          console.log(`[SIM] FAIL -> RETRY: "${card.word}"`);
+
+          await recordCardCompletion(child.id, card.word, {
+            success: false,
+            attempts: 3,
+            matchScore: 0.4,
+            neededHelp: true,
+            pronunciationFailed: true,
+          });
+
+          // Retry success with lower quality (penalized)
+          await recordCardCompletion(child.id, card.word, {
+            success: true,
+            attempts: 2,
+            matchScore: 0.75,
+            neededHelp: false,
+            pronunciationFailed: true,
+          });
+        } else {
+          await recordCardCompletion(child.id, card.word, {
+            success: true,
+            attempts: 1,
+            matchScore: 0.9,
+            neededHelp: false,
+          });
+        }
       }
 
       const updatedChild = await testHelper.db.getChild(child.id);
@@ -131,12 +197,19 @@ describe('Full Journey Simulation - Progression Logs', () => {
         lastLevel = updatedChild.current_level;
       }
 
-      if (updatedChild.current_level > 1) {
+      if (updatedChild.current_level >= maxLesson) {
+        console.log(`[SIM] Reached max lesson ${maxLesson}`);
         break;
       }
+
+      pendingReviewWords = failedThisSession;
     }
 
     const finalChild = await testHelper.db.getChild(child.id);
     expect(finalChild?.current_level).toBeGreaterThan(1);
+
+    if (runFullJourney) {
+      expect(finalChild?.current_level).toBeGreaterThanOrEqual(maxLesson);
+    }
   });
 });
