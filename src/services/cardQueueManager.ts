@@ -200,6 +200,21 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     throw new Error(`Invalid level: ${currentLevel}`);
   }
 
+  // PROACTIVELY introduce all phonemes for the current lesson
+  // This ensures lesson progression isn't blocked by having "enough" cards
+  const currentLessonPhonemes = await getUnintroducedPhonemesForLesson(childId, currentLevel);
+  for (const phoneme of currentLessonPhonemes) {
+    await markPhonemeAsIntroduced(childId, phoneme);
+  }
+  
+  // After introducing phonemes, keep advancing through lessons until we hit one that's not complete
+  // This handles lessons with no phonemes (they auto-complete)
+  let advanceAttempts = 0;
+  const maxAdvanceAttempts = 10; // Safety limit per session
+  while (await advanceLessonIfReady(childId) && advanceAttempts < maxAdvanceAttempts) {
+    advanceAttempts++;
+  }
+
   // Get due review cards (spaced repetition)
   const dueCards = await getDueReviewCards(childId, CARDS_PER_SESSION);
   // Prioritize struggled cards first (more failed attempts)
