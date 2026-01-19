@@ -3,5 +3,7 @@
 - Fixed lesson progression so lessons with no phonemes are treated as complete.
 - Tests run: full-journey-simulation.test.ts, full-curriculum.test.ts.
 - Issue documented: empty-phoneme lessons block progression.
+- Extended simulator to model wrong answers with penalties and full-journey mode.
+- Tests run: FULL_JOURNEY_SIM=1 full-journey-simulation.test.ts (reached max lesson 89).
 Next:
 - Validate on-device progression telemetry to confirm real user path advances.
