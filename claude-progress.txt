@@ -1,0 +1,7 @@
+2026-01-18
+- Added a full journey simulation test that logs lesson progression and phoneme requirements.
+- Fixed lesson progression so lessons with no phonemes are treated as complete.
+- Tests run: full-journey-simulation.test.ts, full-curriculum.test.ts.
+- Issue documented: empty-phoneme lessons block progression.
+Next:
+- Validate on-device progression telemetry to confirm real user path advances.
