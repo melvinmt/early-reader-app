@@ -185,15 +185,22 @@ describe('getCardQueue - REAL Implementation Tests', () => {
 
   describe('Child with Progress - REAL Scenarios', () => {
     it('combines due review cards with new cards', async () => {
-      // Use a higher lesson (10) to ensure enough cards are available
-      const child = await testHelper.createChild({ current_level: 10 });
+      const child = await testHelper.createChild({ current_level: 1 });
       
       // Use actual cards from curriculum instead of assuming specific words exist
-      // Find words available for lesson 10 or earlier
+      // Find words available for lesson 1 (or expand to higher lessons if needed)
       let realWords = DISTAR_CARDS
-        .filter(c => c.type === 'word' && c.lesson <= 10)
+        .filter(c => c.type === 'word' && c.lesson <= 1)
         .slice(0, 3)
         .map(c => c.plainText);
+      
+      // If lesson 1 doesn't have enough words, expand search to early lessons
+      if (realWords.length < 3) {
+        realWords = DISTAR_CARDS
+          .filter(c => c.type === 'word' && c.lesson <= 5)
+          .slice(0, 3)
+          .map(c => c.plainText);
+      }
       
       // Only proceed if we have words for this test
       if (realWords.length >= 3) {
@@ -206,16 +213,16 @@ describe('getCardQueue - REAL Implementation Tests', () => {
         
         const result = await getCardQueue(child.id);
         
-        // For lesson 10, we should have enough cards to fill a session
-        // Allow some flexibility since early lessons may have fewer cards
-        expect(result.cards.length).toBeGreaterThanOrEqual(CARDS_PER_SESSION - 2);
+        // Should have 3 due cards + 17 new cards = 20 total
+        // System should introduce more phonemes to ensure we always get 20 cards
+        expect(result.cards.length).toBe(CARDS_PER_SESSION);
         
         // Should include due cards
         const dueCards = result.cards.filter(c => c.progress !== null);
         expect(dueCards.length).toBeGreaterThanOrEqual(3);
       } else {
         // Skip test if not enough words available (test mode might not have enough)
-        console.warn('Not enough word cards available for lesson 10 - skipping due review test');
+        console.warn('Not enough word cards available for lesson 1-5 - skipping due review test');
       }
     });
   });

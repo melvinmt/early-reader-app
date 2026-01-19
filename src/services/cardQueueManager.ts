@@ -227,7 +227,7 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
 
   if (cardsNeeded > 0) {
     // Pre-introduce phonemes to ensure enough cards are unlocked
-    // This ensures brand new children get 10 cards, not just 3
+    // This ensures brand new children get 20 cards, not just a few
     // Keep introducing phonemes until we have enough unlocked cards
     const allCards = getAllStaticCards();
     let introducedPhonemes = await getIntroducedPhonemes(childId);
@@ -243,64 +243,68 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     existingWords.forEach(w => seenWords.add(w.word));
     
     // Keep introducing phonemes until we have enough available cards
-    // For brand new children, we may need to introduce phonemes from multiple lessons
+    // Search ALL lessons (1-100) to find phonemes to introduce
     let attempts = 0;
-    const maxAttempts = 30; // Safety limit - increased for lesson 100
-    let currentLessonToCheck = currentLevel;
+    const maxAttempts = 50; // Safety limit - enough to introduce all phonemes if needed
     
     while (unlockedCards.filter(c => !seenWords.has(c.plainText)).length < cardsNeeded && attempts < maxAttempts) {
-      // Try current lesson first
-      let unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, currentLessonToCheck);
+      // Search all lessons for unintroduced phonemes, starting from current and expanding outward
+      let foundPhoneme = false;
       
-      // If no phonemes in current lesson, try previous and next lessons
-      if (unintroducedPhonemes.length === 0) {
-        // Try previous lessons first (they should be available)
-        let foundPhonemes = false;
-        for (let lesson = currentLessonToCheck - 1; lesson >= Math.max(1, currentLevel - 20); lesson--) {
-          unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, lesson);
+      // Try lessons in order of proximity to current level
+      for (let offset = 0; offset <= 100 && !foundPhoneme; offset++) {
+        const lessonsToTry = offset === 0 
+          ? [currentLevel] 
+          : [currentLevel - offset, currentLevel + offset].filter(l => l >= 1 && l <= 100);
+        
+        for (const lesson of lessonsToTry) {
+          const unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, lesson);
           if (unintroducedPhonemes.length > 0) {
-            currentLessonToCheck = lesson;
-            foundPhonemes = true;
+            // Introduce this phoneme
+            await markPhonemeAsIntroduced(childId, unintroducedPhonemes[0]);
+            introducedPhonemes = await getIntroducedPhonemes(childId);
+            unlockedCards = getUnlockedCards(allCards, introducedPhonemes);
+            foundPhoneme = true;
             break;
           }
         }
-        // If still no phonemes, try next lessons
-        if (!foundPhonemes) {
-          for (let lesson = currentLessonToCheck + 1; lesson <= Math.min(currentLevel + 20, 100); lesson++) {
-            unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, lesson);
-            if (unintroducedPhonemes.length > 0) {
-              currentLessonToCheck = lesson;
-              foundPhonemes = true;
-              break;
-            }
-          }
-        }
-        if (!foundPhonemes) {
-          break; // No more phonemes available
-        }
       }
       
-      // Introduce the first unintroduced phoneme
-      if (unintroducedPhonemes.length > 0) {
-        await markPhonemeAsIntroduced(childId, unintroducedPhonemes[0]);
-        introducedPhonemes = await getIntroducedPhonemes(childId);
-        unlockedCards = getUnlockedCards(allCards, introducedPhonemes);
-      } else {
-        break;
+      if (!foundPhoneme) {
+        break; // No more phonemes available anywhere
       }
       attempts++;
     }
     
     // Use pre-generated DISTAR cards only (no AI generation)
-    for (let i = 0; i < cardsNeeded; i++) {
+    // Keep trying until we have enough cards or exhaust available cards
+    let generationAttempts = 0;
+    const maxGenerationAttempts = cardsNeeded * 2; // Allow extra attempts
+    
+    while (newCards.length < cardsNeeded && generationAttempts < maxGenerationAttempts) {
       try {
         const card = await generateNewCardFromStatic(childId, currentLevel);
         if (card) {
           newCards.push(card);
+        } else {
+          // No more cards available from generateNewCardFromStatic
+          // Try introducing more phonemes
+          let foundNewPhoneme = false;
+          for (let lesson = 1; lesson <= 100 && !foundNewPhoneme; lesson++) {
+            const unintroducedPhonemes = await getUnintroducedPhonemesForLesson(childId, lesson);
+            if (unintroducedPhonemes.length > 0) {
+              await markPhonemeAsIntroduced(childId, unintroducedPhonemes[0]);
+              foundNewPhoneme = true;
+            }
+          }
+          if (!foundNewPhoneme) {
+            break; // No more phonemes to introduce, can't get more cards
+          }
         }
       } catch (error) {
         console.error('Error loading static card:', error);
       }
+      generationAttempts++;
     }
   }
 
