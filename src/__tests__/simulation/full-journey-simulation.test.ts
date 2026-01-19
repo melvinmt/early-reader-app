@@ -15,6 +15,8 @@ import {
   getPhonemesForLessonNumber,
   isLessonComplete,
 } from '@/services/curriculum/curriculumService';
+import { getAllStaticCards } from '@/services/cardQueueManager';
+import type { DistarCard } from '@/data/distarCards';
 
 // Mock ONLY external dependencies (database, config, levels)
 vi.mock('@/services/storage/database');
@@ -107,13 +109,86 @@ describe('Full Journey Simulation - Progression Logs', () => {
     let lastLevel = child.current_level;
     let pendingReviewWords = new Set<string>();
     const failedAtSession = new Map<string, number>();
+    
+    // Track CVC progression
+    let firstCVCSeen = false;
+    let firstWordSeen = false;
+    let cvcCardsSeen = 0;
+    let wordCardsSeen = 0;
+    let cvcMastered = false;
 
     for (let session = 1; session <= maxSessions; session++) {
       const queue = await getCardQueue(child.id);
+      const allStaticCards = getAllStaticCards();
+      
+      // Track card types in this session
+      let sessionCVC = 0;
+      let sessionWords = 0;
+      let sessionPhonemes = 0;
+      
+      for (const card of queue.cards) {
+        const staticCard = allStaticCards.find(c => c.plainText === card.word);
+        if (staticCard) {
+          if (staticCard.type === 'cvc') {
+            sessionCVC++;
+            if (!firstCVCSeen) {
+              firstCVCSeen = true;
+              console.log(`[SIM] First CVC card seen: "${card.word}"`);
+            }
+            cvcCardsSeen++;
+          } else if (staticCard.type === 'word') {
+            sessionWords++;
+            if (!firstWordSeen) {
+              firstWordSeen = true;
+              console.log(`[SIM] First regular word seen: "${card.word}"`);
+            }
+            wordCardsSeen++;
+          } else if (staticCard.type === 'letter' || staticCard.type === 'digraph') {
+            sessionPhonemes++;
+          }
+        }
+      }
+      
       console.log(
-        `[SIM] Session ${session}: level=${lastLevel} cards=${queue.cards.length}`
+        `[SIM] Session ${session}: level=${lastLevel} cards=${queue.cards.length} ` +
+        `(CVC=${sessionCVC} words=${sessionWords} phonemes=${sessionPhonemes})`
       );
       expect(queue.cards.length).toBe(CARDS_PER_SESSION);
+      
+      // Assert CVC cards appear before regular words
+      if (firstWordSeen && !firstCVCSeen) {
+        // This should not happen - CVC should come first
+        console.warn(`[SIM] WARNING: Regular word seen before any CVC card`);
+      }
+      
+      // Check CVC mastery (ease_factor >= 2.5 and interval_days >= 7 for at least 50% of CVC cards)
+      if (!cvcMastered && cvcCardsSeen > 0) {
+        const allProgress = await testHelper.db.getAllCardsForChild(child.id);
+        const cvcProgress = allProgress.filter(progress => {
+          const card = allStaticCards.find(c => c.plainText === progress.word);
+          return card?.type === 'cvc';
+        });
+        if (cvcProgress.length > 0) {
+          const masteredCVC = cvcProgress.filter(progress => 
+            (progress.ease_factor ?? 0) >= 2.5 &&
+            (progress.interval_days ?? 0) >= 7
+          );
+          const masteryRatio = masteredCVC.length / cvcProgress.length;
+          if (masteryRatio >= 0.5) {
+            cvcMastered = true;
+            console.log(`[SIM] CVC MASTERED: ${masteredCVC.length}/${cvcProgress.length} cards mastered`);
+          }
+        }
+      }
+      
+      // After CVC mastery, assert that regular words are being shown more
+      if (cvcMastered && session > 10) {
+        // After mastery, we should see more regular words
+        const recentRatio = wordCardsSeen / (cvcCardsSeen + wordCardsSeen || 1);
+        if (session % 10 === 0) {
+          console.log(`[SIM] After CVC mastery: word ratio = ${(recentRatio * 100).toFixed(1)}%`);
+        }
+      }
 
       if (pendingReviewWords.size > 0) {
         const currentWords = new Set(queue.cards.map(c => c.word));

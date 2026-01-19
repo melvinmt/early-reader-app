@@ -58,7 +58,7 @@ function getDistarCardsModule() {
 }
 
 // Get all available static cards
-function getAllStaticCards(): DistarCard[] {
+export function getAllStaticCards(): DistarCard[] {
   const cardsModule = getDistarCardsModule();
   return cardsModule.DISTAR_CARDS;
 }
@@ -82,6 +82,38 @@ export const CARDS_PER_SESSION = 20; // Fixed 20 cards per lesson
 const MAX_NEW_CARDS_PER_SESSION = 2; // Limit completely new items per session
 const MAX_LEARNING_CARDS = 4; // Cards still in learning phase (steps 0-2)
 const MIN_CARDS_FOR_LEVEL_UP = 20;
+
+// CVC mastery thresholds
+const CVC_MASTERY_EASE_FACTOR = 2.5;
+const CVC_MASTERY_INTERVAL_DAYS = 7;
+
+/**
+ * Check if child has mastered CVC words (enough CVC cards with high ease factor and interval)
+ */
+async function hasCVCMastery(childId: string): Promise<boolean> {
+  const allProgress = await getAllCardsForChild(childId);
+  const allCards = getAllStaticCards();
+  
+  // Get all CVC cards the child has seen
+  const cvcProgress = allProgress.filter(progress => {
+    const card = allCards.find(c => c.plainText === progress.word);
+    return card?.type === 'cvc';
+  });
+  
+  if (cvcProgress.length === 0) {
+    return false; // No CVC cards seen yet
+  }
+  
+  // Count mastered CVC cards (ease_factor >= 2.5 and interval_days >= 7)
+  const masteredCVC = cvcProgress.filter(progress => 
+    (progress.ease_factor ?? 0) >= CVC_MASTERY_EASE_FACTOR &&
+    (progress.interval_days ?? 0) >= CVC_MASTERY_INTERVAL_DAYS
+  );
+  
+  // Consider CVC mastered if at least 50% of seen CVC cards are mastered
+  const masteryRatio = masteredCVC.length / cvcProgress.length;
+  return masteryRatio >= 0.5;
+}
 
 // ============================================
 // SCREENSHOT MODE - Hardcoded cards for App Store screenshots
@@ -438,10 +470,14 @@ async function generateNewCardFromStatic(
   // Get recent card type counts to balance selection
   const recentCounts = await getRecentCardTypeCounts(childId, 10);
   
-  // Separate cards by type
+  // Separate cards by type (hierarchy: phonemes > CVC > words > sentences)
   const phonemeCards = availableCards.filter(c => c.type === 'letter' || c.type === 'digraph');
+  const cvcCards = availableCards.filter(c => c.type === 'cvc');
   const wordCards = availableCards.filter(c => c.type === 'word');
   const sentenceCards = availableCards.filter(c => c.type === 'sentence');
+  
+  // Check CVC mastery
+  const cvcMastered = await hasCVCMastery(childId);
   
   // Use 2:3 ratio (phonemes:words) - aim for 2 phonemes per 3 words
   // If we've had 2+ phonemes in last 10 cards, prioritize words
@@ -452,14 +488,27 @@ async function generateNewCardFromStatic(
   const shouldPrioritizeWords = recentCounts.wordCount === 0 || 
     (recentCounts.phonemeCount / recentCounts.wordCount) > (2 / 3);
   
-  if (shouldPrioritizeWords && wordCards.length > 0) {
-    // Prioritize words if we've had too many phonemes
-    targetCards = wordCards;
+  // Hierarchy: phonemes > CVC > words > sentences
+  // Prioritize CVC words until mastery, then regular words
+  if (shouldPrioritizeWords) {
+    if (!cvcMastered && cvcCards.length > 0) {
+      // CVC not mastered - prioritize CVC words
+      targetCards = cvcCards;
+    } else if (wordCards.length > 0) {
+      // CVC mastered or no CVC cards - prioritize regular words
+      targetCards = wordCards;
+    } else if (cvcCards.length > 0) {
+      // Fall back to CVC if no regular words
+      targetCards = cvcCards;
+    }
   } else if (phonemeCards.length > 0) {
     // Use phonemes if available and ratio allows
     targetCards = phonemeCards;
+  } else if (!cvcMastered && cvcCards.length > 0) {
+    // No phonemes available, prioritize CVC if not mastered
+    targetCards = cvcCards;
   } else if (wordCards.length > 0) {
-    // Fall back to words if no phonemes
+    // Fall back to words if no phonemes or CVC
     targetCards = wordCards;
   } else if (sentenceCards.length > 0) {
     // Last resort: sentences
@@ -757,19 +806,45 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
     const shouldPrioritizeWords = (recentCounts.wordCount > 0 && recentCounts.phonemeCount > 0) && 
       (recentCounts.phonemeCount / recentCounts.wordCount) > (2 / 3);
     
-    // Separate learning cards by type
+    // Separate learning cards by type (hierarchy: phonemes > CVC > words > sentences)
     const learningCardsWithTypes = learningCardsFiltered.map(progress => {
       const matchingCard = allStaticCards.find(c => c.plainText === progress.word);
       const isPhoneme = matchingCard && (matchingCard.type === 'letter' || matchingCard.type === 'digraph');
-      return { progress, matchingCard, isPhoneme };
+      const isCVC = matchingCard && matchingCard.type === 'cvc';
+      const isWord = matchingCard && matchingCard.type === 'word';
+      return { progress, matchingCard, isPhoneme, isCVC, isWord };
     }).filter(item => item.matchingCard); // Only include cards that exist in static cards
     
-    // If we should prioritize words, filter to word cards first
+    // Check CVC mastery
+    const cvcMastered = await hasCVCMastery(childId);
+    
+    // If we should prioritize words, filter to word cards first (CVC before regular words if not mastered)
     let prioritizedCards = learningCardsWithTypes;
     if (shouldPrioritizeWords) {
-      const wordCards = learningCardsWithTypes.filter(item => !item.isPhoneme);
-      if (wordCards.length > 0) {
-        prioritizedCards = wordCards;
+      if (!cvcMastered) {
+        // CVC not mastered - prioritize CVC words
+        const cvcCards = learningCardsWithTypes.filter(item => item.isCVC);
+        if (cvcCards.length > 0) {
+          prioritizedCards = cvcCards;
+        } else {
+          // No CVC cards, fall back to regular words
+          const wordCards = learningCardsWithTypes.filter(item => item.isWord);
+          if (wordCards.length > 0) {
+            prioritizedCards = wordCards;
+          }
+        }
+      } else {
+        // CVC mastered - prioritize regular words
+        const wordCards = learningCardsWithTypes.filter(item => item.isWord);
+        if (wordCards.length > 0) {
+          prioritizedCards = wordCards;
+        } else {
+          // No regular words, fall back to CVC
+          const cvcCards = learningCardsWithTypes.filter(item => item.isCVC);
+          if (cvcCards.length > 0) {
+            prioritizedCards = cvcCards;
+          }
+        }
       }
     }
     
@@ -887,22 +962,48 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
     const unlockedCards = getUnlockedCards(allStaticCards, introducedPhonemes);
     console.log(`[5] All unlocked cards: ${unlockedCards.map(c => c.plainText).join(', ')}`);
     
-    // Filter to words/sentences that haven't been seen
+    // Filter to words/sentences that haven't been seen (hierarchy: CVC > words > sentences)
     const newUnlockedCards = unlockedCards.filter(
       card => card.type !== 'letter' && card.type !== 'digraph' && !seenWordsSet.has(card.plainText) && (!excludeWord || card.plainText !== excludeWord)
     );
     console.log(`[5] New unlocked cards (not seen, not excluded): ${newUnlockedCards.map(c => c.plainText).join(', ')}`);
     
     if (newUnlockedCards.length > 0) {
-      // Prioritize words over sentences
-      const wordCards = newUnlockedCards.filter(c => c.type === 'word');
-      const targetCard = wordCards.length > 0 ? wordCards[0] : newUnlockedCards[0];
-      console.log(`✅ Selected: [UNLOCKED] ${targetCard.plainText} (${targetCard.type})`);
-      // Increment spacing counter for all learning cards
-      await incrementCardsSinceLastSeen(childId);
-      const card = await createLearningCardFromDistar(childId, currentLesson, targetCard);
-      console.log(`=== getNextCard END ===\n`);
-      return card;
+      // Check CVC mastery
+      const cvcMastered = await hasCVCMastery(childId);
+      
+      // Prioritize by hierarchy: CVC (if not mastered) > words > sentences
+      let targetCard: DistarCard | null = null;
+      if (!cvcMastered) {
+        // CVC not mastered - prioritize CVC words
+        const cvcCards = newUnlockedCards.filter(c => c.type === 'cvc');
+        if (cvcCards.length > 0) {
+          targetCard = cvcCards[0];
+        } else {
+          // No CVC cards, fall back to regular words
+          const wordCards = newUnlockedCards.filter(c => c.type === 'word');
+          targetCard = wordCards.length > 0 ? wordCards[0] : newUnlockedCards[0];
+        }
+      } else {
+        // CVC mastered - prioritize regular words
+        const wordCards = newUnlockedCards.filter(c => c.type === 'word');
+        if (wordCards.length > 0) {
+          targetCard = wordCards[0];
+        } else {
+          // No regular words, fall back to CVC or sentences
+          const cvcCards = newUnlockedCards.filter(c => c.type === 'cvc');
+          targetCard = cvcCards.length > 0 ? cvcCards[0] : newUnlockedCards[0];
+        }
+      }
+      
+      if (targetCard) {
+        console.log(`✅ Selected: [UNLOCKED] ${targetCard.plainText} (${targetCard.type})`);
+        // Increment spacing counter for all learning cards
+        await incrementCardsSinceLastSeen(childId);
+        const card = await createLearningCardFromDistar(childId, currentLesson, targetCard);
+        console.log(`=== getNextCard END ===\n`);
+        return card;
+      }
     }
   } else {
     console.log(`[5] Skipping unlocked cards - already at max new cards per session`);

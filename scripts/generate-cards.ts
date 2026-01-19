@@ -134,8 +134,16 @@ function ensureCardDirectory(cardId: string): string {
  * Generate image using Nano Banana (Gemini 2.5 Flash Image model)
  * Generates portrait 9:16 aspect ratio images with colorful backgrounds
  * The text (phoneme/word/sentence) will be prominently displayed in the image
+ * Skips generation if file already exists (incremental mode)
  */
 async function generateImage(prompt: string, outputPath: string, displayText?: string, label?: string): Promise<void> {
+  // Check if file already exists (incremental generation)
+  if (fs.existsSync(outputPath)) {
+    const labelText = label ? `[${label}] ` : '';
+    console.log(`⊘ ${labelText}Skipping existing image: ${path.basename(outputPath)}`);
+    return;
+  }
+  
   try {
     // Enhanced prompt with 9:16 portrait aspect ratio and colorful background
     // Include the text prominently in the image if provided
@@ -215,8 +223,16 @@ async function generateImage(prompt: string, outputPath: string, displayText?: s
  * Generate audio using ElevenLabs TTS API with Eleven v3 model
  * Uses emotion keywords for child-friendly, encouraging speech
  * Speed: 0.7 = 70% speed (slowed down for children learning to read)
+ * Skips generation if file already exists (incremental mode)
  */
 async function generateAudio(text: string, outputPath: string, emotion: 'happy' | 'excited' | 'neutral' = 'happy', label?: string): Promise<void> {
+  // Check if file already exists (incremental generation)
+  if (fs.existsSync(outputPath)) {
+    const labelText = label ? `[${label}] ` : '';
+    console.log(`⊘ ${labelText}Skipping existing audio: ${path.basename(outputPath)}`);
+    return;
+  }
+  
   try {
     // Add emotion keyword based on context
     // Eleven v3 supports emotion tags: [happy], [sad], [angry], [neutral]
@@ -307,12 +323,55 @@ function segmentWordIntoPhonemes(word: string): string[] {
 }
 
 /**
+ * CVC Word List (Consonant-Vowel-Consonant words)
+ * Organized by short vowel sound
+ */
+const CVC_WORDS: { [vowel: string]: string[] } = {
+  'a': [
+    'jam', 'Pam', 'ram', 'cam', 'fam', 'ram', 'pan', 'ban', 'can',
+    'Dan', 'fan', 'man', 'ran', 'tan', 'van', 'sap', 'cap', 'gap',
+    'lap', 'map', 'rap', 'tap', 'pat', 'rat', 'cat', 'bar', 'car',
+    'war', 'tar', 'jar', 'far', 'mat', 'hat', 'bat', 'yap', 'nap'
+  ],
+  'e': [
+    'let', 'met', 'net', 'pet', 'set', 'vet', 'wet', 'yet', 'het',
+    'web', 'gem', 'hem', 'pep', 'yes', 'dew', 'mew', 'pew'
+  ],
+  'i': [
+    'fin', 'pin', 'sin', 'tin', 'win', 'kin', 'din', 'gin', 'yin',
+    'dip', 'hip', 'nip', 'rip', 'sip', 'tip', 'zip', 'lip', 'pip',
+    'bit', 'fit', 'hit', 'kit', 'sit', 'mix', 'six', 'fix', 'wit'
+  ],
+  'o': [
+    'son', 'ton', 'won', 'con', 'box', 'fox', 'pox', 'lox', 'bow',
+    'cow', 'sow', 'row', 'boy', 'soy', 'toy', 'mom', 'Tom', 'bod',
+    'lot', 'tot', 'rot', 'got', 'cog', 'jog', 'Bob', 'hog', 'bog'
+  ],
+  'u': [
+    'sum', 'bum', 'rum', 'tum',
+    'bun', 'fun', 'nun', 'run',
+    'sun', 'gun', 'pun', 'yum',
+    'but', 'cut', 'hut', 'nut',
+    'put', 'rut', 'gut', 'jut',
+    'pup', 'bus', 'yup', 'tux'
+  ]
+};
+
+/**
+ * Get all CVC words as a flat list
+ */
+function getAllCVCWords(): string[] {
+  return Object.values(CVC_WORDS).flat();
+}
+
+/**
  * Generate a contextual prompt for the child based on card type
  */
-function getCardPrompt(type: 'letter' | 'digraph' | 'word' | 'sentence'): string {
+function getCardPrompt(type: 'letter' | 'digraph' | 'word' | 'cvc' | 'sentence'): string {
   const prompts = {
     'letter': 'What sound does this letter make?',
     'digraph': 'What sound do these letters make together?',
+    'cvc': 'Can you read this word?',
     'word': 'Can you read this word?',
     'sentence': 'Can you read this sentence?',
   };
@@ -322,7 +381,7 @@ function getCardPrompt(type: 'letter' | 'digraph' | 'word' | 'sentence'): string
 /**
  * Generate varied "great job" prompts that repeat the content affirmatively
  */
-function getGreatJobPrompts(content: string, type: 'letter' | 'digraph' | 'word' | 'sentence'): string[] {
+function getGreatJobPrompts(content: string, type: 'letter' | 'digraph' | 'word' | 'cvc' | 'sentence'): string[] {
   const prompts: string[] = [];
   
   if (type === 'letter' || type === 'digraph') {
@@ -336,7 +395,7 @@ function getGreatJobPrompts(content: string, type: 'letter' | 'digraph' | 'word'
       `Amazing! ${content} is correct.`,
       `Well done! The sound ${content} is right.`
     );
-  } else if (type === 'word') {
+  } else if (type === 'word' || type === 'cvc') {
     prompts.push(
       `Great job! That word is ${content}.`,
       `Excellent! You read ${content} correctly.`,
@@ -366,10 +425,10 @@ function getGreatJobPrompts(content: string, type: 'letter' | 'digraph' | 'word'
 /**
  * Generate "try again" prompt that repeats the content
  */
-function getTryAgainPrompt(content: string, type: 'letter' | 'digraph' | 'word' | 'sentence'): string {
+function getTryAgainPrompt(content: string, type: 'letter' | 'digraph' | 'word' | 'cvc' | 'sentence'): string {
   if (type === 'letter' || type === 'digraph') {
     return `Try again! Say the sound ${content}.`;
-  } else if (type === 'word') {
+  } else if (type === 'word' || type === 'cvc') {
     return `Try again! Say the word ${content}.`;
   } else { // sentence
     return `Try again! Read this: ${content}.`;
@@ -791,6 +850,120 @@ async function generateWordCards(): Promise<any[]> {
 }
 
 /**
+ * Generate CVC cards (Consonant-Vowel-Consonant words)
+ * CVC words are introduced after phonemes and before regular words
+ */
+async function generateCVCCards(): Promise<any[]> {
+  const cards: any[] = [];
+  
+  // Get all CVC words
+  const allCVCWords = getAllCVCWords();
+  
+  // In test mode, randomly select CVC words
+  const cvcWordsToGenerate = TEST_MODE
+    ? randomSelect(allCVCWords, TEST_CARDS_PER_CATEGORY)
+    : allCVCWords;
+  
+  for (const word of cvcWordsToGenerate) {
+    const phonemes = segmentWordIntoPhonemes(word.toLowerCase());
+    
+    // Determine lesson based on phonemes required
+    // Find the latest lesson needed for all phonemes in this CVC word
+    let maxLesson = 1;
+    for (const phoneme of phonemes) {
+      const phonemeData = DISTAR_PHONEMES.find(p => p.symbol.toLowerCase() === phoneme.toLowerCase());
+      if (phonemeData && phonemeData.lesson > maxLesson) {
+        maxLesson = phonemeData.lesson;
+      }
+    }
+    // CVC words appear shortly after their phonemes are introduced
+    const lesson = maxLesson + 1;
+    
+    // Generate card ID with sequential number prefix
+    const cardId = generateCardId(`cvc-${word.toLowerCase()}`);
+    
+    // Store mapping for cross-references (CVC words can be used in sentences)
+    wordToCardId.set(word.toLowerCase(), cardId);
+    
+    const cardLabel = `cvc:${word}`;
+    console.log(`  Generating ${cardLabel} (${cardId})...`);
+    
+    const cardDir = ensureCardDirectory(cardId);
+    
+    const imagePath = path.join(cardDir, 'image.webp');
+    const promptPath = path.join(cardDir, 'prompt.mp3');
+    const tryAgainPath = path.join(cardDir, 'try-again.mp3');
+    const audioPath = path.join(cardDir, 'audio.mp3');
+    const soundedOutPath = path.join(cardDir, 'audio-sounded.mp3');
+    
+    // Generate image with the word text displayed
+    await generateImage(`Illustration of ${word}`, imagePath, word, cardLabel);
+    
+    // Generate prompt audio - encouraging and not giving away the answer
+    const promptText = getCardPrompt('cvc');
+    await generateAudio(promptText, promptPath, 'happy', cardLabel);
+    
+    // Generate try again prompt - repeats the word
+    const tryAgainText = getTryAgainPrompt(word, 'cvc');
+    await generateAudio(tryAgainText, tryAgainPath, 'happy', cardLabel);
+    
+    // Generate one varied "I didn't hear anything" prompt (different variation per card)
+    const noInputPrompts = getNoInputPrompts();
+    const noInputIndex = cards.length % noInputPrompts.length; // Cycle through variations
+    const noInputText = noInputPrompts[noInputIndex];
+    const noInputPath = path.join(cardDir, 'no-input.mp3');
+    await generateAudio(noInputText, noInputPath, 'neutral', cardLabel);
+    
+    // Generate one varied "great job" prompt with the word repeated (different variation per card)
+    const greatJobPrompts = getGreatJobPrompts(word, 'cvc');
+    const greatJobIndex = cards.length % greatJobPrompts.length; // Cycle through variations
+    const greatJobText = greatJobPrompts[greatJobIndex];
+    const greatJobPath = path.join(cardDir, 'great-job.mp3');
+    await generateAudio(greatJobText, greatJobPath, 'excited', cardLabel);
+    
+    // Generate full word audio - use 'happy' for encouraging learning
+    await generateAudio(word, audioPath, 'happy', cardLabel);
+    
+    // Generate sounded-out audio - use 'neutral' for clear pronunciation
+    const soundedOut = phonemes.map(p => {
+      const phoneme = DISTAR_PHONEMES.find(ph => ph.symbol === p);
+      return phoneme?.pronunciation || p;
+    }).join('-');
+    await generateAudio(soundedOut, soundedOutPath, 'neutral', cardLabel);
+    
+    // Generate phoneme audio paths - only include paths for cards that actually exist
+    const phonemeAudioPaths = phonemes
+      .map(p => getPhonemeAudioPath(p))
+      .filter((p): p is string => p !== null);
+    
+    cards.push({
+      id: cardId,
+      type: 'cvc',
+      display: word,
+      plainText: word.toLowerCase(),
+      phonemes,
+      ...(phonemeAudioPaths.length > 0 && { phonemeAudioPaths }),
+      lesson,
+      imagePath: `assets/${LOCALE}/${cardId}/image.webp`,
+      promptPath: `assets/${LOCALE}/${cardId}/prompt.mp3`,
+      tryAgainPath: `assets/${LOCALE}/${cardId}/try-again.mp3`,
+      noInputPath: `assets/${LOCALE}/${cardId}/no-input.mp3`,
+      greatJobPath: `assets/${LOCALE}/${cardId}/great-job.mp3`,
+      audioPath: `assets/${LOCALE}/${cardId}/audio.mp3`,
+      soundedOutPath: `assets/${LOCALE}/${cardId}/audio-sounded.mp3`,
+      orthography: {
+        macrons: [],
+        small: [],
+        balls: [],
+        arrows: [],
+      },
+    });
+  }
+  
+  return cards;
+}
+
+/**
  * Generate sentence cards (100 total, or 2 in test mode)
  */
 async function generateSentenceCards(): Promise<any[]> {
@@ -1018,7 +1191,7 @@ function generateCardsFile(cards: any[]): void {
 
 export interface DistarCard {
   id: string;
-  type: 'letter' | 'digraph' | 'word' | 'sentence';
+  type: 'letter' | 'digraph' | 'cvc' | 'word' | 'sentence';
   display: string;
   plainText: string;
   phonemes: string[];
@@ -1341,23 +1514,7 @@ async function main() {
     process.exit(1);
   }
   
-  // Prompt for confirmation before cleaning up existing cards and assets
-  console.log('\n⚠️  WARNING: This will delete all existing cards and assets!');
-  console.log('   - All existing card data files');
-  console.log('   - All existing asset mapping files');
-  console.log('   - All existing card asset directories in assets/');
-  
-  const confirmed = await promptForConfirmation('\n❓ Continue with cleanup? (y/n): ');
-  
-  if (!confirmed) {
-    console.log('\n❌ Operation cancelled. No files were deleted.');
-    process.exit(0);
-  }
-  
-  console.log('');
-  
-  // Clean up existing cards and assets first
-  cleanupExistingCards();
+  console.log('\n📦 Incremental generation mode: Only missing assets will be generated.\n');
   
   ensureDirectories();
   
@@ -1375,6 +1532,15 @@ async function main() {
   console.log(`✓ Generated ${phonemeCards.length} phoneme cards\n`);
   
   if (TEST_MODE) {
+    console.log(`📝 Generating ${TEST_CARDS_PER_CATEGORY} CVC cards...`);
+  } else {
+    const cvcCount = getAllCVCWords().length;
+    console.log(`📝 Generating CVC cards (${cvcCount})...`);
+  }
+  const cvcCards = await generateCVCCards();
+  console.log(`✓ Generated ${cvcCards.length} CVC cards\n`);
+  
+  if (TEST_MODE) {
     console.log(`📝 Generating ${TEST_CARDS_PER_CATEGORY} word cards...`);
   } else {
     console.log('📝 Generating word cards (400)...');
@@ -1390,7 +1556,7 @@ async function main() {
   const sentenceCards = await generateSentenceCards();
   console.log(`✓ Generated ${sentenceCards.length} sentence cards\n`);
   
-  const allCards = [...phonemeCards, ...wordCards, ...sentenceCards];
+  const allCards = [...phonemeCards, ...cvcCards, ...wordCards, ...sentenceCards];
   
   console.log('📝 Generating cards TypeScript file...');
   generateCardsFile(allCards);
@@ -1398,14 +1564,16 @@ async function main() {
   if (TEST_MODE) {
     console.log(`\n✅ TEST MODE: Successfully generated ${allCards.length} test cards!`);
     console.log(`   - ${phonemeCards.length} phoneme/letter cards`);
+    console.log(`   - ${cvcCards.length} CVC cards`);
     console.log(`   - ${wordCards.length} word cards`);
     console.log(`   - ${sentenceCards.length} sentence cards`);
-    console.log(`\n💡 To generate all 550 cards, run with --full flag:`);
+    console.log(`\n💡 To generate all cards, run with --full flag:`);
     console.log(`   npm run generate-cards:full`);
     console.log(`   or: npx ts-node scripts/generate-cards.ts --full`);
   } else {
     console.log(`\n✅ FULL MODE: Successfully generated ${allCards.length} cards!`);
     console.log(`   - ${phonemeCards.length} phoneme/letter cards`);
+    console.log(`   - ${cvcCards.length} CVC cards`);
     console.log(`   - ${wordCards.length} word cards`);
     console.log(`   - ${sentenceCards.length} sentence cards`);
   }
