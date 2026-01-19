@@ -7,5 +7,7 @@
 - Tests run: FULL_JOURNEY_SIM=1 full-journey-simulation.test.ts (reached max lesson 89).
 - Removed hard max lesson cap and adjusted simulator to run by sessions instead of max lesson.
 - Tests run: full-journey-simulation.test.ts.
+- Added repeat-card fallback so sessions are always filled (no empty lessons).
+- Tests run: FULL_JOURNEY_SIM=1 full-journey-simulation.test.ts.
 Next:
 - Validate on-device progression telemetry to confirm real user path advances.
