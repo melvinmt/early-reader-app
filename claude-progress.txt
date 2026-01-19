@@ -36,5 +36,8 @@
 - Tests run: all 113 tests pass (16 test files).
 - Re-verified day-based simulation outputs and session invariants (20 cards, no consecutive duplicates).
 - Tests run: npx vitest run (113/113 passing).
+- Full-journey simulation now advances the system date per day to avoid same-day replay lock.
+- Added FULL_JOURNEY_DAYS override to run 100-day sims.
+- Tests run: FULL_JOURNEY_SIM=1 FULL_JOURNEY_DAYS=100 full-journey-simulation.test.ts.
 Next:
 - Validate on-device progression telemetry to confirm real user path advances.

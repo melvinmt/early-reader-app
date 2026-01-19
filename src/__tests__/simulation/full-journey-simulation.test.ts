@@ -32,8 +32,14 @@ const mockLevels = vi.mocked(levelsModule);
 describe('Full Journey Simulation - Day-Based Progression', () => {
   let testHelper: IntegrationTestHelper;
   const runFullJourney = process.env.FULL_JOURNEY_SIM === '1';
-  const maxDays = runFullJourney ? 60 : 10;
+  const maxDaysEnv = Number(process.env.FULL_JOURNEY_DAYS);
+  const maxDays = Number.isFinite(maxDaysEnv) && maxDaysEnv > 0
+    ? maxDaysEnv
+    : runFullJourney
+      ? 60
+      : 10;
   const maxReappearanceGap = 3;
+  const baseDate = new Date(2026, 0, 1, 12, 0, 0);
 
   const hashWord = (word: string): number => {
     let hash = 0;
@@ -56,6 +62,9 @@ describe('Full Journey Simulation - Day-Based Progression', () => {
   };
 
   beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(baseDate);
+
     testHelper = new IntegrationTestHelper();
     const testDb = testHelper.db;
 
@@ -116,6 +125,7 @@ describe('Full Journey Simulation - Day-Based Progression', () => {
     if (testHelper) {
       await testHelper.teardown();
     }
+    vi.useRealTimers();
   });
 
   it('progresses through days with replays and skip days', async () => {
@@ -133,6 +143,10 @@ describe('Full Journey Simulation - Day-Based Progression', () => {
     const dailyStats: { day: number; sessions: number; levelStart: number; levelEnd: number }[] = [];
 
     for (let day = 1; day <= maxDays; day++) {
+      const dayDate = new Date(baseDate);
+      dayDate.setDate(baseDate.getDate() + (day - 1));
+      vi.setSystemTime(dayDate);
+
       const sessionsToday = getSessionsForDay(day);
       
       if (sessionsToday === 0) {
