@@ -209,8 +209,6 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   }
   
   // Check if we have enough unlocked cards to fill a session
-  // If not, introduce phonemes from future lessons ONLY to unlock more cards
-  // But level advancement is still limited to 1 per session
   const staticCards = getAllStaticCards();
   let introducedPhonemes = await getIntroducedPhonemes(childId);
   let unlockedCards = getUnlockedCards(staticCards, introducedPhonemes);
@@ -223,21 +221,27 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   );
   const seenWords = new Set(existingWords.map(w => w.word));
   
-  // Keep introducing phonemes until we have enough cards for a session
-  let lessonToCheck = currentLevel + 1;
-  while (unlockedCards.filter(c => !seenWords.has(c.plainText)).length < CARDS_PER_SESSION && lessonToCheck <= 100) {
-    const lessonPhonemes = await getUnintroducedPhonemesForLesson(childId, lessonToCheck);
-    for (const phoneme of lessonPhonemes) {
-      await markPhonemeAsIntroduced(childId, phoneme);
+  // For early lessons (1-10), we allow introducing phonemes from future lessons
+  // to ensure enough cards are available. After lesson 10, we use repeat cards instead.
+  const EARLY_LESSON_THRESHOLD = 10;
+  if (currentLevel <= EARLY_LESSON_THRESHOLD) {
+    // Keep introducing phonemes until we have enough cards for a session
+    let lessonToCheck = currentLevel + 1;
+    while (unlockedCards.filter(c => !seenWords.has(c.plainText)).length < CARDS_PER_SESSION && lessonToCheck <= 100) {
+      const lessonPhonemes = await getUnintroducedPhonemesForLesson(childId, lessonToCheck);
+      for (const phoneme of lessonPhonemes) {
+        await markPhonemeAsIntroduced(childId, phoneme);
+      }
+      introducedPhonemes = await getIntroducedPhonemes(childId);
+      unlockedCards = getUnlockedCards(staticCards, introducedPhonemes);
+      lessonToCheck++;
     }
-    introducedPhonemes = await getIntroducedPhonemes(childId);
-    unlockedCards = getUnlockedCards(staticCards, introducedPhonemes);
-    lessonToCheck++;
   }
+  // After lesson 10, we DON'T introduce future phonemes - just use repeat cards
   
-  // After introducing phonemes, check if we can advance (max 1 level per session start)
-  // This prevents skipping ahead too fast - child must complete a session at each level
-  // Note: Phonemes may be ahead of level, but level only advances once per session
+  // Check if we can advance to next lesson
+  // Note: Same-day replays naturally get review cards (no new cards), so progression
+  // only happens when there are new cards to master
   await advanceLessonIfReady(childId);
 
   // Get due review cards (spaced repetition)
@@ -377,11 +381,45 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     }
   }
 
+  // Reorder cards to prevent consecutive duplicates (same word back-to-back)
+  const reorderedCards = preventConsecutiveDuplicates(validCards.slice(0, CARDS_PER_SESSION));
+
   return {
-    cards: validCards.slice(0, CARDS_PER_SESSION),
+    cards: reorderedCards,
     hasMore: validCards.length >= CARDS_PER_SESSION,
     currentLevel,
   };
+}
+
+/**
+ * Reorder cards to ensure no consecutive duplicates (same word back-to-back)
+ * Uses a simple swap algorithm: if current card matches previous, swap with next different card
+ */
+function preventConsecutiveDuplicates(cards: LearningCard[]): LearningCard[] {
+  if (cards.length <= 1) return cards;
+  
+  const result = [...cards];
+  
+  for (let i = 1; i < result.length; i++) {
+    if (result[i].word === result[i - 1].word) {
+      // Find the next card with a different word to swap with
+      let swapIndex = -1;
+      for (let j = i + 1; j < result.length; j++) {
+        if (result[j].word !== result[i - 1].word) {
+          swapIndex = j;
+          break;
+        }
+      }
+      
+      if (swapIndex !== -1) {
+        // Swap cards
+        [result[i], result[swapIndex]] = [result[swapIndex], result[i]];
+      }
+      // If no swap candidate found, we can't fix this duplicate (rare edge case)
+    }
+  }
+  
+  return result;
 }
 
 /**
