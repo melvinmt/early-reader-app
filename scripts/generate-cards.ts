@@ -125,7 +125,18 @@ function generateCardId(name: string): string {
   // Ensure existing IDs are loaded
   loadExistingCardIds();
   
-  const sanitizedName = name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '-').toLowerCase();
+  // Replace macron vowels with "long-X" to distinguish from short vowels
+  // These are different phonemes and need distinct folder names
+  let processed = name
+    .replace(/ē/g, 'long-e')
+    .replace(/ā/g, 'long-a')
+    .replace(/ō/g, 'long-o')
+    .replace(/ī/g, 'long-i')
+    .replace(/ȳ/g, 'long-y')
+    .replace(/ū/g, 'long-u');
+  
+  // Now sanitize: keep only alphanumeric and hyphens, convert spaces to hyphens
+  const sanitizedName = processed.replace(/[^a-z0-9\s-]/gi, '').replace(/\s+/g, '-').toLowerCase();
   
   // Check if we already have a folder for this name
   const existingId = existingCardIds.get(sanitizedName);

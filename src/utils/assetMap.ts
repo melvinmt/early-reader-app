@@ -13,7 +13,6 @@ const IMAGE_ASSETS: Record<string, any> = {
   'assets/en-US/001-m/image.webp': require('../../assets/en-US/001-m/image.webp'),
   'assets/en-US/002-s/image.webp': require('../../assets/en-US/002-s/image.webp'),
   'assets/en-US/003-a/image.webp': require('../../assets/en-US/003-a/image.webp'),
-  'assets/en-US/004-/image.webp': require('../../assets/en-US/004-/image.webp'),
   'assets/en-US/005-t/image.webp': require('../../assets/en-US/005-t/image.webp'),
   'assets/en-US/006-r/image.webp': require('../../assets/en-US/006-r/image.webp'),
   'assets/en-US/007-d/image.webp': require('../../assets/en-US/007-d/image.webp'),
@@ -588,7 +587,6 @@ const IMAGE_ASSETS: Record<string, any> = {
   'assets/en-US/533-light/image.webp': require('../../assets/en-US/533-light/image.webp'),
   'assets/en-US/534-craze/image.webp': require('../../assets/en-US/534-craze/image.webp'),
   'assets/en-US/534-little/image.webp': require('../../assets/en-US/534-little/image.webp'),
-  'assets/en-US/535-long/image.webp': require('../../assets/en-US/535-long/image.webp'),
   'assets/en-US/536-beat/image.webp': require('../../assets/en-US/536-beat/image.webp'),
   'assets/en-US/536-look/image.webp': require('../../assets/en-US/536-look/image.webp'),
   'assets/en-US/537-heat/image.webp': require('../../assets/en-US/537-heat/image.webp'),
@@ -768,6 +766,9 @@ const IMAGE_ASSETS: Record<string, any> = {
   'assets/en-US/719-i-can-count-to-ten/image.webp': require('../../assets/en-US/719-i-can-count-to-ten/image.webp'),
   'assets/en-US/720-she-is-my-best-friend/image.webp': require('../../assets/en-US/720-she-is-my-best-friend/image.webp'),
   'assets/en-US/721-we-are-all-different/image.webp': require('../../assets/en-US/721-we-are-all-different/image.webp'),
+  'assets/en-US/723-sam-sat/image.webp': require('../../assets/en-US/723-sam-sat/image.webp'),
+  'assets/en-US/724-see-me/image.webp': require('../../assets/en-US/724-see-me/image.webp'),
+  'assets/en-US/725-the-cat-sat/image.webp': require('../../assets/en-US/725-the-cat-sat/image.webp'),
 };
 
 /**
