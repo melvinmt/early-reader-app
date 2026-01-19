@@ -78,6 +78,7 @@ export interface CardQueueResult {
   cards: LearningCard[];
   hasMore: boolean;
   currentLevel: number;
+  isReplay: boolean;
 }
 
 export const CARDS_PER_SESSION = 20; // Fixed 20 cards per lesson
@@ -186,6 +187,7 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
       cards: screenshotCards,
       hasMore: true,
       currentLevel: 1,
+      isReplay: false,
     };
   }
 
@@ -230,6 +232,7 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
       cards: replayCards,
       hasMore: true,
       currentLevel,
+      isReplay: true,
     };
   }
 
@@ -447,6 +450,7 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     cards: reorderedCards,
     hasMore: validCards.length >= CARDS_PER_SESSION,
     currentLevel, // Return the level at session start
+    isReplay: false,
   };
 }
 
@@ -699,6 +703,7 @@ export async function recordCardCompletion(
     matchScore: number;
     neededHelp: boolean;
     pronunciationFailed?: boolean; // Optional: true if pronunciation check failed
+    countAsCompleted?: boolean; // Optional: set false for same-day replays
   }
 ): Promise<void> {
   // Get current progress
@@ -817,7 +822,8 @@ export async function recordCardCompletion(
   await createOrUpdateCardProgress(updatedProgress);
 
   // Increment child's total cards completed if successful
-  if (result.success) {
+  const shouldCountCompletion = result.countAsCompleted !== false;
+  if (result.success && shouldCountCompletion) {
     await incrementChildCardsCompleted(childId);
   }
   

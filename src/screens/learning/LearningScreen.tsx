@@ -39,6 +39,8 @@ export default function LearningScreen() {
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const cardQueueRef = useRef<LearningCard[]>([]);
   const isLoadingQueueRef = useRef(false);
+  const hasInitialQueueRef = useRef(false);
+  const isReplaySessionRef = useRef(false);
   const wordTapDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingRef = useRef(false);
 
@@ -165,6 +167,11 @@ export default function LearningScreen() {
     try {
       isLoadingQueueRef.current = true;
       const result = await getCardQueue(childId);
+
+      if (!hasInitialQueueRef.current) {
+        isReplaySessionRef.current = result.isReplay;
+        hasInitialQueueRef.current = true;
+      }
       
       // Filter out excluded word to prevent consecutive repeats
       const filteredCards = excludeWord
@@ -342,6 +349,7 @@ export default function LearningScreen() {
           matchScore: hasMatched ? (interactionManager.getMatchConfidence() || 1.0) : 0.5,
           neededHelp,
           pronunciationFailed: didFailPronunciation,
+          countAsCompleted: !isReplaySessionRef.current,
         });
         
         const newCardsCompleted = cardsCompleted + 1;
