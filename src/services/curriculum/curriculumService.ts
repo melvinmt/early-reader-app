@@ -135,7 +135,10 @@ export async function isLessonComplete(childId: string, lesson: number): Promise
   
   // Get phonemes for this lesson
   const lessonPhonemes = getPhonemesForLessonNumber(lesson);
-  if (lessonPhonemes.length === 0) return false;
+  if (lessonPhonemes.length === 0) {
+    // No phonemes defined for this lesson, treat as complete
+    return true;
+  }
   
   // Check if all phonemes have been introduced
   const introducedPhonemes = await getIntroducedPhonemes(childId);
