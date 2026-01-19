@@ -200,7 +200,16 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     throw new Error(`Invalid level: ${currentLevel}`);
   }
 
-  // Introduce phonemes for current lesson and all previous lessons first
+  // Threshold for early lessons where we're more flexible with progression
+  const EARLY_LESSON_THRESHOLD = 10;
+  const isEarlyLesson = currentLevel <= EARLY_LESSON_THRESHOLD;
+  
+  // Check if current lesson has unintroduced phonemes BEFORE we do any introduction
+  // This determines if this is a "new lesson" session vs a replay
+  const currentLessonUnintroduced = await getUnintroducedPhonemesForLesson(childId, currentLevel);
+  const isFirstSessionForThisLevel = currentLessonUnintroduced.length > 0;
+  
+  // Introduce phonemes for current lesson and all previous lessons
   for (let lesson = 1; lesson <= currentLevel; lesson++) {
     const lessonPhonemes = await getUnintroducedPhonemesForLesson(childId, lesson);
     for (const phoneme of lessonPhonemes) {
@@ -221,11 +230,9 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   );
   const seenWords = new Set(existingWords.map(w => w.word));
   
-  // For early lessons (1-10), we allow introducing phonemes from future lessons
-  // to ensure enough cards are available. After lesson 10, we use repeat cards instead.
-  const EARLY_LESSON_THRESHOLD = 10;
-  if (currentLevel <= EARLY_LESSON_THRESHOLD) {
-    // Keep introducing phonemes until we have enough cards for a session
+  // For EARLY lessons: introduce phonemes from future lessons as needed to fill session
+  // This may cause faster level progression, but ensures 20 cards per session
+  if (isEarlyLesson) {
     let lessonToCheck = currentLevel + 1;
     while (unlockedCards.filter(c => !seenWords.has(c.plainText)).length < CARDS_PER_SESSION && lessonToCheck <= 100) {
       const lessonPhonemes = await getUnintroducedPhonemesForLesson(childId, lessonToCheck);
@@ -236,13 +243,15 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
       unlockedCards = getUnlockedCards(staticCards, introducedPhonemes);
       lessonToCheck++;
     }
+    // For early lessons, advance if current lesson is complete (may be multiple levels per session)
+    await advanceLessonIfReady(childId);
+  } else {
+    // For LATER lessons: only advance if this is the first session for this level
+    // This ensures natural 1 level per session progression after the early phase
+    if (isFirstSessionForThisLevel) {
+      await advanceLessonIfReady(childId);
+    }
   }
-  // After lesson 10, we DON'T introduce future phonemes - just use repeat cards
-  
-  // Check if we can advance to next lesson
-  // Note: Same-day replays naturally get review cards (no new cards), so progression
-  // only happens when there are new cards to master
-  await advanceLessonIfReady(childId);
 
   // Get due review cards (spaced repetition)
   const dueCards = await getDueReviewCards(childId, CARDS_PER_SESSION);

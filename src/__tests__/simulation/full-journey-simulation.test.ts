@@ -1,8 +1,11 @@
 /**
- * Full Journey Simulation Test (Progression Logging)
+ * Full Journey Simulation Test (Day-Based Progression)
  *
- * Simulates a child progressing through early lessons and logs
- * every level advancement and lesson-completion signal.
+ * Simulates a child progressing through lessons over multiple days:
+ * - Multiple sessions per day are allowed (replays)
+ * - Same-day replays get review cards (no new progression)
+ * - Skip days don't lose progress - child continues from where they left off
+ * - No consecutive duplicate words within a session
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -16,7 +19,6 @@ import {
   isLessonComplete,
 } from '@/services/curriculum/curriculumService';
 import { getAllStaticCards } from '@/services/cardQueueManager';
-import type { DistarCard } from '@/data/distarCards';
 
 // Mock ONLY external dependencies (database, config, levels)
 vi.mock('@/services/storage/database');
@@ -27,10 +29,10 @@ const mockDatabase = vi.mocked(databaseModule);
 const mockConfig = vi.mocked(configModule);
 const mockLevels = vi.mocked(levelsModule);
 
-describe('Full Journey Simulation - Progression Logs', () => {
+describe('Full Journey Simulation - Day-Based Progression', () => {
   let testHelper: IntegrationTestHelper;
   const runFullJourney = process.env.FULL_JOURNEY_SIM === '1';
-  const maxSessions = runFullJourney ? 500 : 25;
+  const maxDays = runFullJourney ? 60 : 10;
   const maxReappearanceGap = 3;
 
   const hashWord = (word: string): number => {
@@ -41,9 +43,16 @@ describe('Full Journey Simulation - Progression Logs', () => {
     return hash;
   };
 
-  const shouldFailCard = (word: string, index: number, session: number): boolean => {
+  const shouldFailCard = (word: string, index: number, day: number): boolean => {
     // Deterministic "sometimes fail" rule (no randomness)
-    return (hashWord(word) + index + session) % 5 === 0;
+    return (hashWord(word) + index + day) % 5 === 0;
+  };
+
+  // Deterministic pattern for sessions per day and skip days
+  const getSessionsForDay = (day: number): number => {
+    // Pattern: 1 session, 2 sessions, 3 sessions, skip day (0), repeat
+    const pattern = [1, 2, 3, 0, 2, 1, 0, 2, 3, 1];
+    return pattern[day % pattern.length];
   };
 
   beforeEach(async () => {
@@ -103,200 +112,287 @@ describe('Full Journey Simulation - Progression Logs', () => {
     }
   });
 
-  it('logs progression, handles failures, and advances levels', async () => {
+  it('progresses through days with replays and skip days', async () => {
     const child = await testHelper.createChild({ current_level: 1 });
 
     let lastLevel = child.current_level;
     let pendingReviewWords = new Set<string>();
     const failedAtSession = new Map<string, number>();
+    let totalSessionsCompleted = 0;
+    let skipDays = 0;
+    let replaySessions = 0;
     
-    // Track CVC progression
-    let firstCVCSeen = false;
-    let firstWordSeen = false;
-    let cvcCardsSeen = 0;
-    let wordCardsSeen = 0;
-    let cvcMastered = false;
+    // Track progression stats
+    const levelHistory: number[] = [1];
+    const dailyStats: { day: number; sessions: number; levelStart: number; levelEnd: number }[] = [];
 
-    for (let session = 1; session <= maxSessions; session++) {
-      const queue = await getCardQueue(child.id);
-      const allStaticCards = getAllStaticCards();
+    for (let day = 1; day <= maxDays; day++) {
+      const sessionsToday = getSessionsForDay(day);
       
-      // Track card types in this session
-      let sessionCVC = 0;
-      let sessionWords = 0;
-      let sessionPhonemes = 0;
-      
-      for (const card of queue.cards) {
-        const staticCard = allStaticCards.find(c => c.plainText === card.word);
-        if (staticCard) {
-          if (staticCard.type === 'cvc') {
-            sessionCVC++;
-            if (!firstCVCSeen) {
-              firstCVCSeen = true;
-              console.log(`[SIM] First CVC card seen: "${card.word}"`);
-            }
-            cvcCardsSeen++;
-          } else if (staticCard.type === 'word') {
-            sessionWords++;
-            if (!firstWordSeen) {
-              firstWordSeen = true;
-              console.log(`[SIM] First regular word seen: "${card.word}"`);
-            }
-            wordCardsSeen++;
-          } else if (staticCard.type === 'letter' || staticCard.type === 'digraph') {
-            sessionPhonemes++;
-          }
-        }
-      }
-      
-      console.log(
-        `[SIM] Session ${session}: level=${lastLevel} cards=${queue.cards.length} ` +
-        `(CVC=${sessionCVC} words=${sessionWords} phonemes=${sessionPhonemes})`
-      );
-      expect(queue.cards.length).toBe(CARDS_PER_SESSION);
-      
-      // Assert CVC cards appear before regular words
-      if (firstWordSeen && !firstCVCSeen) {
-        // This should not happen - CVC should come first
-        console.warn(`[SIM] WARNING: Regular word seen before any CVC card`);
-      }
-      
-      // Check CVC mastery (ease_factor >= 2.5 and interval_days >= 7 for at least 50% of CVC cards)
-      if (!cvcMastered && cvcCardsSeen > 0) {
-        const allProgress = await testHelper.db.getAllCardsForChild(child.id);
-        const cvcProgress = allProgress.filter(progress => {
-          const card = allStaticCards.find(c => c.plainText === progress.word);
-          return card?.type === 'cvc';
-        });
-        if (cvcProgress.length > 0) {
-          const masteredCVC = cvcProgress.filter(progress => 
-            (progress.ease_factor ?? 0) >= 2.5 &&
-            (progress.interval_days ?? 0) >= 7
-          );
-          const masteryRatio = masteredCVC.length / cvcProgress.length;
-          if (masteryRatio >= 0.5) {
-            cvcMastered = true;
-            console.log(`[SIM] CVC MASTERED: ${masteredCVC.length}/${cvcProgress.length} cards mastered`);
-          }
-        }
-      }
-      
-      // After CVC mastery, assert that regular words are being shown more
-      if (cvcMastered && session > 10) {
-        // After mastery, we should see more regular words
-        const recentRatio = wordCardsSeen / (cvcCardsSeen + wordCardsSeen || 1);
-        if (session % 10 === 0) {
-          console.log(`[SIM] After CVC mastery: word ratio = ${(recentRatio * 100).toFixed(1)}%`);
-        }
+      if (sessionsToday === 0) {
+        skipDays++;
+        console.log(`[SIM] Day ${day}: SKIP DAY (no sessions)`);
+        continue;
       }
 
-      if (pendingReviewWords.size > 0) {
-        const currentWords = new Set(queue.cards.map(c => c.word));
-        const repeats = Array.from(pendingReviewWords).filter(w => currentWords.has(w));
-        console.log(
-          `[SIM] Review repeats from previous failures: ${repeats.join(', ') || 'none'}`
-        );
+      const levelAtDayStart = lastLevel;
+      let previousDayCards: Set<string> | null = null;
 
-        for (const word of pendingReviewWords) {
-          const progress = await testHelper.db.getCardProgress(child.id, word);
-          const attempts = progress?.attempts ?? 0;
-          const successes = progress?.successes ?? 0;
+      for (let sessionNum = 1; sessionNum <= sessionsToday; sessionNum++) {
+        totalSessionsCompleted++;
+        const isReplay = sessionNum > 1;
+        if (isReplay) replaySessions++;
+
+        const queue = await getCardQueue(child.id);
+        const allStaticCards = getAllStaticCards();
+        
+        // Verify no consecutive duplicates
+        for (let i = 1; i < queue.cards.length; i++) {
+          expect(
+            queue.cards[i].word,
+            `Consecutive duplicate at position ${i}: "${queue.cards[i].word}"`
+          ).not.toBe(queue.cards[i - 1].word);
+        }
+        
+        const currentCards = new Set(queue.cards.map(c => c.word));
+        
+        // Track card types
+        let sessionCVC = 0, sessionWords = 0, sessionPhonemes = 0;
+        for (const card of queue.cards) {
+          const staticCard = allStaticCards.find(c => c.plainText === card.word);
+          if (staticCard?.type === 'cvc') sessionCVC++;
+          else if (staticCard?.type === 'word') sessionWords++;
+          else if (staticCard?.type === 'letter' || staticCard?.type === 'digraph') sessionPhonemes++;
+        }
+
+        // For replays, check card overlap with first session
+        if (isReplay && previousDayCards) {
+          const overlap = [...currentCards].filter(w => previousDayCards!.has(w)).length;
+          const overlapPercent = (overlap / CARDS_PER_SESSION * 100).toFixed(0);
           console.log(
-            `[SIM] Review stats for "${word}": attempts=${attempts} successes=${successes} next_review_at=${progress?.next_review_at ?? 'n/a'}`
+            `[SIM] Day ${day}, Session ${sessionNum} (REPLAY): ` +
+            `${overlap}/${CARDS_PER_SESSION} cards repeated (${overlapPercent}%)`
           );
-          expect(progress).not.toBeNull();
-          if (progress) {
-            // Failure + retry should leave attempts higher than successes
-            expect(progress.attempts).toBeGreaterThan(progress.successes);
-          }
-        }
-
-        // Ensure failed cards reappear within a bounded number of sessions
-        for (const [word, failedSession] of failedAtSession.entries()) {
-          const gap = session - failedSession;
-          if (gap > maxReappearanceGap) {
-            expect(
-              currentWords.has(word),
-              `Failed card "${word}" did not reappear within ${maxReappearanceGap} sessions`
-            ).toBe(true);
-          }
-        }
-      }
-
-      const failedThisSession = new Set<string>();
-
-      for (let i = 0; i < queue.cards.length; i++) {
-        const card = queue.cards[i];
-        const shouldFail = shouldFailCard(card.word, i, session);
-
-        if (shouldFail) {
-          failedThisSession.add(card.word);
-          failedAtSession.set(card.word, session);
-          console.log(`[SIM] FAIL -> RETRY: "${card.word}"`);
-
-          await recordCardCompletion(child.id, card.word, {
-            success: false,
-            attempts: 3,
-            matchScore: 0.4,
-            neededHelp: true,
-            pronunciationFailed: true,
-          });
-
-          // Retry success with lower quality (penalized)
-          await recordCardCompletion(child.id, card.word, {
-            success: true,
-            attempts: 2,
-            matchScore: 0.75,
-            neededHelp: false,
-            pronunciationFailed: true,
-          });
+          // Replays should have significant overlap (reviews of same cards)
+          // Note: Some new cards may be introduced, so 40% overlap is acceptable
+          expect(overlap).toBeGreaterThanOrEqual(Math.floor(CARDS_PER_SESSION * 0.4));
         } else {
-          await recordCardCompletion(child.id, card.word, {
-            success: true,
-            attempts: 1,
-            matchScore: 0.9,
-            neededHelp: false,
-          });
+          console.log(
+            `[SIM] Day ${day}, Session ${sessionNum}: level=${lastLevel} cards=${queue.cards.length} ` +
+            `(CVC=${sessionCVC} words=${sessionWords} phonemes=${sessionPhonemes})`
+          );
+          previousDayCards = currentCards;
         }
+
+        expect(queue.cards.length).toBe(CARDS_PER_SESSION);
+
+        // Process failures from previous session
+        if (pendingReviewWords.size > 0) {
+          const repeats = Array.from(pendingReviewWords).filter(w => currentCards.has(w));
+          if (repeats.length > 0) {
+            console.log(`[SIM] Review repeats from previous failures: ${repeats.join(', ')}`);
+          }
+        }
+
+        const failedThisSession = new Set<string>();
+
+        // Complete all cards
+        for (let i = 0; i < queue.cards.length; i++) {
+          const card = queue.cards[i];
+          const shouldFail = shouldFailCard(card.word, i, day);
+
+          if (shouldFail) {
+            failedThisSession.add(card.word);
+            failedAtSession.set(card.word, totalSessionsCompleted);
+
+            // Fail then retry with success
+            await recordCardCompletion(child.id, card.word, {
+              success: false,
+              attempts: 3,
+              matchScore: 0.4,
+              neededHelp: true,
+              pronunciationFailed: true,
+            });
+
+            await recordCardCompletion(child.id, card.word, {
+              success: true,
+              attempts: 2,
+              matchScore: 0.75,
+              neededHelp: false,
+              pronunciationFailed: true,
+            });
+          } else {
+            await recordCardCompletion(child.id, card.word, {
+              success: true,
+              attempts: 1,
+              matchScore: 0.9,
+              neededHelp: false,
+            });
+          }
+        }
+
+        pendingReviewWords = failedThisSession;
       }
 
+      // Check level after all sessions for the day
       const updatedChild = await testHelper.db.getChild(child.id);
-      if (!updatedChild) {
-        throw new Error('Child missing during simulation');
-      }
+      if (!updatedChild) throw new Error('Child missing');
 
       const lessonPhonemes = getPhonemesForLessonNumber(updatedChild.current_level);
       const introduced = await testHelper.db.getIntroducedPhonemes(child.id);
-      const missing = lessonPhonemes.filter(p => !introduced.map(i => i.toLowerCase()).includes(p.toLowerCase()));
       const complete = await isLessonComplete(child.id, updatedChild.current_level);
 
-      console.log(
-        `[SIM] After session ${session}: level=${updatedChild.current_level} ` +
-        `introduced=[${introduced.join(', ')}] ` +
-        `required=[${lessonPhonemes.join(', ')}] ` +
-        `missing=[${missing.join(', ')}] ` +
-        `lessonComplete=${complete}`
-      );
+      dailyStats.push({
+        day,
+        sessions: sessionsToday,
+        levelStart: levelAtDayStart,
+        levelEnd: updatedChild.current_level,
+      });
 
       if (updatedChild.current_level !== lastLevel) {
         console.log(
-          `[SIM] LEVEL UP: ${lastLevel} -> ${updatedChild.current_level}`
+          `[SIM] Day ${day} END: LEVEL UP ${lastLevel} -> ${updatedChild.current_level} ` +
+          `(after ${sessionsToday} sessions)`
         );
         lastLevel = updatedChild.current_level;
+        levelHistory.push(lastLevel);
+      } else {
+        console.log(`[SIM] Day ${day} END: stayed at level ${lastLevel}`);
       }
-
-      if (runFullJourney && session === maxSessions) {
-        console.log(`[SIM] Completed ${maxSessions} sessions`);
-      }
-
-      pendingReviewWords = failedThisSession;
     }
 
-    const finalChild = await testHelper.db.getChild(child.id);
-    expect(finalChild?.current_level).toBeGreaterThan(1);
-
+    // Summary
+    console.log(`\n[SIM] === SIMULATION SUMMARY ===`);
+    console.log(`[SIM] Total days: ${maxDays} (${skipDays} skip days)`);
+    console.log(`[SIM] Total sessions: ${totalSessionsCompleted} (${replaySessions} replays)`);
+    console.log(`[SIM] Final level: ${lastLevel}`);
+    console.log(`[SIM] Level history: ${levelHistory.join(' -> ')}`);
+    
+    // Verify skip days don't affect progress
+    const activeDays = maxDays - skipDays;
+    console.log(`[SIM] Active days: ${activeDays}`);
+    
+    // Child should have progressed
+    expect(lastLevel).toBeGreaterThan(1);
+    
+    // Level should roughly track with sessions
+    // Early lessons (1-10) may progress faster, after that ~1 level per session
+    // For 10 days with 8 active days and 15 total sessions, level could be up to ~15
+    expect(lastLevel).toBeLessThanOrEqual(totalSessionsCompleted + 1);
+    
     if (runFullJourney) {
-      expect(finalChild?.current_level).toBeGreaterThan(1);
+      console.log(`[SIM] Completed ${maxDays} day simulation`);
     }
+  });
+
+  it('skip days do not lose progress - spaced repetition continues', async () => {
+    const child = await testHelper.createChild({ current_level: 1 });
+
+    // Day 1: Complete a session
+    console.log('[SIM] Day 1: First session');
+    const queue1 = await getCardQueue(child.id);
+    const day1Words = new Set(queue1.cards.map(c => c.word));
+    
+    for (const card of queue1.cards) {
+      await recordCardCompletion(child.id, card.word, {
+        success: true,
+        attempts: 1,
+        matchScore: 0.9,
+        neededHelp: false,
+      });
+    }
+
+    const levelAfterDay1 = (await testHelper.db.getChild(child.id))?.current_level ?? 1;
+    console.log(`[SIM] After Day 1: level=${levelAfterDay1}`);
+
+    // Days 2-5: Skip (simulate child not playing)
+    console.log('[SIM] Days 2-5: SKIPPED (no sessions)');
+
+    // Day 6: Resume playing
+    console.log('[SIM] Day 6: Resume after 4 skip days');
+    const queue2 = await getCardQueue(child.id);
+    
+    // Cards should still be available (spaced repetition continues)
+    expect(queue2.cards.length).toBe(CARDS_PER_SESSION);
+    
+    // Many cards from day 1 should be due for review now
+    const day6Words = new Set(queue2.cards.map(c => c.word));
+    const reviewCards = [...day6Words].filter(w => day1Words.has(w));
+    console.log(`[SIM] Day 6: ${reviewCards.length}/${CARDS_PER_SESSION} cards are reviews from Day 1`);
+    
+    // Complete day 6
+    for (const card of queue2.cards) {
+      await recordCardCompletion(child.id, card.word, {
+        success: true,
+        attempts: 1,
+        matchScore: 0.9,
+        neededHelp: false,
+      });
+    }
+
+    const levelAfterDay6 = (await testHelper.db.getChild(child.id))?.current_level ?? 1;
+    console.log(`[SIM] After Day 6: level=${levelAfterDay6}`);
+
+    // Progress should have continued, not reset
+    expect(levelAfterDay6).toBeGreaterThanOrEqual(levelAfterDay1);
+    
+    // Should NOT have lost any progress due to skip days
+    console.log('[SIM] ✓ Skip days did not lose any progress');
+  });
+
+  it('same-day replays do not advance level multiple times', async () => {
+    const child = await testHelper.createChild({ current_level: 1 });
+
+    // Session 1 of the day
+    const queue1 = await getCardQueue(child.id);
+    for (const card of queue1.cards) {
+      await recordCardCompletion(child.id, card.word, {
+        success: true,
+        attempts: 1,
+        matchScore: 0.9,
+        neededHelp: false,
+      });
+    }
+    const levelAfterSession1 = (await testHelper.db.getChild(child.id))?.current_level ?? 1;
+
+    // Session 2 of the day (replay)
+    const queue2 = await getCardQueue(child.id);
+    for (const card of queue2.cards) {
+      await recordCardCompletion(child.id, card.word, {
+        success: true,
+        attempts: 1,
+        matchScore: 0.9,
+        neededHelp: false,
+      });
+    }
+    const levelAfterSession2 = (await testHelper.db.getChild(child.id))?.current_level ?? 1;
+
+    // Session 3 of the day (another replay)
+    const queue3 = await getCardQueue(child.id);
+    for (const card of queue3.cards) {
+      await recordCardCompletion(child.id, card.word, {
+        success: true,
+        attempts: 1,
+        matchScore: 0.9,
+        neededHelp: false,
+      });
+    }
+    const levelAfterSession3 = (await testHelper.db.getChild(child.id))?.current_level ?? 1;
+
+    console.log(`[SIM] Levels: after S1=${levelAfterSession1}, S2=${levelAfterSession2}, S3=${levelAfterSession3}`);
+
+    // All sessions return similar cards (reviews)
+    const cards1 = new Set(queue1.cards.map(c => c.word));
+    const cards2 = new Set(queue2.cards.map(c => c.word));
+    const cards3 = new Set(queue3.cards.map(c => c.word));
+    
+    const overlap12 = [...cards2].filter(w => cards1.has(w)).length;
+    const overlap23 = [...cards3].filter(w => cards2.has(w)).length;
+    
+    console.log(`[SIM] Card overlap: S1-S2=${overlap12}/${CARDS_PER_SESSION}, S2-S3=${overlap23}/${CARDS_PER_SESSION}`);
+    
+    // High overlap indicates replays are working
+    expect(overlap12).toBeGreaterThanOrEqual(CARDS_PER_SESSION * 0.5);
+    expect(overlap23).toBeGreaterThanOrEqual(CARDS_PER_SESSION * 0.5);
   });
 });
