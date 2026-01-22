@@ -83,7 +83,7 @@ export interface CardQueueResult {
 
 export const CARDS_PER_SESSION = 20; // Fixed 20 cards per lesson
 const MAX_NEW_CARDS_PER_SESSION = 2; // Limit completely new items per session
-const MAX_LEARNING_CARDS = 4; // Cards still in learning phase (steps 0-2)
+const MIN_GRADUATED_REVIEWS = 4; // Minimum slots for graduated review cards
 const MIN_CARDS_FOR_LEVEL_UP = 20;
 
 // CVC mastery thresholds
@@ -298,7 +298,6 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   const allDueCards = await getDueReviewCards(childId, CARDS_PER_SESSION * 2);
   
   // Separate learning cards (step 0-2) from graduated cards (step 3+)
-  // This ensures variety: limit learning cards, prioritize graduated reviews + new cards
   const learningDueCards = allDueCards.filter(p => (p.learning_step ?? 3) < 3);
   const graduatedDueCards = allDueCards.filter(p => (p.learning_step ?? 3) >= 3);
   
@@ -318,13 +317,31 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   sortByStruggle(learningDueCards);
   sortByStruggle(graduatedDueCards);
   
-  // Limit learning cards to MAX_LEARNING_CARDS to ensure variety
-  // This prevents the same cards from appearing every day during learning phase
-  const limitedLearningCards = learningDueCards.slice(0, MAX_LEARNING_CARDS);
-  console.log(`📊 Due cards: ${graduatedDueCards.length} graduated, ${learningDueCards.length} learning (limited to ${limitedLearningCards.length})`);
+  // Calculate how many slots for each card type:
+  // Session = 20 cards total
+  // 1. Reserve MIN_GRADUATED_REVIEWS (4) slots for graduated reviews
+  // 2. Reserve MAX_NEW_CARDS_PER_SESSION (2) slots for new cards
+  // 3. PRIORITIZE learning cards for remaining slots (14) - they MUST graduate
+  // 
+  // This ensures:
+  // - Learning cards get reviewed enough to graduate (3x per card)
+  // - New cards introduced at sustainable pace (2 per day)
+  // - Graduated cards get regular spaced repetition
   
-  // Combine: graduated reviews first (they're mastered, quick practice), then learning cards
-  const dueCards = [...graduatedDueCards, ...limitedLearningCards];
+  const reservedForGraduated = Math.min(graduatedDueCards.length, MIN_GRADUATED_REVIEWS);
+  const reservedForNew = MAX_NEW_CARDS_PER_SESSION;
+  const learningSlots = CARDS_PER_SESSION - reservedForGraduated - reservedForNew;
+  
+  // Fill learning slots with as many learning cards as possible
+  const learningCards = learningDueCards.slice(0, learningSlots);
+  
+  // Fill graduated slots
+  const graduatedCards = graduatedDueCards.slice(0, reservedForGraduated);
+  
+  console.log(`📊 Session composition: ${learningCards.length}/${learningDueCards.length} learning, ${graduatedCards.length} graduated, up to ${reservedForNew} new`);
+  
+  // Combine due cards: learning first (need to graduate), then graduated
+  const dueCards = [...learningCards, ...graduatedCards];
   
   // Always surface recently failed cards even if they aren't due yet
   const allProgress = await getAllCardsForChild(childId);
@@ -335,16 +352,17 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   const failedNotDue = failedCards.filter(p => !dueWords.has(p.word));
   const prioritizedDue = [...failedNotDue, ...dueCards];
 
-  // Generate new cards if needed
-  const cardsNeeded = CARDS_PER_SESSION - prioritizedDue.length;
+  // Generate new cards - LIMITED to MAX_NEW_CARDS_PER_SESSION for sustainable learning pace
+  const newCardSlots = Math.min(
+    CARDS_PER_SESSION - prioritizedDue.length,
+    MAX_NEW_CARDS_PER_SESSION
+  );
   const newCards: LearningCard[] = [];
   const repeatCards: CardProgress[] = [];
 
-  if (cardsNeeded > 0) {
+  if (newCardSlots > 0) {
     // Generate new cards from static DISTAR cards (only using already-introduced phonemes)
-    // We DON'T introduce new phonemes here - that happens at session start for current lesson only
-    // This ensures level never exceeds session count
-    for (let i = 0; i < cardsNeeded; i++) {
+    for (let i = 0; i < newCardSlots; i++) {
       try {
         const card = await generateNewCardFromStatic(childId, currentLevel);
         if (card) {
