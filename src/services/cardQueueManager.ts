@@ -470,8 +470,12 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     }
   }
 
-  // Reorder cards to prevent consecutive duplicates (same word back-to-back)
-  const reorderedCards = preventConsecutiveDuplicates(validCards.slice(0, CARDS_PER_SESSION));
+  // Order cards by pedagogical type: phonemes → CVC → words → sentences
+  // This ensures building blocks are taught before complex combinations
+  const orderedByType = orderCardsByType(validCards.slice(0, CARDS_PER_SESSION));
+  
+  // Then prevent consecutive duplicates (same word back-to-back)
+  const reorderedCards = preventConsecutiveDuplicates(orderedByType);
 
   // Persist this session for same-day replays
   await saveSessionCardsForDate(
@@ -498,6 +502,41 @@ function getLocalDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Get the pedagogical order priority for a card type
+ * Lower number = shown earlier in session
+ */
+function getCardTypePriority(card: LearningCard): number {
+  const type = card.distarCard?.type;
+  switch (type) {
+    case 'letter':
+    case 'digraph':
+      return 0; // Phonemes first - building blocks
+    case 'cvc':
+      return 1; // CVC words next - simple combinations
+    case 'word':
+      return 2; // Regular words after
+    case 'sentence':
+      return 3; // Sentences last - complex combinations
+    default:
+      return 2; // Default to word level if unknown
+  }
+}
+
+/**
+ * Order cards by pedagogical type for optimal learning sequence
+ * Order: phonemes → CVC → words → sentences
+ * Within each type, maintain the original order (due cards first, then new)
+ */
+function orderCardsByType(cards: LearningCard[]): LearningCard[] {
+  // Stable sort by type priority
+  return [...cards].sort((a, b) => {
+    const priorityA = getCardTypePriority(a);
+    const priorityB = getCardTypePriority(b);
+    return priorityA - priorityB;
+  });
 }
 
 /**
