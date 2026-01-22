@@ -295,16 +295,37 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   }
 
   // Get due review cards (spaced repetition)
-  const dueCards = await getDueReviewCards(childId, CARDS_PER_SESSION);
-  // Prioritize struggled cards first (more failed attempts)
-  dueCards.sort((a, b) => {
-    const failA = (a.attempts ?? 0) - (a.successes ?? 0);
-    const failB = (b.attempts ?? 0) - (b.successes ?? 0);
-    if (failA !== failB) {
-      return failB - failA;
-    }
-    return new Date(a.next_review_at).getTime() - new Date(b.next_review_at).getTime();
-  });
+  const allDueCards = await getDueReviewCards(childId, CARDS_PER_SESSION * 2);
+  
+  // Separate learning cards (step 0-2) from graduated cards (step 3+)
+  // This ensures variety: limit learning cards, prioritize graduated reviews + new cards
+  const learningDueCards = allDueCards.filter(p => (p.learning_step ?? 3) < 3);
+  const graduatedDueCards = allDueCards.filter(p => (p.learning_step ?? 3) >= 3);
+  
+  // Prioritize struggled cards first within each category
+  const sortByStruggle = (cards: CardProgress[]) => {
+    cards.sort((a, b) => {
+      const failA = (a.attempts ?? 0) - (a.successes ?? 0);
+      const failB = (b.attempts ?? 0) - (b.successes ?? 0);
+      if (failA !== failB) {
+        return failB - failA;
+      }
+      return new Date(a.next_review_at).getTime() - new Date(b.next_review_at).getTime();
+    });
+    return cards;
+  };
+  
+  sortByStruggle(learningDueCards);
+  sortByStruggle(graduatedDueCards);
+  
+  // Limit learning cards to MAX_LEARNING_CARDS to ensure variety
+  // This prevents the same cards from appearing every day during learning phase
+  const limitedLearningCards = learningDueCards.slice(0, MAX_LEARNING_CARDS);
+  console.log(`📊 Due cards: ${graduatedDueCards.length} graduated, ${learningDueCards.length} learning (limited to ${limitedLearningCards.length})`);
+  
+  // Combine: graduated reviews first (they're mastered, quick practice), then learning cards
+  const dueCards = [...graduatedDueCards, ...limitedLearningCards];
+  
   // Always surface recently failed cards even if they aren't due yet
   const allProgress = await getAllCardsForChild(childId);
   const failedCards = allProgress.filter(
@@ -776,20 +797,28 @@ export async function recordCardCompletion(
         nextReviewDate = sm2Result.nextReviewDate;
         console.log(`🎓 Card "${word}" graduated to SM-2! next_review_at = ${nextReviewDate}`);
       } else {
-        // Still in learning phase - set next_review_at to now so it can be shown again in this session
-        // The spacing logic in getNextCard will handle when to show it
-        const now = new Date();
-        nextReviewDate = now.toISOString();
+        // Still in learning phase - set next_review_at to TOMORROW
+        // This ensures cards rotate across days instead of repeating the same cards
+        // Session persistence handles same-day replays, so we don't need immediate due
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0); // Start of next day
+        nextReviewDate = tomorrow.toISOString();
         nextIntervalDays = 1;
         nextEaseFactor = progress.ease_factor;
+        console.log(`📖 Card "${word}" still in learning phase (step ${nextLearningStep}), due tomorrow`);
       }
     } else {
-      // Failed or poor quality - stay at current step, will be shown again
-      // Set next_review_at to now so it can be retried
-      const now = new Date();
-      nextReviewDate = now.toISOString();
+      // Failed or poor quality - stay at current step
+      // For failed cards, set to due tomorrow so child gets fresh practice next day
+      // Same-day retries are handled by session persistence
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      nextReviewDate = tomorrow.toISOString();
       nextIntervalDays = 1;
       nextEaseFactor = progress.ease_factor;
+      console.log(`❌ Card "${word}" failed/low quality, due tomorrow for retry`);
     }
   } else {
     // Card is graduated (step 3+) - use standard SM-2

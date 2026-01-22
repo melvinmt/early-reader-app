@@ -418,4 +418,75 @@ describe('Full Journey Simulation - Day-Based Progression', () => {
     expect(levelAfterSession2).toBe(levelAfterSession1);
     expect(levelAfterSession3).toBe(levelAfterSession1);
   });
+
+  it('different days should show card variation (not same cards every day)', async () => {
+    const child = await testHelper.createChild({ current_level: 1 });
+    
+    // Track card sets across 5 days
+    const dailyCardSets: Set<string>[] = [];
+    
+    for (let day = 1; day <= 5; day++) {
+      // Advance to new day
+      const dayDate = new Date(baseDate);
+      dayDate.setDate(baseDate.getDate() + (day - 1));
+      vi.setSystemTime(dayDate);
+      
+      console.log(`[SIM] Day ${day}: ${dayDate.toISOString().split('T')[0]}`);
+      
+      // Get card queue for this day
+      const queue = await getCardQueue(child.id);
+      const cardWords = new Set(queue.cards.map(c => c.word));
+      dailyCardSets.push(cardWords);
+      
+      console.log(`[SIM] Day ${day} cards (${queue.cards.length}): ${[...cardWords].slice(0, 5).join(', ')}...`);
+      console.log(`[SIM] Day ${day} isReplay: ${queue.isReplay}`);
+      
+      // Complete all cards successfully (quality 5 - perfect)
+      for (const card of queue.cards) {
+        await recordCardCompletion(child.id, card.word, {
+          success: true,
+          attempts: 1,
+          matchScore: 0.95,
+          neededHelp: false,
+        });
+      }
+      
+      const currentChild = await testHelper.db.getChild(child.id);
+      console.log(`[SIM] Day ${day} END: level=${currentChild?.current_level}`);
+    }
+    
+    // Check overlap between consecutive days
+    const overlaps: number[] = [];
+    for (let i = 1; i < dailyCardSets.length; i++) {
+      const prevSet = dailyCardSets[i - 1];
+      const currSet = dailyCardSets[i];
+      const overlap = [...currSet].filter(w => prevSet.has(w)).length;
+      overlaps.push(overlap);
+      console.log(`[SIM] Day ${i} → Day ${i + 1} overlap: ${overlap}/${CARDS_PER_SESSION} (${(overlap / CARDS_PER_SESSION * 100).toFixed(0)}%)`);
+    }
+    
+    // Check for the problematic pattern: same cards every day (100% overlap)
+    const allSameCards = overlaps.every(o => o === CARDS_PER_SESSION);
+    
+    if (allSameCards) {
+      console.log(`[SIM] ❌ BUG DETECTED: Same cards shown every day for 5 days!`);
+      console.log(`[SIM] Card set: ${[...dailyCardSets[0]].join(', ')}`);
+    } else {
+      console.log(`[SIM] ✓ Card variation detected across days`);
+    }
+    
+    // CRITICAL: After 5 perfect days, we should see SOME variation
+    // Due cards with interval 1 day come back, but cards with interval 3+ days should NOT
+    // So we expect LESS than 100% overlap after day 2
+    const averageOverlap = overlaps.reduce((a, b) => a + b, 0) / overlaps.length;
+    console.log(`[SIM] Average daily overlap: ${averageOverlap.toFixed(1)}/${CARDS_PER_SESSION}`);
+    
+    // After day 2, SM-2 should push some cards to 3-day intervals
+    // So we shouldn't see 100% overlap on day 3, 4, 5
+    expect(overlaps[2]).toBeLessThan(CARDS_PER_SESSION);
+    expect(overlaps[3]).toBeLessThan(CARDS_PER_SESSION);
+    
+    // The child should NOT see the same exact cards every single day
+    expect(allSameCards).toBe(false);
+  });
 });
