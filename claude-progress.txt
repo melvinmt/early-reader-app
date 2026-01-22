@@ -39,5 +39,18 @@
 - Full-journey simulation now advances the system date per day to avoid same-day replay lock.
 - Added FULL_JOURNEY_DAYS override to run 100-day sims.
 - Tests run: FULL_JOURNEY_SIM=1 FULL_JOURNEY_DAYS=100 full-journey-simulation.test.ts.
+2026-01-22
+- **CRITICAL FIX**: Fixed same cards appearing every day for 5+ days
+  - Root cause: Learning phase cards (step 0-2) had next_review_at = now,
+    and getCardQueue() selected ALL due cards without limiting learning cards.
+    This caused same 20 cards to appear every day until graduation (4 days).
+  - Fix 1: Limit learning phase cards to MAX_LEARNING_CARDS (4) in getCardQueue()
+  - Fix 2: Set next_review_at to tomorrow instead of now during learning phase
+  - Fix 3: Prioritize graduated review cards first, then learning cards
+- Added test "different days should show card variation" to verify fix
+- Before fix: 100% card overlap on days 1-4
+- After fix: 20% overlap on day 2, 0% overlap on days 3+
+- Tests run: npx vitest run (114/114 passing)
+
 Next:
 - Validate on-device progression telemetry to confirm real user path advances.
