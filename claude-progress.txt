@@ -42,14 +42,16 @@
 2026-01-22
 - **CRITICAL FIX**: Fixed same cards appearing every day for 5+ days
   - Root cause: Learning phase cards (step 0-2) had next_review_at = now,
-    and getCardQueue() selected ALL due cards without limiting learning cards.
+    and getCardQueue() selected ALL due cards without limiting them.
     This caused same 20 cards to appear every day until graduation (4 days).
-  - Fix 1: Limit learning phase cards to MAX_LEARNING_CARDS (4) in getCardQueue()
-  - Fix 2: Set next_review_at to tomorrow instead of now during learning phase
-  - Fix 3: Prioritize graduated review cards first, then learning cards
+  - Fix 1: Set next_review_at to tomorrow instead of now during learning phase
+  - Fix 2: Balance session composition:
+    - 14 slots for learning cards (they MUST graduate, need 3 reviews each)
+    - 4 slots for graduated reviews (MIN_GRADUATED_REVIEWS)
+    - 2 slots for new cards (MAX_NEW_CARDS_PER_SESSION)
 - Added test "different days should show card variation" to verify fix
-- Before fix: 100% card overlap on days 1-4
-- After fix: 20% overlap on day 2, 0% overlap on days 3+
+- Before fix: 100% card overlap on days 1-4 (same cards every day)
+- After fix: Natural progression 90% → 80% → 70% → 60% as cards graduate
 - Tests run: npx vitest run (114/114 passing)
 
 Next:
