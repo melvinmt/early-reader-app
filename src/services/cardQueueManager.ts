@@ -82,7 +82,7 @@ export interface CardQueueResult {
 }
 
 export const CARDS_PER_SESSION = 20; // Fixed 20 cards per lesson
-const MAX_NEW_CARDS_PER_SESSION = 2; // Limit completely new items per session
+const MIN_NEW_CARDS_PER_SESSION = 4; // Guaranteed new cards each session for progression
 const MIN_GRADUATED_REVIEWS = 4; // Minimum slots for graduated review cards
 const MIN_CARDS_FOR_LEVEL_UP = 20;
 
@@ -320,16 +320,16 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   // Calculate how many slots for each card type:
   // Session = 20 cards total
   // 1. Reserve MIN_GRADUATED_REVIEWS (4) slots for graduated reviews
-  // 2. Reserve MAX_NEW_CARDS_PER_SESSION (2) slots for new cards
-  // 3. PRIORITIZE learning cards for remaining slots (14) - they MUST graduate
+  // 2. Guarantee MIN_NEW_CARDS_PER_SESSION (4) slots for new cards
+  // 3. PRIORITIZE learning cards for remaining slots (12) - they MUST graduate
   // 
   // This ensures:
   // - Learning cards get reviewed enough to graduate (3x per card)
-  // - New cards introduced at sustainable pace (2 per day)
+  // - New cards ALWAYS introduced (4 per session minimum)
   // - Graduated cards get regular spaced repetition
   
   const reservedForGraduated = Math.min(graduatedDueCards.length, MIN_GRADUATED_REVIEWS);
-  const reservedForNew = MAX_NEW_CARDS_PER_SESSION;
+  const reservedForNew = MIN_NEW_CARDS_PER_SESSION;
   const learningSlots = CARDS_PER_SESSION - reservedForGraduated - reservedForNew;
   
   // Fill learning slots with as many learning cards as possible
@@ -351,18 +351,18 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   const dueWords = new Set(dueCards.map(p => p.word));
   const failedNotDue = failedCards.filter(p => !dueWords.has(p.word));
   
-  // IMPORTANT: Limit prioritizedDue to leave room for new cards
-  // We MUST always reserve MAX_NEW_CARDS_PER_SESSION slots for new cards
+  // IMPORTANT: Cap review cards to guarantee slots for new cards
+  // We MUST always have MIN_NEW_CARDS_PER_SESSION slots for new cards
   // to ensure curriculum progression
-  const maxDueCards = CARDS_PER_SESSION - MAX_NEW_CARDS_PER_SESSION;
+  const maxDueCards = CARDS_PER_SESSION - MIN_NEW_CARDS_PER_SESSION;
   const combinedDue = [...failedNotDue, ...dueCards];
   const prioritizedDue = combinedDue.slice(0, maxDueCards);
 
-  // Generate new cards - LIMITED to MAX_NEW_CARDS_PER_SESSION for sustainable learning pace
-  // With the fix above, we're guaranteed to have at least MAX_NEW_CARDS_PER_SESSION slots
+  // Generate new cards - guaranteed MIN_NEW_CARDS_PER_SESSION slots for progression
+  // The cap above ensures we always have room for new cards
   const newCardSlots = Math.min(
     CARDS_PER_SESSION - prioritizedDue.length,
-    MAX_NEW_CARDS_PER_SESSION
+    MIN_NEW_CARDS_PER_SESSION
   );
   const newCards: LearningCard[] = [];
   const repeatCards: CardProgress[] = [];
@@ -1079,18 +1079,18 @@ export async function getNextCard(childId: string, excludeWord?: string): Promis
   }
   
   // 3. Get new phonemes for current lesson (only if we haven't had too many phonemes recently)
-  // Check if we've already introduced MAX_NEW_CARDS_PER_SESSION new cards in this session
+  // Check if we've already introduced MIN_NEW_CARDS_PER_SESSION new cards in this session
   const database = await initDatabase();
   const sessionNewCards = await database.getAllAsync<{ word: string }>(
     `SELECT word FROM card_progress 
      WHERE child_id = ? AND learning_step = 0 AND last_seen_at >= datetime('now', '-1 hour')
      ORDER BY last_seen_at DESC
      LIMIT ?`,
-    [childId, MAX_NEW_CARDS_PER_SESSION]
+    [childId, MIN_NEW_CARDS_PER_SESSION]
   );
   
-  const canIntroduceNewCard = sessionNewCards.length < MAX_NEW_CARDS_PER_SESSION;
-  console.log(`[3] New cards this session: ${sessionNewCards.length}/${MAX_NEW_CARDS_PER_SESSION}, can introduce: ${canIntroduceNewCard}`);
+  const canIntroduceNewCard = sessionNewCards.length < MIN_NEW_CARDS_PER_SESSION;
+  console.log(`[3] New cards this session: ${sessionNewCards.length}/${MIN_NEW_CARDS_PER_SESSION}, can introduce: ${canIntroduceNewCard}`);
   
   // Check recent card types - only introduce new phonemes if we haven't had too many recently
   // If there are no words at all (wordCount === 0 and phonemeCount === 0), allow phonemes

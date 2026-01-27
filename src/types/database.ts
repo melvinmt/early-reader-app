@@ -16,7 +16,6 @@ export interface Child {
   created_at: string; // ISO timestamp
   current_level: number;
   total_cards_completed: number;
-  last_level_advance_date?: string; // YYYY-MM-DD of last level advance (for 1 level/day limit)
 }
 
 export interface CardProgress {

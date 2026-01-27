@@ -186,10 +186,10 @@ describe('Real Database Simulation', () => {
       expect(updatedChild?.current_level).toBe(day + 1);
     }
     
-    // After the fix: Each day after day 1 should have at least 2 new cards
+    // After the fix: Each day after day 1 should have at least 4 new cards
     for (let i = 1; i < dailyNewCards.length; i++) {
       console.log(`[REAL-SIM] Day ${i + 1} had ${dailyNewCards[i].size} new cards`);
-      expect(dailyNewCards[i].size).toBeGreaterThanOrEqual(2);
+      expect(dailyNewCards[i].size).toBeGreaterThanOrEqual(4);
     }
     
     // Calculate overlap between consecutive days
@@ -245,12 +245,12 @@ describe('Real Database Simulation', () => {
     const day2Cards = new Set(queue2.cards.map(c => c.word));
     const newOnDay2 = [...day2Cards].filter(w => !day1Cards.has(w));
     
-    console.log(`[REAL-SIM] Day 2 new cards: ${newOnDay2.length} (should be >= 2)`);
+    console.log(`[REAL-SIM] Day 2 new cards: ${newOnDay2.length} (should be >= 4)`);
     console.log(`[REAL-SIM] New cards: ${newOnDay2.join(', ')}`);
     
-    // CRITICAL: Even with all cards failed, we MUST get at least 2 new cards
+    // CRITICAL: Even with all cards failed, we MUST get at least 4 new cards
     // This tests the fix we made to prioritizedDue.slice(0, maxDueCards)
-    expect(newOnDay2.length).toBeGreaterThanOrEqual(2);
+    expect(newOnDay2.length).toBeGreaterThanOrEqual(4);
   });
 
   it('phonemes are introduced progressively in real database', async () => {
