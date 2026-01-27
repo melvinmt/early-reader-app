@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LogBox } from 'react-native';
-import { initDatabase, clearTestingData } from '@/services/storage';
+import { initDatabase } from '@/services/storage';
 
 // Suppress touch-related warnings from gesture handler
 LogBox.ignoreLogs([
@@ -13,13 +13,8 @@ LogBox.ignoreLogs([
 
 export default function RootLayout() {
   useEffect(() => {
-    // Initialize database
-    initDatabase()
-      .then(() => {
-        // Clear testing data on startup (for testing purposes)
-        return clearTestingData();
-      })
-      .catch(console.error);
+    // Initialize database on app start
+    initDatabase().catch(console.error);
   }, []);
 
   return (
