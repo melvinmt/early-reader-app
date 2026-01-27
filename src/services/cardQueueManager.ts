@@ -350,9 +350,16 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   );
   const dueWords = new Set(dueCards.map(p => p.word));
   const failedNotDue = failedCards.filter(p => !dueWords.has(p.word));
-  const prioritizedDue = [...failedNotDue, ...dueCards];
+  
+  // IMPORTANT: Limit prioritizedDue to leave room for new cards
+  // We MUST always reserve MAX_NEW_CARDS_PER_SESSION slots for new cards
+  // to ensure curriculum progression
+  const maxDueCards = CARDS_PER_SESSION - MAX_NEW_CARDS_PER_SESSION;
+  const combinedDue = [...failedNotDue, ...dueCards];
+  const prioritizedDue = combinedDue.slice(0, maxDueCards);
 
   // Generate new cards - LIMITED to MAX_NEW_CARDS_PER_SESSION for sustainable learning pace
+  // With the fix above, we're guaranteed to have at least MAX_NEW_CARDS_PER_SESSION slots
   const newCardSlots = Math.min(
     CARDS_PER_SESSION - prioritizedDue.length,
     MAX_NEW_CARDS_PER_SESSION
