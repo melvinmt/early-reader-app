@@ -2,6 +2,14 @@
 
 A mobile app implementing the **DISTAR phonics methodology** pioneered by Siegfried Engelmann, combined with **spaced repetition** learning algorithms and a touch of AI.
 
+## 📲 Download
+
+Early Reader is available for **free** on the App Store:
+
+[![Download on the App Store](https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg)](https://apps.apple.com/us/app/early-reader-preschool/id6757128645)
+
+No account required. No data collection. Works completely offline.
+
 ## 👨‍👧 Who Is This For?
 
 I built this app for my 4-year-old daughter to help her learn to read before starting first grade. As a parent, I wanted something based on proven research rather than gamified edutainment—and I'm sharing it with other parents who feel the same way.
