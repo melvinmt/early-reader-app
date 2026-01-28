@@ -214,6 +214,8 @@ class InteractionManager {
     this.notifyStateChange('playing_prompt');
 
     try {
+      // Stop any current audio and disable recording mode for playback
+      await audioPlayer.disableRecordingMode();
       const result = await audioPlayer.playSoundWithTimeout(promptPath);
       
       if (result === 'timeout') {
@@ -222,7 +224,7 @@ class InteractionManager {
         console.warn('⚠️ Prompt audio error, starting listening anyway');
       }
       
-      // Always start listening after prompt (even on timeout/error)
+      // Immediately start listening after prompt (even on timeout/error)
       await this.startListening();
     } catch (error) {
       console.error('Error in playPromptThenListen:', error);
@@ -500,7 +502,7 @@ class InteractionManager {
 
   /**
    * Play audio with speech recognition paused
-   * Pauses listening, plays audio, then resumes listening
+   * Pauses listening, plays audio, then resumes listening immediately
    */
   async playAudioWithPause(audioPath: string): Promise<void> {
     if (this.state === 'fallback' || this.state === 'matched') {
@@ -514,10 +516,14 @@ class InteractionManager {
     await audioPlayer.disableRecordingMode();
 
     try {
-      await audioPlayer.playSoundWithTimeout(audioPath);
+      const result = await audioPlayer.playSoundWithTimeout(audioPath);
+      // Immediately resume listening after playback completes
+      if (result === 'completed' || result === 'timeout' || result === 'error') {
+        await this.resumeListening();
+      }
     } catch (error) {
       console.error('Error playing audio:', error);
-    } finally {
+      // Resume listening even on error
       await this.resumeListening();
     }
   }
@@ -525,6 +531,7 @@ class InteractionManager {
   /**
    * Play feedback audio then resume listening
    * Stops speech recognition before playing to avoid transcribing the audio
+   * Resumes listening immediately after playback ends
    */
   async playFeedbackThenResume(feedbackPath: string): Promise<void> {
     if (this.state === 'fallback' || this.state === 'matched') {
@@ -545,9 +552,11 @@ class InteractionManager {
         console.warn('⚠️ Feedback audio error, resuming listening anyway');
       }
       
+      // Immediately start listening after feedback audio completes
       await this.startListening();
     } catch (error) {
       console.error('Error in playFeedbackThenResume:', error);
+      // Start listening even on error
       await this.startListening();
     }
   }

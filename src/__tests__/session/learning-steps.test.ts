@@ -231,14 +231,16 @@ describe('Learning Steps Implementation', () => {
   });
 
   describe('Session limits', () => {
-    it('limits new cards to MAX_NEW_CARDS_PER_SESSION', async () => {
-      // Mock that 2 new cards have already been introduced this session
+    it('limits new cards to MIN_NEW_CARDS_PER_SESSION', async () => {
+      // Mock that 4 new cards have already been introduced this session
       mockDatabase.getDueReviewCardsByPriority.mockResolvedValue([]);
       mockDatabase.getLearningCards.mockResolvedValue([]);
       mockDatabase.initDatabase.mockResolvedValue({
         getAllAsync: vi.fn().mockResolvedValue([
           { word: 'm' },
           { word: 's' },
+          { word: 'a' },
+          { word: 't' },
         ]),
       } as any);
       mockDatabase.getIntroducedPhonemes.mockResolvedValue([]);

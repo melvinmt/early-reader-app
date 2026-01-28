@@ -1,11 +1,67 @@
 import * as SQLite from 'expo-sqlite';
 import { Parent, Child, CardProgress, ContentCache, Session, IntroducedPhoneme } from '@/types/database';
+import { 
+  getDatabaseAdapter, 
+  isUsingTestAdapter, 
+  isDatabaseInitialized, 
+  markInitialized,
+  type DatabaseAdapter 
+} from './databaseInterface';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
-export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
+/**
+ * Unified database interface that works with both expo-sqlite and test adapter
+ */
+interface UnifiedDatabase {
+  getAllAsync<T>(sql: string, params?: any[]): Promise<T[]>;
+  getFirstAsync<T>(sql: string, params?: any[]): Promise<T | null>;
+  runAsync(sql: string, params?: any[]): Promise<void>;
+  execAsync(sql: string): Promise<void>;
+}
+
+/**
+ * Wrap test adapter to add getFirstAsync
+ */
+function wrapTestAdapter(adapter: DatabaseAdapter): UnifiedDatabase {
+  return {
+    getAllAsync: adapter.getAllAsync.bind(adapter),
+    runAsync: adapter.runAsync.bind(adapter),
+    execAsync: adapter.execAsync.bind(adapter),
+    async getFirstAsync<T>(sql: string, params?: any[]): Promise<T | null> {
+      const results = await adapter.getAllAsync<T>(sql, params);
+      return results.length > 0 ? results[0] : null;
+    },
+  };
+}
+
+/**
+ * Wrap expo-sqlite database
+ */
+function wrapExpoDatabase(database: SQLite.SQLiteDatabase): UnifiedDatabase {
+  return {
+    getAllAsync: database.getAllAsync.bind(database),
+    getFirstAsync: database.getFirstAsync.bind(database),
+    runAsync: database.runAsync.bind(database),
+    execAsync: database.execAsync.bind(database),
+  };
+}
+
+export async function initDatabase(): Promise<UnifiedDatabase> {
+  // Check if using test adapter
+  const testAdapter = getDatabaseAdapter();
+  if (testAdapter) {
+    if (!isDatabaseInitialized()) {
+      // Initialize test database schema
+      await createTablesWithAdapter(testAdapter);
+      markInitialized();
+    }
+    return wrapTestAdapter(testAdapter);
+  }
+  
+  // Production: use expo-sqlite
   if (db) {
-    return db;
+    return wrapExpoDatabase(db);
   }
 
   db = await SQLite.openDatabaseAsync('earlyreader.db');
@@ -16,7 +72,130 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
   // Create tables
   await createTables(db);
 
-  return db;
+  return wrapExpoDatabase(db);
+}
+
+/**
+ * Create tables using the database adapter (for testing)
+ */
+async function createTablesWithAdapter(adapter: DatabaseAdapter): Promise<void> {
+  // Parents table
+  await adapter.execAsync(`
+    CREATE TABLE IF NOT EXISTS parents (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      subscription_status TEXT DEFAULT 'none',
+      settings TEXT DEFAULT '{}'
+    );
+  `);
+
+  // Children table
+  await adapter.execAsync(`
+    CREATE TABLE IF NOT EXISTS children (
+      id TEXT PRIMARY KEY,
+      parent_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      age INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      current_level INTEGER DEFAULT 1,
+      total_cards_completed INTEGER DEFAULT 0,
+      FOREIGN KEY (parent_id) REFERENCES parents(id)
+    );
+  `);
+
+  // Card progress table - includes all columns from the start
+  await adapter.execAsync(`
+    CREATE TABLE IF NOT EXISTS card_progress (
+      id TEXT PRIMARY KEY,
+      child_id TEXT NOT NULL,
+      word TEXT NOT NULL,
+      ease_factor REAL DEFAULT 2.5,
+      interval_days INTEGER DEFAULT 0,
+      next_review_at TEXT NOT NULL,
+      attempts INTEGER DEFAULT 0,
+      successes INTEGER DEFAULT 0,
+      last_seen_at TEXT,
+      hint_used INTEGER DEFAULT 0,
+      learning_step INTEGER DEFAULT 0,
+      cards_since_last_seen INTEGER DEFAULT 0,
+      FOREIGN KEY (child_id) REFERENCES children(id),
+      UNIQUE(child_id, word)
+    );
+  `);
+
+  // Introduced phonemes table
+  await adapter.execAsync(`
+    CREATE TABLE IF NOT EXISTS introduced_phonemes (
+      id TEXT PRIMARY KEY,
+      child_id TEXT NOT NULL,
+      phoneme_symbol TEXT NOT NULL,
+      introduced_at TEXT NOT NULL,
+      FOREIGN KEY (child_id) REFERENCES children(id),
+      UNIQUE(child_id, phoneme_symbol)
+    );
+  `);
+
+  // Content cache table
+  await adapter.execAsync(`
+    CREATE TABLE IF NOT EXISTS content_cache (
+      id TEXT PRIMARY KEY,
+      content_type TEXT NOT NULL,
+      content_key TEXT NOT NULL,
+      content_data TEXT NOT NULL,
+      file_path TEXT,
+      created_at TEXT NOT NULL,
+      expires_at TEXT,
+      UNIQUE(content_type, content_key)
+    );
+  `);
+
+  // Sessions table
+  await adapter.execAsync(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      child_id TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      cards_completed INTEGER DEFAULT 0,
+      duration_seconds INTEGER DEFAULT 0,
+      FOREIGN KEY (child_id) REFERENCES children(id)
+    );
+  `);
+
+  // Session cards table (persist exact session for replays)
+  await adapter.execAsync(`
+    CREATE TABLE IF NOT EXISTS session_cards (
+      id TEXT PRIMARY KEY,
+      child_id TEXT NOT NULL,
+      session_date TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      word TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (child_id) REFERENCES children(id),
+      UNIQUE(child_id, session_date, position)
+    );
+  `);
+
+  // Create indexes
+  await adapter.execAsync(`
+    CREATE INDEX IF NOT EXISTS idx_card_progress_child ON card_progress(child_id);
+  `);
+  await adapter.execAsync(`
+    CREATE INDEX IF NOT EXISTS idx_card_progress_review ON card_progress(next_review_at);
+  `);
+  await adapter.execAsync(`
+    CREATE INDEX IF NOT EXISTS idx_sessions_child ON sessions(child_id);
+  `);
+  await adapter.execAsync(`
+    CREATE INDEX IF NOT EXISTS idx_session_cards_child_date ON session_cards(child_id, session_date);
+  `);
+  await adapter.execAsync(`
+    CREATE INDEX IF NOT EXISTS idx_content_cache_type ON content_cache(content_type, content_key);
+  `);
+  await adapter.execAsync(`
+    CREATE INDEX IF NOT EXISTS idx_introduced_phonemes_child ON introduced_phonemes(child_id);
+  `);
 }
 
 async function createTables(database: SQLite.SQLiteDatabase) {
@@ -102,11 +281,26 @@ async function createTables(database: SQLite.SQLiteDatabase) {
     );
   `);
 
+  // Session cards table (persist exact session for replays)
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS session_cards (
+      id TEXT PRIMARY KEY,
+      child_id TEXT NOT NULL,
+      session_date TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      word TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (child_id) REFERENCES children(id),
+      UNIQUE(child_id, session_date, position)
+    );
+  `);
+
   // Create indexes
   await database.execAsync(`
     CREATE INDEX IF NOT EXISTS idx_card_progress_child ON card_progress(child_id);
     CREATE INDEX IF NOT EXISTS idx_card_progress_review ON card_progress(next_review_at);
     CREATE INDEX IF NOT EXISTS idx_sessions_child ON sessions(child_id);
+    CREATE INDEX IF NOT EXISTS idx_session_cards_child_date ON session_cards(child_id, session_date);
     CREATE INDEX IF NOT EXISTS idx_content_cache_type ON content_cache(content_type, content_key);
     CREATE INDEX IF NOT EXISTS idx_introduced_phonemes_child ON introduced_phonemes(child_id);
   `);
@@ -167,6 +361,10 @@ export async function clearTestingData(): Promise<void> {
     // Clear sessions
     await database.execAsync('DELETE FROM sessions;');
     console.log('Cleared sessions table');
+
+    // Clear session cards
+    await database.execAsync('DELETE FROM session_cards;');
+    console.log('Cleared session_cards table');
     
     // Reset children's progress counters
     await database.execAsync(`
@@ -517,6 +715,45 @@ export async function getSessionsByChildId(childId: string): Promise<Session[]> 
     [childId]
   );
   return result;
+}
+
+// Session cards operations (persist exact session for replays)
+export async function getSessionCardsForDate(
+  childId: string,
+  sessionDate: string
+): Promise<string[]> {
+  const database = await initDatabase();
+  const result = await database.getAllAsync<{ word: string }>(
+    `SELECT word FROM session_cards 
+     WHERE child_id = ? AND session_date = ?
+     ORDER BY position ASC`,
+    [childId, sessionDate]
+  );
+  return result.map((row) => row.word);
+}
+
+export async function saveSessionCardsForDate(
+  childId: string,
+  sessionDate: string,
+  words: string[]
+): Promise<void> {
+  const database = await initDatabase();
+  const now = new Date().toISOString();
+
+  // Replace any existing session cards for the day
+  await database.runAsync(
+    `DELETE FROM session_cards WHERE child_id = ? AND session_date = ?`,
+    [childId, sessionDate]
+  );
+
+  for (let i = 0; i < words.length; i++) {
+    const id = `${childId}-${sessionDate}-${i}`;
+    await database.runAsync(
+      `INSERT INTO session_cards (id, child_id, session_date, position, word, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, childId, sessionDate, i, words[i], now]
+    );
+  }
 }
 
 // Introduced phonemes operations

@@ -133,6 +133,18 @@
       "passes": false
     },
     {
+      "id": "session-001",
+      "category": "Session Progression",
+      "description": "Daily sessions are deterministic and advance levels once per day",
+      "steps": [
+        "Return the same 20 cards for same-day replays",
+        "Advance level only once per new session day",
+        "Prevent consecutive duplicate cards in a session",
+        "Always fill sessions to 20 cards"
+      ],
+      "passes": true
+    },
+    {
       "id": "ai-word-001",
       "category": "AI Content Generation",
       "description": "Gemini 3 Flash generates appropriate words for child's level",
@@ -182,6 +194,7 @@
     }
   ]
 }
+
 
 
 

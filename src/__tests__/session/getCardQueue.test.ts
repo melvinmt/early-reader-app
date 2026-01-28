@@ -64,6 +64,12 @@ describe('getCardQueue - REAL Implementation Tests', () => {
     mockDatabase.markPhonemeIntroduced.mockImplementation((childId: string, phoneme: string) => 
       testDb.markPhonemeIntroduced(childId, phoneme)
     );
+    mockDatabase.getSessionCardsForDate.mockImplementation((childId: string, sessionDate: string) =>
+      testDb.getSessionCardsForDate(childId, sessionDate)
+    );
+    mockDatabase.saveSessionCardsForDate.mockImplementation((childId: string, sessionDate: string, words: string[]) =>
+      testDb.saveSessionCardsForDate(childId, sessionDate, words)
+    );
     mockDatabase.initDatabase.mockResolvedValue({
       getAllAsync: vi.fn().mockImplementation(async (sql: string, params: any[]) => {
         if (sql.includes('SELECT DISTINCT word')) {
@@ -213,7 +219,8 @@ describe('getCardQueue - REAL Implementation Tests', () => {
         
         const result = await getCardQueue(child.id);
         
-        // Should have 3 due cards + 7 new cards = 10 total
+        // Should have 3 due cards + 17 new cards = 20 total
+        // System should introduce more phonemes to ensure we always get 20 cards
         expect(result.cards.length).toBe(CARDS_PER_SESSION);
         
         // Should include due cards

@@ -1,0 +1,58 @@
+2026-01-18
+- Added a full journey simulation test that logs lesson progression and phoneme requirements.
+- Fixed lesson progression so lessons with no phonemes are treated as complete.
+- Tests run: full-journey-simulation.test.ts, full-curriculum.test.ts.
+- Issue documented: empty-phoneme lessons block progression.
+- Extended simulator to model wrong answers with penalties and full-journey mode.
+- Tests run: FULL_JOURNEY_SIM=1 full-journey-simulation.test.ts (reached max lesson 89).
+- Removed hard max lesson cap and adjusted simulator to run by sessions instead of max lesson.
+- Tests run: full-journey-simulation.test.ts.
+- Added repeat-card fallback so sessions are always filled (no empty lessons).
+- Tests run: FULL_JOURNEY_SIM=1 full-journey-simulation.test.ts.
+- Enforced 20 cards per session and failed-card reappearance within 3 sessions.
+- Prioritized failed cards in review selection; capped SM-2 interval to avoid date overflow.
+- Tests run: FULL_JOURNEY_SIM=1 full-journey-simulation.test.ts (passes).
+
+2026-01-19
+- Fixed duplicate card ID issue in generate-cards.ts (duplicate 'ram' and 'room' in word lists).
+- Added duplicate detection to generateCVCCards() to prevent duplicate entries in generated cards.
+- Added fallback to phonemes/sentences when prioritizing words but none available.
+- Improved card queue filling to aggressively introduce phonemes from ALL lessons (1-100).
+- System now always fills sessions with 20 cards by introducing more phonemes as needed.
+- **CRITICAL FIX**: Fixed lesson progression stalling - phonemes are now proactively introduced
+  at the start of each session, not just when more cards are needed. Before this fix, children
+  could be stuck at level 1 indefinitely even after months of practice.
+- Fixed level progression with day-based simulation:
+  - Early lessons (1-10): Flexible progression to ensure 20 cards per session
+  - After level 10: Natural 1 level per session progression
+  - Same-day replays get same cards (100% overlap), no level advancement
+  - Skip days don't lose progress
+- Added preventConsecutiveDuplicates() to ensure no back-to-back same words in sessions
+- Added comprehensive day-based simulation tests (3 tests):
+  - "progresses through days with replays and skip days"
+  - "skip days do not lose progress"
+  - "same-day replays do not advance level multiple times"
+- Simulation results: 60 days → level 11 (fast early progression, stabilizes after level 10)
+- Tests run: all 113 tests pass (16 test files).
+- Re-verified day-based simulation outputs and session invariants (20 cards, no consecutive duplicates).
+- Tests run: npx vitest run (113/113 passing).
+- Full-journey simulation now advances the system date per day to avoid same-day replay lock.
+- Added FULL_JOURNEY_DAYS override to run 100-day sims.
+- Tests run: FULL_JOURNEY_SIM=1 FULL_JOURNEY_DAYS=100 full-journey-simulation.test.ts.
+2026-01-22
+- **CRITICAL FIX**: Fixed same cards appearing every day for 5+ days
+  - Root cause: Learning phase cards (step 0-2) had next_review_at = now,
+    and getCardQueue() selected ALL due cards without limiting them.
+    This caused same 20 cards to appear every day until graduation (4 days).
+  - Fix 1: Set next_review_at to tomorrow instead of now during learning phase
+  - Fix 2: Balance session composition:
+    - 14 slots for learning cards (they MUST graduate, need 3 reviews each)
+    - 4 slots for graduated reviews (MIN_GRADUATED_REVIEWS)
+    - 2 slots for new cards (MAX_NEW_CARDS_PER_SESSION)
+- Added test "different days should show card variation" to verify fix
+- Before fix: 100% card overlap on days 1-4 (same cards every day)
+- After fix: Natural progression 90% → 80% → 70% → 60% as cards graduate
+- Tests run: npx vitest run (114/114 passing)
+
+Next:
+- Validate on-device progression telemetry to confirm real user path advances.

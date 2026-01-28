@@ -135,7 +135,10 @@ export async function isLessonComplete(childId: string, lesson: number): Promise
   
   // Get phonemes for this lesson
   const lessonPhonemes = getPhonemesForLessonNumber(lesson);
-  if (lessonPhonemes.length === 0) return false;
+  if (lessonPhonemes.length === 0) {
+    // No phonemes defined for this lesson, treat as complete
+    return true;
+  }
   
   // Check if all phonemes have been introduced
   const introducedPhonemes = await getIntroducedPhonemes(childId);
@@ -167,14 +170,10 @@ export async function advanceLessonIfReady(childId: string): Promise<boolean> {
   const isComplete = await isLessonComplete(childId, currentLesson);
   
   if (isComplete) {
-    // Advance to next lesson
+    // Advance to next lesson (no upper cap; curriculum can extend as needed)
     const nextLesson = currentLesson + 1;
-    
-    // Don't advance beyond lesson 100 (max DISTAR lesson)
-    if (nextLesson <= 100) {
-      await updateChildLevel(childId, nextLesson);
-      return true;
-    }
+    await updateChildLevel(childId, nextLesson);
+    return true;
   }
   
   return false;

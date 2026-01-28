@@ -1,6 +1,6 @@
 {
   "name": "earlyreader",
-  "version": "1.0.0",
+  "version": "1.4.1",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
@@ -51,11 +51,13 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.0.0",
     "@types/react": "~19.1.10",
     "@vitest/coverage-v8": "^4.0.16",
     "axios": "^1.6.0",
     "babel-preset-expo": "^54.0.9",
+    "better-sqlite3": "^12.6.2",
     "dotenv": "^16.4.0",
     "sharp": "^0.34.5",
     "ts-node": "^10.9.0",

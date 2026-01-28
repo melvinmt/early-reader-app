@@ -9,7 +9,7 @@
 
 export interface DistarCard {
   id: string;
-  type: 'letter' | 'digraph' | 'word' | 'sentence';
+  type: 'letter' | 'digraph' | 'cvc' | 'word' | 'sentence';
   display: string;
   plainText: string;
   phonemes: string[];
@@ -240,6 +240,7 @@ export function getCardsUpToLesson(lesson: number): DistarCard[] {
 export function getCardsByType(type: DistarCard['type']): DistarCard[] {
   return DISTAR_CARDS.filter(card => card.type === type);
 }
+
 
 
 

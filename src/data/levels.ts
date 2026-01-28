@@ -732,7 +732,15 @@ export const LEVELS: Level[] = [
  * Get level definition by level number
  */
 export function getLevel(level: number): Level | null {
-  return LEVELS.find((l) => l.level === level) || null;
+  const exact = LEVELS.find((l) => l.level === level);
+  if (exact) return exact;
+
+  // For levels beyond defined curriculum, reuse the final level definition.
+  if (level > LEVELS[LEVELS.length - 1].level) {
+    return LEVELS[LEVELS.length - 1];
+  }
+
+  return null;
 }
 
 /**
@@ -740,7 +748,9 @@ export function getLevel(level: number): Level | null {
  */
 export function getPhonemesUpToLevel(level: number): string[] {
   const phonemes: string[] = [];
-  for (let i = 1; i <= level && i <= LEVELS.length; i++) {
+  const maxLevel = LEVELS[LEVELS.length - 1].level;
+  const safeLevel = Math.min(level, maxLevel);
+  for (let i = 1; i <= safeLevel && i <= LEVELS.length; i++) {
     const levelData = LEVELS[i - 1];
     if (levelData) {
       phonemes.push(...levelData.phonemes);

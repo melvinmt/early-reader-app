@@ -40,6 +40,10 @@ export interface TestDatabaseInterface {
   // Utility
   clearAll(): Promise<void>;
   reset(): Promise<void>;
+
+  // Session cards operations
+  getSessionCardsForDate(childId: string, sessionDate: string): Promise<string[]>;
+  saveSessionCardsForDate(childId: string, sessionDate: string, words: string[]): Promise<void>;
 }
 
 /**
@@ -52,6 +56,7 @@ export class InMemoryTestDatabase implements TestDatabaseInterface {
   private children: Map<string, Child> = new Map();
   private cardProgress: Map<string, CardProgress> = new Map();
   private introducedPhonemes: Map<string, IntroducedPhoneme> = new Map();
+  private sessionCards: Map<string, string[]> = new Map();
 
   async getChild(id: string): Promise<Child | null> {
     return this.children.get(id) || null;
@@ -123,10 +128,21 @@ export class InMemoryTestDatabase implements TestDatabaseInterface {
     this.children.clear();
     this.cardProgress.clear();
     this.introducedPhonemes.clear();
+    this.sessionCards.clear();
   }
 
   async reset(): Promise<void> {
     await this.clearAll();
+  }
+
+  async getSessionCardsForDate(childId: string, sessionDate: string): Promise<string[]> {
+    const key = `${childId}-${sessionDate}`;
+    return this.sessionCards.get(key) ?? [];
+  }
+
+  async saveSessionCardsForDate(childId: string, sessionDate: string, words: string[]): Promise<void> {
+    const key = `${childId}-${sessionDate}`;
+    this.sessionCards.set(key, [...words]);
   }
 }
 
@@ -163,6 +179,12 @@ export function createDatabaseMockImplementations(testDb: TestDatabaseInterface)
     ),
     markPhonemeIntroduced: vi.fn().mockImplementation((childId: string, phoneme: string) => 
       testDb.markPhonemeIntroduced(childId, phoneme)
+    ),
+    getSessionCardsForDate: vi.fn().mockImplementation((childId: string, sessionDate: string) =>
+      testDb.getSessionCardsForDate(childId, sessionDate)
+    ),
+    saveSessionCardsForDate: vi.fn().mockImplementation((childId: string, sessionDate: string, words: string[]) =>
+      testDb.saveSessionCardsForDate(childId, sessionDate, words)
     ),
     initDatabase: vi.fn().mockResolvedValue({
       getAllAsync: vi.fn().mockImplementation(async (sql: string, params: any[]) => {
