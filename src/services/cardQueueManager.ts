@@ -326,9 +326,29 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   const learningDueCards = allDueCards.filter(p => (p.learning_step ?? 3) < 3 && !isRetiredCard(p));
   const graduatedDueCards = allDueCards.filter(p => (p.learning_step ?? 3) >= 3 && !isRetiredCard(p));
   
-  // Sort by struggle (more failures = higher priority), then by due date
-  const sortByStruggle = (cards: CardProgress[]) => {
+  // Helper to check if a card is a sentence
+  const isSentenceCard = (progress: CardProgress): boolean => {
+    const staticCard = staticCards.find(c => c.plainText === progress.word);
+    return staticCard?.type === 'sentence';
+  };
+  
+  // At higher levels, prioritize sentences in review cards
+  // This ensures sentence-heavy sessions for reading fluency practice
+  const SENTENCE_PRIORITY_LEVEL = 50;
+  const shouldPrioritizeSentences = currentLevel >= SENTENCE_PRIORITY_LEVEL;
+  
+  // Sort by: sentences first (at high levels), then struggle, then due date
+  const sortByPriority = (cards: CardProgress[]) => {
     cards.sort((a, b) => {
+      // At high levels, sentences come first
+      if (shouldPrioritizeSentences) {
+        const aIsSentence = isSentenceCard(a);
+        const bIsSentence = isSentenceCard(b);
+        if (aIsSentence && !bIsSentence) return -1;
+        if (!aIsSentence && bIsSentence) return 1;
+      }
+      
+      // Then sort by struggle (more failures = higher priority)
       const failA = (a.attempts ?? 0) - (a.successes ?? 0);
       const failB = (b.attempts ?? 0) - (b.successes ?? 0);
       if (failA !== failB) {
@@ -339,8 +359,8 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     return cards;
   };
   
-  sortByStruggle(learningDueCards);
-  sortByStruggle(graduatedDueCards);
+  sortByPriority(learningDueCards);
+  sortByPriority(graduatedDueCards);
   
   // Calculate how many slots for each card type:
   // Session = 20 cards total
@@ -419,7 +439,18 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     ]);
 
     // First try existing progress records (exclude retired cards)
-    for (const progress of allProgress) {
+    // At high levels, prioritize sentences in repeat cards too
+    const sortedProgress = shouldPrioritizeSentences 
+      ? [...allProgress].sort((a, b) => {
+          const aIsSentence = isSentenceCard(a);
+          const bIsSentence = isSentenceCard(b);
+          if (aIsSentence && !bIsSentence) return -1;
+          if (!aIsSentence && bIsSentence) return 1;
+          return 0;
+        })
+      : allProgress;
+    
+    for (const progress of sortedProgress) {
       if (!excluded.has(progress.word) && !isRetiredCard(progress)) {
         repeatCards.push(progress);
         excluded.add(progress.word);
@@ -750,7 +781,7 @@ async function generateNewCardFromStatic(
   // At higher levels, weight selection towards sentences for reading fluency
   // This creates a natural progression: early = more words, later = more sentences
   const SENTENCE_WEIGHT_START_LEVEL = 30;  // Start weighting at level 30
-  const MAX_SENTENCE_WEIGHT = 4;           // At high levels, sentences 4x more likely
+  const MAX_SENTENCE_WEIGHT = 10;          // At high levels, sentences 10x more likely
   
   let selectedCard: DistarCard;
   const sentencesInPool = targetCards.filter(c => c.type === 'sentence');
