@@ -343,9 +343,22 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   const learningDueCards = allDueCards.filter(p => (p.learning_step ?? 3) < 3 && !isRetiredCard(p));
   const graduatedDueCards = allDueCards.filter(p => (p.learning_step ?? 3) >= 3 && !isRetiredCard(p));
   
-  // Prioritize struggled cards first within each category
-  const sortByStruggle = (cards: CardProgress[]) => {
+  // Helper to check if a card is a sentence
+  const isSentenceCard = (progress: CardProgress): boolean => {
+    const staticCard = staticCards.find(c => c.plainText === progress.word);
+    return staticCard?.type === 'sentence';
+  };
+  
+  // Prioritize sentences first, then struggled cards within each category
+  const sortBySentenceThenStruggle = (cards: CardProgress[]) => {
     cards.sort((a, b) => {
+      // Sentences always come first
+      const aIsSentence = isSentenceCard(a);
+      const bIsSentence = isSentenceCard(b);
+      if (aIsSentence && !bIsSentence) return -1;
+      if (!aIsSentence && bIsSentence) return 1;
+      
+      // Then sort by struggle (more failures = higher priority)
       const failA = (a.attempts ?? 0) - (a.successes ?? 0);
       const failB = (b.attempts ?? 0) - (b.successes ?? 0);
       if (failA !== failB) {
@@ -356,8 +369,8 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     return cards;
   };
   
-  sortByStruggle(learningDueCards);
-  sortByStruggle(graduatedDueCards);
+  sortBySentenceThenStruggle(learningDueCards);
+  sortBySentenceThenStruggle(graduatedDueCards);
   
   // Calculate how many slots for each card type:
   // Session = 20 cards total
@@ -436,7 +449,16 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     ]);
 
     // First try existing progress records (exclude retired cards)
-    for (const progress of allProgress) {
+    // Prioritize sentences first, then other cards
+    const sortedProgress = [...allProgress].sort((a, b) => {
+      const aIsSentence = isSentenceCard(a);
+      const bIsSentence = isSentenceCard(b);
+      if (aIsSentence && !bIsSentence) return -1;
+      if (!aIsSentence && bIsSentence) return 1;
+      return 0;
+    });
+    
+    for (const progress of sortedProgress) {
       if (!excluded.has(progress.word) && !isRetiredCard(progress)) {
         repeatCards.push(progress);
         excluded.add(progress.word);
@@ -731,15 +753,24 @@ async function generateNewCardFromStatic(
   const shouldPrioritizeWords = recentCounts.wordCount === 0 || 
     (recentCounts.phonemeCount / recentCounts.wordCount) > (2 / 3);
   
-  // Hierarchy: phonemes > CVC > words > sentences
-  // Prioritize CVC words until mastery, then regular words
-  if (shouldPrioritizeWords) {
+  // At higher levels (30+), prioritize sentences for reading fluency
+  // Early levels focus on building blocks (phonemes, CVC, words)
+  const SENTENCE_PRIORITY_LEVEL = 30;
+  const shouldPrioritizeSentences = currentLesson >= SENTENCE_PRIORITY_LEVEL;
+  
+  // Hierarchy changes based on level:
+  // - Early (< 30): phonemes > CVC > words > sentences  
+  // - Later (>= 30): sentences > words > CVC > phonemes
+  if (shouldPrioritizeSentences && sentenceCards.length > 0) {
+    // High level: prioritize sentences for fluency
+    targetCards = sentenceCards;
+  } else if (shouldPrioritizeWords) {
     if (!cvcMastered && cvcCards.length > 0) {
       // CVC not mastered - prioritize CVC words
       targetCards = cvcCards;
     } else if (wordCards.length > 0 || sentenceCards.length > 0) {
-      // CVC mastered or no CVC cards - prioritize regular words, allow sentences later
-      targetCards = sentenceCards.length > 0 ? [...wordCards, ...sentenceCards] : wordCards;
+      // CVC mastered or no CVC cards - prioritize words, then sentences
+      targetCards = wordCards.length > 0 ? wordCards : sentenceCards;
     } else if (cvcCards.length > 0) {
       // Fall back to CVC if no regular words
       targetCards = cvcCards;
@@ -755,7 +786,7 @@ async function generateNewCardFromStatic(
     targetCards = cvcCards;
   } else if (wordCards.length > 0 || sentenceCards.length > 0) {
     // Fall back to words; allow sentences once CVC is mastered
-    targetCards = sentenceCards.length > 0 ? [...wordCards, ...sentenceCards] : wordCards;
+    targetCards = wordCards.length > 0 ? wordCards : sentenceCards;
   }
   
   if (targetCards.length === 0) {
