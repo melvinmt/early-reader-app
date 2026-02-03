@@ -297,15 +297,10 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   // Get due review cards (spaced repetition)
   const allDueCards = await getDueReviewCards(childId, CARDS_PER_SESSION * 2);
   
-  // Cards retire after enough successful reviews - focus shifts to sentences for fluency
-  // Retirement thresholds by card type (sentences never retire):
-  // - Phonemes: 3 reviews (foundational, simple)
-  // - CVC: 6 reviews (building blocks)
-  // - Words: 10 reviews (core vocabulary)
-  // - Sentences: never retire (reading fluency practice)
+  // Only phonemes fully retire - they're foundational and too simple to keep drilling
+  // CVC/words use exponential backoff (longer intervals) but don't retire
+  // Sentences never retire - always practice reading fluency
   const PHONEME_RETIREMENT_THRESHOLD = 3;
-  const CVC_RETIREMENT_THRESHOLD = 6;
-  const WORD_RETIREMENT_THRESHOLD = 10;
   
   const isRetiredCard = (progress: CardProgress): boolean => {
     const staticCard = staticCards.find(c => c.plainText === progress.word);
@@ -317,24 +312,12 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     const successes = progress.successes ?? 0;
     const cardType = staticCard.type;
     
-    // Sentences never retire - always practice reading fluency
-    if (cardType === 'sentence') return false;
-    
-    // Phonemes retire quickly
+    // Only phonemes retire - after 3 successful reviews
     if (cardType === 'letter' || cardType === 'digraph') {
       return successes >= PHONEME_RETIREMENT_THRESHOLD;
     }
     
-    // CVC words retire after moderate practice
-    if (cardType === 'cvc') {
-      return successes >= CVC_RETIREMENT_THRESHOLD;
-    }
-    
-    // Regular words retire after extensive practice
-    if (cardType === 'word') {
-      return successes >= WORD_RETIREMENT_THRESHOLD;
-    }
-    
+    // Everything else uses exponential backoff, not retirement
     return false;
   };
   
@@ -343,22 +326,9 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   const learningDueCards = allDueCards.filter(p => (p.learning_step ?? 3) < 3 && !isRetiredCard(p));
   const graduatedDueCards = allDueCards.filter(p => (p.learning_step ?? 3) >= 3 && !isRetiredCard(p));
   
-  // Helper to check if a card is a sentence
-  const isSentenceCard = (progress: CardProgress): boolean => {
-    const staticCard = staticCards.find(c => c.plainText === progress.word);
-    return staticCard?.type === 'sentence';
-  };
-  
-  // Prioritize sentences first, then struggled cards within each category
-  const sortBySentenceThenStruggle = (cards: CardProgress[]) => {
+  // Sort by struggle (more failures = higher priority), then by due date
+  const sortByStruggle = (cards: CardProgress[]) => {
     cards.sort((a, b) => {
-      // Sentences always come first
-      const aIsSentence = isSentenceCard(a);
-      const bIsSentence = isSentenceCard(b);
-      if (aIsSentence && !bIsSentence) return -1;
-      if (!aIsSentence && bIsSentence) return 1;
-      
-      // Then sort by struggle (more failures = higher priority)
       const failA = (a.attempts ?? 0) - (a.successes ?? 0);
       const failB = (b.attempts ?? 0) - (b.successes ?? 0);
       if (failA !== failB) {
@@ -369,8 +339,8 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     return cards;
   };
   
-  sortBySentenceThenStruggle(learningDueCards);
-  sortBySentenceThenStruggle(graduatedDueCards);
+  sortByStruggle(learningDueCards);
+  sortByStruggle(graduatedDueCards);
   
   // Calculate how many slots for each card type:
   // Session = 20 cards total
@@ -449,16 +419,7 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
     ]);
 
     // First try existing progress records (exclude retired cards)
-    // Prioritize sentences first, then other cards
-    const sortedProgress = [...allProgress].sort((a, b) => {
-      const aIsSentence = isSentenceCard(a);
-      const bIsSentence = isSentenceCard(b);
-      if (aIsSentence && !bIsSentence) return -1;
-      if (!aIsSentence && bIsSentence) return 1;
-      return 0;
-    });
-    
-    for (const progress of sortedProgress) {
+    for (const progress of allProgress) {
       if (!excluded.has(progress.word) && !isRetiredCard(progress)) {
         repeatCards.push(progress);
         excluded.add(progress.word);
@@ -753,29 +714,22 @@ async function generateNewCardFromStatic(
   const shouldPrioritizeWords = recentCounts.wordCount === 0 || 
     (recentCounts.phonemeCount / recentCounts.wordCount) > (2 / 3);
   
-  // At higher levels (30+), prioritize sentences for reading fluency
-  // Early levels focus on building blocks (phonemes, CVC, words)
-  const SENTENCE_PRIORITY_LEVEL = 30;
-  const shouldPrioritizeSentences = currentLesson >= SENTENCE_PRIORITY_LEVEL;
-  
-  // Hierarchy changes based on level:
-  // - Early (< 30): phonemes > CVC > words > sentences  
-  // - Later (>= 30): sentences > words > CVC > phonemes
-  if (shouldPrioritizeSentences && sentenceCards.length > 0) {
-    // High level: prioritize sentences for fluency
-    targetCards = sentenceCards;
-  } else if (shouldPrioritizeWords) {
+  // Natural progression: phonemes > CVC > (words + sentences mixed)
+  // Once CVC is mastered, words and sentences are introduced together
+  // This ensures sentences appear naturally alongside words
+  if (shouldPrioritizeWords) {
     if (!cvcMastered && cvcCards.length > 0) {
       // CVC not mastered - prioritize CVC words
       targetCards = cvcCards;
     } else if (wordCards.length > 0 || sentenceCards.length > 0) {
-      // CVC mastered or no CVC cards - prioritize words, then sentences
-      targetCards = wordCards.length > 0 ? wordCards : sentenceCards;
+      // CVC mastered - mix words and sentences together
+      // This ensures sentences are introduced throughout, not just at the end
+      targetCards = [...wordCards, ...sentenceCards];
     } else if (cvcCards.length > 0) {
-      // Fall back to CVC if no regular words
+      // Fall back to CVC if no regular words or sentences
       targetCards = cvcCards;
     } else if (phonemeCards.length > 0) {
-      // Fall back to phonemes if no CVC or words
+      // Fall back to phonemes if nothing else
       targetCards = phonemeCards;
     }
   } else if (phonemeCards.length > 0) {
@@ -785,8 +739,8 @@ async function generateNewCardFromStatic(
     // No phonemes available, prioritize CVC if not mastered
     targetCards = cvcCards;
   } else if (wordCards.length > 0 || sentenceCards.length > 0) {
-    // Fall back to words; allow sentences once CVC is mastered
-    targetCards = wordCards.length > 0 ? wordCards : sentenceCards;
+    // Mix words and sentences
+    targetCards = [...wordCards, ...sentenceCards];
   }
   
   if (targetCards.length === 0) {
@@ -978,21 +932,21 @@ export async function recordCardCompletion(
     if (staticCard && result.success) {
       // Mastery thresholds and interval multipliers by card type
       // After mastery, intervals grow much faster (exponential backoff)
-      const PHONEME_MASTERY = 3;   // After 3 successes, boost intervals 4x
-      const CVC_MASTERY = 6;       // After 6 successes, boost intervals 3x  
-      const WORD_MASTERY = 10;     // After 10 successes, boost intervals 2x
+      // Exponential backoff: once mastered, push reviews much further out
+      // This naturally creates space for sentences as simpler cards become infrequent
+      const CVC_MASTERY = 3;       // After 3 successes, boost intervals
+      const WORD_MASTERY = 4;      // After 4 successes, boost intervals
       
       let intervalMultiplier = 1;
       const cardType = staticCard.type;
       
-      if ((cardType === 'letter' || cardType === 'digraph') && successes >= PHONEME_MASTERY) {
-        intervalMultiplier = 4; // Phonemes: review every ~month instead of ~week
-      } else if (cardType === 'cvc' && successes >= CVC_MASTERY) {
-        intervalMultiplier = 3; // CVC: review every ~3 weeks instead of ~week
+      // Phonemes fully retire (handled by isRetiredCard), no backoff needed
+      if (cardType === 'cvc' && successes >= CVC_MASTERY) {
+        intervalMultiplier = 4; // CVC: push to ~month intervals
       } else if (cardType === 'word' && successes >= WORD_MASTERY) {
-        intervalMultiplier = 2; // Words: review every ~2 weeks instead of ~week
+        intervalMultiplier = 3; // Words: push to ~3 week intervals
       }
-      // Sentences: no multiplier, always use standard SM-2
+      // Sentences: no multiplier, always use standard SM-2 for reading practice
       
       if (intervalMultiplier > 1) {
         nextIntervalDays = Math.min(nextIntervalDays * intervalMultiplier, 180); // Cap at 6 months
