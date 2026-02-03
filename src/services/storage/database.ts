@@ -471,6 +471,16 @@ export async function incrementChildCardsCompleted(childId: string): Promise<voi
   );
 }
 
+export async function deleteChild(childId: string): Promise<void> {
+  const database = await initDatabase();
+  // Delete related records first (no CASCADE defined in schema)
+  await database.runAsync('DELETE FROM session_cards WHERE child_id = ?', [childId]);
+  await database.runAsync('DELETE FROM sessions WHERE child_id = ?', [childId]);
+  await database.runAsync('DELETE FROM card_progress WHERE child_id = ?', [childId]);
+  await database.runAsync('DELETE FROM introduced_phonemes WHERE child_id = ?', [childId]);
+  await database.runAsync('DELETE FROM children WHERE id = ?', [childId]);
+}
+
 // Card progress operations
 export async function createOrUpdateCardProgress(progress: CardProgress): Promise<void> {
   const database = await initDatabase();

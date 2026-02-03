@@ -1,10 +1,98 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getAllChildren } from '@/services/storage';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
+import { getAllChildren, deleteChild } from '@/services/storage';
 import { Child } from '@/types/database';
 import ParentalGate from '@/components/parent/ParentalGate';
 import AddChildrenScreen from '@/screens/onboarding/AddChildrenScreen';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const DELETE_THRESHOLD = -80; // Swipe left threshold to reveal delete button
+const DELETE_BUTTON_WIDTH = 80;
+
+// Swipeable child card component
+function SwipeableChildCard({ 
+  child, 
+  onSelect, 
+  onDeleteRequest 
+}: { 
+  child: Child; 
+  onSelect: (child: Child) => void;
+  onDeleteRequest: (child: Child) => void;
+}) {
+  const translateX = useSharedValue(0);
+  const isSwipeOpen = useSharedValue(false);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-10, 10])
+    .onUpdate((event) => {
+      // Only allow swiping left (negative values)
+      if (isSwipeOpen.value) {
+        // If already open, allow swiping back
+        translateX.value = Math.min(0, Math.max(-DELETE_BUTTON_WIDTH, -DELETE_BUTTON_WIDTH + event.translationX));
+      } else {
+        translateX.value = Math.min(0, Math.max(-DELETE_BUTTON_WIDTH, event.translationX));
+      }
+    })
+    .onEnd((event) => {
+      if (translateX.value < DELETE_THRESHOLD / 2) {
+        // Snap open
+        translateX.value = withSpring(-DELETE_BUTTON_WIDTH, { damping: 20 });
+        isSwipeOpen.value = true;
+      } else {
+        // Snap closed
+        translateX.value = withSpring(0, { damping: 20 });
+        isSwipeOpen.value = false;
+      }
+    });
+
+  const animatedCardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const handleDelete = () => {
+    translateX.value = withSpring(0, { damping: 20 });
+    isSwipeOpen.value = false;
+    onDeleteRequest(child);
+  };
+
+  return (
+    <View style={styles.swipeContainer}>
+      {/* Delete button behind the card */}
+      <TouchableOpacity 
+        style={styles.deleteButton} 
+        onPress={handleDelete}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.deleteButtonText}>Delete</Text>
+      </TouchableOpacity>
+      
+      {/* Swipeable card */}
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={[styles.childCard, animatedCardStyle]}>
+          <TouchableOpacity
+            style={styles.childCardInner}
+            onPress={() => onSelect(child)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.childInfo}>
+              <Text style={styles.childName}>{child.name}</Text>
+              <Text style={styles.childDetails}>
+                Age {child.age} • Level {child.current_level}
+              </Text>
+              <Text style={styles.childProgress}>
+                {child.total_cards_completed} cards completed
+              </Text>
+            </View>
+            <Text style={styles.arrow}>→</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
+}
 
 export default function ChildSelectionScreen() {
   const router = useRouter();
@@ -12,6 +100,8 @@ export default function ChildSelectionScreen() {
   const [loading, setLoading] = useState(true);
   const [showParentalGate, setShowParentalGate] = useState(false);
   const [showAddChild, setShowAddChild] = useState(false);
+  const [childToDelete, setChildToDelete] = useState<Child | null>(null);
+  const [showDeleteGate, setShowDeleteGate] = useState(false);
 
   useEffect(() => {
     loadChildren();
@@ -59,6 +149,53 @@ export default function ChildSelectionScreen() {
     loadChildren();
   };
 
+  // Delete flow handlers
+  const handleDeleteRequest = useCallback((child: Child) => {
+    setChildToDelete(child);
+    setShowDeleteGate(true);
+  }, []);
+
+  const handleDeleteGateSuccess = useCallback(() => {
+    setShowDeleteGate(false);
+    // Show confirmation dialog after parental gate passes
+    if (childToDelete) {
+      Alert.alert(
+        'Delete Profile',
+        `Delete ${childToDelete.name}'s profile? All learning progress will be permanently lost.`,
+        [
+          { 
+            text: 'Cancel', 
+            style: 'cancel', 
+            onPress: () => setChildToDelete(null) 
+          },
+          { 
+            text: 'Delete', 
+            style: 'destructive', 
+            onPress: handleConfirmDelete 
+          },
+        ]
+      );
+    }
+  }, [childToDelete]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (childToDelete) {
+      try {
+        await deleteChild(childToDelete.id);
+        setChildToDelete(null);
+        loadChildren();
+      } catch (error) {
+        console.error('Error deleting child:', error);
+        Alert.alert('Error', 'Failed to delete profile. Please try again.');
+      }
+    }
+  }, [childToDelete]);
+
+  const handleDeleteGateCancel = useCallback(() => {
+    setShowDeleteGate(false);
+    setChildToDelete(null);
+  }, []);
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -85,22 +222,12 @@ export default function ChildSelectionScreen() {
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         {children.map((child) => (
-          <TouchableOpacity
+          <SwipeableChildCard
             key={child.id}
-            style={styles.childCard}
-            onPress={() => handleSelectChild(child)}
-          >
-            <View style={styles.childInfo}>
-              <Text style={styles.childName}>{child.name}</Text>
-              <Text style={styles.childDetails}>
-                Age {child.age} • Level {child.current_level}
-              </Text>
-              <Text style={styles.childProgress}>
-                {child.total_cards_completed} cards completed
-              </Text>
-            </View>
-            <Text style={styles.arrow}>→</Text>
-          </TouchableOpacity>
+            child={child}
+            onSelect={handleSelectChild}
+            onDeleteRequest={handleDeleteRequest}
+          />
         ))}
       </ScrollView>
 
@@ -112,6 +239,13 @@ export default function ChildSelectionScreen() {
         visible={showParentalGate}
         onSuccess={handleGateSuccess}
         onCancel={() => setShowParentalGate(false)}
+      />
+
+      {/* Parental gate for delete action */}
+      <ParentalGate
+        visible={showDeleteGate}
+        onSuccess={handleDeleteGateSuccess}
+        onCancel={handleDeleteGateCancel}
       />
     </View>
   );
@@ -169,14 +303,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
   },
+  swipeContainer: {
+    marginBottom: 16,
+    position: 'relative',
+  },
+  deleteButton: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: DELETE_BUTTON_WIDTH,
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
   childCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+  },
+  childCardInner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
     padding: 20,
-    marginBottom: 16,
   },
   childInfo: {
     flex: 1,
