@@ -297,9 +297,21 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   // Get due review cards (spaced repetition)
   const allDueCards = await getDueReviewCards(childId, CARDS_PER_SESSION * 2);
   
+  // Phonemes are "retired" after 3 successful reviews - they're too simple to keep drilling
+  // Filter out graduated phoneme cards from reviews to focus on words and sentences
+  const PHONEME_RETIREMENT_THRESHOLD = 3;
+  const isRetiredPhoneme = (progress: CardProgress): boolean => {
+    const staticCard = staticCards.find(c => c.plainText === progress.word);
+    const isPhoneme = staticCard?.type === 'letter' || staticCard?.type === 'digraph';
+    const isGraduated = (progress.learning_step ?? 3) >= 3;
+    const hasMastered = (progress.successes ?? 0) >= PHONEME_RETIREMENT_THRESHOLD;
+    return isPhoneme && isGraduated && hasMastered;
+  };
+  
   // Separate learning cards (step 0-2) from graduated cards (step 3+)
-  const learningDueCards = allDueCards.filter(p => (p.learning_step ?? 3) < 3);
-  const graduatedDueCards = allDueCards.filter(p => (p.learning_step ?? 3) >= 3);
+  // Exclude retired phonemes from both pools
+  const learningDueCards = allDueCards.filter(p => (p.learning_step ?? 3) < 3 && !isRetiredPhoneme(p));
+  const graduatedDueCards = allDueCards.filter(p => (p.learning_step ?? 3) >= 3 && !isRetiredPhoneme(p));
   
   // Prioritize struggled cards first within each category
   const sortByStruggle = (cards: CardProgress[]) => {
@@ -393,9 +405,9 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
       ...newCards.map(c => c.word),
     ]);
 
-    // First try existing progress records
+    // First try existing progress records (exclude retired phonemes)
     for (const progress of allProgress) {
-      if (!excluded.has(progress.word)) {
+      if (!excluded.has(progress.word) && !isRetiredPhoneme(progress)) {
         repeatCards.push(progress);
         excluded.add(progress.word);
       }
