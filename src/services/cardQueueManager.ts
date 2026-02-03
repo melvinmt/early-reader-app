@@ -747,8 +747,37 @@ async function generateNewCardFromStatic(
     return null;
   }
   
-  // Select a random card from the target group
-  const distarCard = targetCards[Math.floor(Math.random() * targetCards.length)];
+  // At higher levels, weight selection towards sentences for reading fluency
+  // This creates a natural progression: early = more words, later = more sentences
+  const SENTENCE_WEIGHT_START_LEVEL = 30;  // Start weighting at level 30
+  const MAX_SENTENCE_WEIGHT = 4;           // At high levels, sentences 4x more likely
+  
+  let selectedCard: DistarCard;
+  const sentencesInPool = targetCards.filter(c => c.type === 'sentence');
+  const nonSentencesInPool = targetCards.filter(c => c.type !== 'sentence');
+  
+  if (currentLesson >= SENTENCE_WEIGHT_START_LEVEL && sentencesInPool.length > 0 && nonSentencesInPool.length > 0) {
+    // Calculate weight based on level progression (30-100 maps to 1-4x weight)
+    const levelProgress = Math.min((currentLesson - SENTENCE_WEIGHT_START_LEVEL) / 70, 1);
+    const sentenceWeight = 1 + levelProgress * (MAX_SENTENCE_WEIGHT - 1);
+    
+    // Weighted random selection
+    const totalWeight = nonSentencesInPool.length + (sentencesInPool.length * sentenceWeight);
+    const roll = Math.random() * totalWeight;
+    
+    if (roll < sentencesInPool.length * sentenceWeight) {
+      // Select a sentence
+      selectedCard = sentencesInPool[Math.floor(Math.random() * sentencesInPool.length)];
+    } else {
+      // Select a non-sentence
+      selectedCard = nonSentencesInPool[Math.floor(Math.random() * nonSentencesInPool.length)];
+    }
+  } else {
+    // Before level 30 or no sentences available: uniform random selection
+    selectedCard = targetCards[Math.floor(Math.random() * targetCards.length)];
+  }
+  
+  const distarCard = selectedCard;
   
   return createLearningCardFromDistar(childId, level, distarCard);
 }
@@ -932,19 +961,19 @@ export async function recordCardCompletion(
     if (staticCard && result.success) {
       // Mastery thresholds and interval multipliers by card type
       // After mastery, intervals grow much faster (exponential backoff)
-      // Exponential backoff: once mastered, push reviews much further out
-      // This naturally creates space for sentences as simpler cards become infrequent
-      const CVC_MASTERY = 3;       // After 3 successes, boost intervals
-      const WORD_MASTERY = 4;      // After 4 successes, boost intervals
+      // Aggressive exponential backoff: mastered cards quickly pushed to very long intervals
+      // This creates natural space for sentences as CVC/words become infrequent
+      const CVC_MASTERY = 2;       // After 2 successes, boost intervals
+      const WORD_MASTERY = 3;      // After 3 successes, boost intervals
       
       let intervalMultiplier = 1;
       const cardType = staticCard.type;
       
       // Phonemes fully retire (handled by isRetiredCard), no backoff needed
       if (cardType === 'cvc' && successes >= CVC_MASTERY) {
-        intervalMultiplier = 4; // CVC: push to ~month intervals
+        intervalMultiplier = 6; // CVC: push to ~6 week intervals quickly
       } else if (cardType === 'word' && successes >= WORD_MASTERY) {
-        intervalMultiplier = 3; // Words: push to ~3 week intervals
+        intervalMultiplier = 5; // Words: push to ~5 week intervals
       }
       // Sentences: no multiplier, always use standard SM-2 for reading practice
       
