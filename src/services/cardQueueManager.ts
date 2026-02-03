@@ -297,9 +297,46 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   // Get due review cards (spaced repetition)
   const allDueCards = await getDueReviewCards(childId, CARDS_PER_SESSION * 2);
   
-  // No cards fully retire - we use exponential backoff via SM-2 instead
-  // Cards that are "mastered" get priority lowered so sentences get more slots
-  const isRetiredCard = (_progress: CardProgress): boolean => false;
+  // Cards retire after enough successful reviews - focus shifts to sentences for fluency
+  // Retirement thresholds by card type (sentences never retire):
+  // - Phonemes: 3 reviews (foundational, simple)
+  // - CVC: 6 reviews (building blocks)
+  // - Words: 10 reviews (core vocabulary)
+  // - Sentences: never retire (reading fluency practice)
+  const PHONEME_RETIREMENT_THRESHOLD = 3;
+  const CVC_RETIREMENT_THRESHOLD = 6;
+  const WORD_RETIREMENT_THRESHOLD = 10;
+  
+  const isRetiredCard = (progress: CardProgress): boolean => {
+    const staticCard = staticCards.find(c => c.plainText === progress.word);
+    if (!staticCard) return false;
+    
+    const isGraduated = (progress.learning_step ?? 3) >= 3;
+    if (!isGraduated) return false;
+    
+    const successes = progress.successes ?? 0;
+    const cardType = staticCard.type;
+    
+    // Sentences never retire - always practice reading fluency
+    if (cardType === 'sentence') return false;
+    
+    // Phonemes retire quickly
+    if (cardType === 'letter' || cardType === 'digraph') {
+      return successes >= PHONEME_RETIREMENT_THRESHOLD;
+    }
+    
+    // CVC words retire after moderate practice
+    if (cardType === 'cvc') {
+      return successes >= CVC_RETIREMENT_THRESHOLD;
+    }
+    
+    // Regular words retire after extensive practice
+    if (cardType === 'word') {
+      return successes >= WORD_RETIREMENT_THRESHOLD;
+    }
+    
+    return false;
+  };
   
   // Separate learning cards (step 0-2) from graduated cards (step 3+)
   // Exclude retired cards from both pools
