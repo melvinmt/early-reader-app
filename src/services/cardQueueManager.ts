@@ -297,21 +297,14 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
   // Get due review cards (spaced repetition)
   const allDueCards = await getDueReviewCards(childId, CARDS_PER_SESSION * 2);
   
-  // Phonemes are "retired" after 3 successful reviews - they're too simple to keep drilling
-  // Filter out graduated phoneme cards from reviews to focus on words and sentences
-  const PHONEME_RETIREMENT_THRESHOLD = 3;
-  const isRetiredPhoneme = (progress: CardProgress): boolean => {
-    const staticCard = staticCards.find(c => c.plainText === progress.word);
-    const isPhoneme = staticCard?.type === 'letter' || staticCard?.type === 'digraph';
-    const isGraduated = (progress.learning_step ?? 3) >= 3;
-    const hasMastered = (progress.successes ?? 0) >= PHONEME_RETIREMENT_THRESHOLD;
-    return isPhoneme && isGraduated && hasMastered;
-  };
+  // No cards fully retire - we use exponential backoff via SM-2 instead
+  // Cards that are "mastered" get priority lowered so sentences get more slots
+  const isRetiredCard = (_progress: CardProgress): boolean => false;
   
   // Separate learning cards (step 0-2) from graduated cards (step 3+)
-  // Exclude retired phonemes from both pools
-  const learningDueCards = allDueCards.filter(p => (p.learning_step ?? 3) < 3 && !isRetiredPhoneme(p));
-  const graduatedDueCards = allDueCards.filter(p => (p.learning_step ?? 3) >= 3 && !isRetiredPhoneme(p));
+  // Exclude retired cards from both pools
+  const learningDueCards = allDueCards.filter(p => (p.learning_step ?? 3) < 3 && !isRetiredCard(p));
+  const graduatedDueCards = allDueCards.filter(p => (p.learning_step ?? 3) >= 3 && !isRetiredCard(p));
   
   // Prioritize struggled cards first within each category
   const sortByStruggle = (cards: CardProgress[]) => {
@@ -405,9 +398,9 @@ export async function getCardQueue(childId: string): Promise<CardQueueResult> {
       ...newCards.map(c => c.word),
     ]);
 
-    // First try existing progress records (exclude retired phonemes)
+    // First try existing progress records (exclude retired cards)
     for (const progress of allProgress) {
-      if (!excluded.has(progress.word) && !isRetiredPhoneme(progress)) {
+      if (!excluded.has(progress.word) && !isRetiredCard(progress)) {
         repeatCards.push(progress);
         excluded.add(progress.word);
       }
@@ -907,6 +900,40 @@ export async function recordCardCompletion(
     nextEaseFactor = sm2Result.nextEaseFactor;
     nextIntervalDays = sm2Result.nextInterval;
     nextReviewDate = sm2Result.nextReviewDate;
+    
+    // Apply interval boost for mastered simple cards
+    // This creates exponential backoff so sentences get more review slots
+    const allCards = getAllStaticCards();
+    const staticCard = allCards.find(c => c.plainText === word);
+    const successes = (progress.successes ?? 0) + (result.success ? 1 : 0);
+    
+    if (staticCard && result.success) {
+      // Mastery thresholds and interval multipliers by card type
+      // After mastery, intervals grow much faster (exponential backoff)
+      const PHONEME_MASTERY = 3;   // After 3 successes, boost intervals 4x
+      const CVC_MASTERY = 6;       // After 6 successes, boost intervals 3x  
+      const WORD_MASTERY = 10;     // After 10 successes, boost intervals 2x
+      
+      let intervalMultiplier = 1;
+      const cardType = staticCard.type;
+      
+      if ((cardType === 'letter' || cardType === 'digraph') && successes >= PHONEME_MASTERY) {
+        intervalMultiplier = 4; // Phonemes: review every ~month instead of ~week
+      } else if (cardType === 'cvc' && successes >= CVC_MASTERY) {
+        intervalMultiplier = 3; // CVC: review every ~3 weeks instead of ~week
+      } else if (cardType === 'word' && successes >= WORD_MASTERY) {
+        intervalMultiplier = 2; // Words: review every ~2 weeks instead of ~week
+      }
+      // Sentences: no multiplier, always use standard SM-2
+      
+      if (intervalMultiplier > 1) {
+        nextIntervalDays = Math.min(nextIntervalDays * intervalMultiplier, 180); // Cap at 6 months
+        const boostedDate = new Date();
+        boostedDate.setDate(boostedDate.getDate() + nextIntervalDays);
+        nextReviewDate = boostedDate.toISOString();
+        console.log(`⏰ Interval boost for "${word}" (${cardType}): ${sm2Result.nextInterval}d → ${nextIntervalDays}d (${intervalMultiplier}x)`);
+      }
+    }
   }
 
   // Update progress
