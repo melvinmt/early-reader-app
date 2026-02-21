@@ -1,3 +1,5 @@
+[![Explore with Instagit](https://instagit.com/badge.svg)](https://instagit.com/melvinmt/early-reader-app)
+
 # Early Reader App
 
 A mobile app implementing the **DISTAR phonics methodology** pioneered by Siegfried Engelmann, combined with **spaced repetition** learning algorithms and a touch of AI.
